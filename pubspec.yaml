@@ -1,0 +1,40 @@
+name: kode_radar
+description: A Flutter application for monitoring GitHub and Azure DevOps repositories.
+version: 1.0.0+1
+homepage: https://github.com/kamilon/kode_radar
+repository: https://github.com/kamilon/kode_radar
+issue_tracker: https://github.com/kamilon/kode_radar/issues
+
+environment:
+  sdk: ">=2.19.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_local_notifications: ^19.1.0
+  flutter_local_notifications_linux: ^6.0.0
+  window_manager: ^0.4.3 # Add the window_manager package
+  url_launcher: ^6.1.7 # Add the url_launcher package
+  shared_preferences: ^2.0.15
+  http: ^1.3.0
+  cupertino_icons: ^1.0.8
+  tray_manager: ^0.4.0
+  collection: ^1.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.11.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/app_icon.png
+
+flutter_icons:
+  android: true
+  ios: true
+  macos:
+    image_path: "assets/app_icon.png"
+  image_path: "assets/app_icon.png"

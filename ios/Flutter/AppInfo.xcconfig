@@ -1,0 +1,7 @@
+// Application-level settings for the iOS Runner target.
+
+// The application's bundle identifier - can be overridden via environment variables
+APP_BUNDLE_ID = $(APP_BUNDLE_ID:default=com.example.kodeRadar)
+
+// The copyright displayed in application information - can be overridden via environment variables  
+APP_COMPANY = $(APP_COMPANY:default=com.example)

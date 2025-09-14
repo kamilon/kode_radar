@@ -1,0 +1,40 @@
+Custom License for Kode Radar
+
+Copyright (c) 2025 Kamilon
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to use,
+copy, modify, and contribute to the Software, subject to the following conditions:
+
+PERMITTED USES:
+- Use the Software for any purpose, including commercial and business use
+- Modify the Software for personal, internal business, or development use
+- Fork and contribute modifications back to the original project
+- Distribute the source code with modifications (under this same license)
+- Create derivative works for personal or internal business use
+
+PROHIBITED WITHOUT WRITTEN PERMISSION:
+- Publishing the Software or compiled derivatives to app stores (including but not limited to Apple App Store, Google Play Store, Microsoft Store, etc.)
+- Selling or commercially distributing compiled versions of the Software
+- Bundling the Software in commercial products for public distribution
+- Redistributing compiled binaries through any commercial channel
+
+REQUIREMENTS:
+- The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software
+- Any distributed source code must retain this license
+- Commercial distribution of compiled versions requires explicit written permission from the copyright holder
+- For commercial distribution licensing, file an issue at: https://github.com/kamilon/kode_radar/issues
+
+CONTRIBUTIONS:
+By contributing to this project, you agree that your contributions will be licensed under the same terms as this license.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+For commercial distribution licensing, please file an issue at:
+https://github.com/kamilon/kode_radar/issues
