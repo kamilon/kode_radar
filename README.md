@@ -98,3 +98,24 @@ In CI (GitHub Actions, GitLab CI, etc.) set these values as environment variable
 ```
 
 Store any sensitive values (API tokens, signing keys) in the CI provider's encrypted secrets store — never commit them to the repository, even in your personal branches.
+
+---
+
+## App Icon Management
+
+The app uses a single source icon located at `assets/app_icon.png` (1024x1024 PNG). Platform-specific icons are generated automatically using the `flutter_launcher_icons` package and should not be committed to version control.
+
+**To regenerate app icons after changing the source icon:**
+
+```bash
+dart run flutter_launcher_icons
+```
+
+**Generated icon locations (ignored by git):**
+- Android: `android/app/src/main/res/mipmap-*/ic_launcher.png`
+- iOS: `ios/Runner/Assets.xcassets/AppIcon.appiconset/*.png`
+- macOS: `macos/Runner/Assets.xcassets/AppIcon.appiconset/*.png`
+- Windows: `windows/runner/resources/app_icon.ico`
+- Web: `web/favicon.png`
+
+The app icon configuration is in `pubspec.yaml` under the `flutter_icons` section.

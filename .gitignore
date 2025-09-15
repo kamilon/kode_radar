@@ -46,3 +46,10 @@ app.*.map.json
 
 # Generated Windows resource file (generated from template)
 /windows/runner/Runner.rc
+
+# Generated app icons (use `dart run flutter_launcher_icons` to regenerate)
+android/app/src/main/res/mipmap-*/
+ios/Runner/Assets.xcassets/AppIcon.appiconset/*.png
+macos/Runner/Assets.xcassets/AppIcon.appiconset/*.png
+windows/runner/resources/app_icon.ico
+web/favicon.png
