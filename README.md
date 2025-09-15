@@ -1,5 +1,7 @@
 # Kode Radar
 
+[![PR Validation](https://github.com/kamilon/kode_radar/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/kamilon/kode_radar/actions/workflows/pr-validation.yml)
+
 Kode Radar is a lightweight Flutter application for tracking repositories hosted on GitHub and Azure DevOps. A core design principal for Kode Radar is that all user secrets are stored locally on all platforms. This is to ensure the application is safe to use for both personal and enterprise use cases. Kode Radar does not have any backend service and doesn't do any tracking.
 
 The repository contains multiplatform targets currently supporting:
