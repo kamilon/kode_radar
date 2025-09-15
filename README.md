@@ -98,3 +98,60 @@ In CI (GitHub Actions, GitLab CI, etc.) set these values as environment variable
 ```
 
 Store any sensitive values (API tokens, signing keys) in the CI provider's encrypted secrets store — never commit them to the repository, even in your personal branches.
+
+---
+
+## GitHub Actions CI/CD
+
+This repository includes comprehensive GitHub Actions workflows for continuous integration and pull request validation.
+
+### PR Validation Workflow
+
+The `pr-validation.yml` workflow automatically runs on all pull requests and includes:
+
+#### Code Quality Checks
+- **Dart/Flutter formatting validation** - Ensures consistent code style
+- **Static analysis** - Runs `flutter analyze --fatal-infos` to catch potential issues
+- **Unit tests** - Executes all tests with coverage reporting
+- **Coverage reporting** - Uploads coverage data to Codecov (optional)
+
+#### Multi-Platform Builds
+All supported platforms are built automatically to ensure compatibility:
+
+- **Android** - Builds both APK and App Bundle formats
+- **iOS** - Builds without code signing for CI validation
+- **macOS** - Desktop application build
+- **Linux** - Desktop application build with GTK dependencies
+- **Windows** - Desktop application build
+
+#### Performance Optimizations
+- **Dependency caching** - Caches Flutter pub dependencies and platform-specific build tools
+- **Parallel execution** - All platform builds run concurrently after code quality checks pass
+- **Artifact uploads** - Build outputs are uploaded for review and testing
+
+### Branch Protection
+
+To enforce PR validation, configure branch protection rules for the `main` branch:
+
+1. Navigate to **Settings** > **Branches** in your GitHub repository
+2. Add a branch protection rule for `main`
+3. Require the following status checks:
+   - `Code Quality Checks`
+   - `Build Android`
+   - `Build iOS`
+   - `Build macOS`
+   - `Build Linux`
+   - `Build Windows`
+
+See [.github/BRANCH_PROTECTION.md](.github/BRANCH_PROTECTION.md) for detailed configuration instructions.
+
+### Environment Variables
+
+The CI workflow uses the same configurable build properties as local builds:
+
+- **APP_BUNDLE_ID** - Application/bundle identifier
+- **APP_COMPANY** - Company name for copyright notices
+
+Default values are provided for CI, but you can override them using GitHub Secrets for organization-specific builds.
+
+---
