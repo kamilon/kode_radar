@@ -107,8 +107,14 @@ The app uses a single source icon located at `assets/app_icon.png` (1024x1024 PN
 
 **To regenerate app icons after changing the source icon:**
 
+Using the Flutter package (recommended):
 ```bash
 dart run flutter_launcher_icons
+```
+
+Or using the provided script (requires ImageMagick):
+```bash
+./scripts/generate_icons.sh
 ```
 
 **Generated icon locations (ignored by git):**
