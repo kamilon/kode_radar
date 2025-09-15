@@ -12,11 +12,11 @@ The repository contains multiplatform targets currently supporting:
 
 This project has been verified to build and run for the following targets:
 
-[ ] Android
-[ ] iOS
-[x] macOS
-[ ] Linux
-[ ] Windows
+- [ ] Android
+- [ ] iOS
+- [x] macOS
+- [ ] Linux
+- [ ] Windows
 
 Note: This project has been almost entirely AI generated. I don't recommend using the project as a model for code style, Flutter architecture/design or best practices.
 
