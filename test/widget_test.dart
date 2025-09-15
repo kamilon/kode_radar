@@ -10,20 +10,36 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kode_radar/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+  testWidgets('Kode Radar app loads and shows main content', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const MyApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Verify that the app title is displayed
+    expect(find.text('Kode Radar Home Page'), findsOneWidget);
+    
+    // Verify that the settings icon is present
+    expect(find.byIcon(Icons.settings), findsOneWidget);
+    
+    // Verify that the add button is present
+    expect(find.byIcon(Icons.add), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('Settings page can be opened', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
+    await tester.pumpWidget(const MyApp());
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Tap the settings icon
+    await tester.tap(find.byIcon(Icons.settings));
+    await tester.pumpAndSettle();
+
+    // Verify that we navigated to the settings page
+    expect(find.text('Settings'), findsOneWidget);
+    
+    // Verify that token sections are present
+    expect(find.text('GitHub Access Token'), findsOneWidget);
+    expect(find.text('Azure DevOps Access Token'), findsOneWidget);
+    
+    // Verify that create token buttons are present
+    expect(find.text('Create New Token'), findsNWidgets(2));
   });
 }
