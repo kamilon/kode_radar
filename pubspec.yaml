@@ -34,6 +34,7 @@ flutter:
 flutter_icons:
   android: true
   ios: true
-  macos:
-    image_path: "assets/app_icon.png"
+  macos: true
+  windows: true
+  web: true
   image_path: "assets/app_icon.png"
