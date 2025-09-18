@@ -10,26 +10,36 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kode_radar/main.dart';
 
 void main() {
-  testWidgets('App loads without crashing', (WidgetTester tester) async {
+  testWidgets('Kode Radar app loads and shows main content', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const MyApp());
 
-    // Verify that the app loads (basic smoke test)
-    // Look for key elements that should be present in the main app
-    expect(find.byType(MaterialApp), findsOneWidget);
+    // Verify that the app title is displayed
+    expect(find.text('Kode Radar Home Page'), findsOneWidget);
     
-    // The app should have some basic navigation or content
-    // This is a minimal test to ensure the app structure is sound
-    await tester.pump();
+    // Verify that the settings icon is present
+    expect(find.byIcon(Icons.settings), findsOneWidget);
+    
+    // Verify that the add button is present
+    expect(find.byIcon(Icons.add), findsOneWidget);
   });
 
-  testWidgets('Main widget tree is properly constructed', (WidgetTester tester) async {
+  testWidgets('Settings page can be opened', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
     await tester.pumpWidget(const MyApp());
-    
-    // Verify MaterialApp is the root widget
-    expect(find.byType(MaterialApp), findsOneWidget);
-    
-    // The app should render without throwing exceptions
+
+    // Tap the settings icon
+    await tester.tap(find.byIcon(Icons.settings));
     await tester.pumpAndSettle();
+
+    // Verify that we navigated to the settings page
+    expect(find.text('Settings'), findsOneWidget);
+    
+    // Verify that token sections are present
+    expect(find.text('GitHub Access Token'), findsOneWidget);
+    expect(find.text('Azure DevOps Access Token'), findsOneWidget);
+    
+    // Verify that create token buttons are present
+    expect(find.text('Create New Token'), findsNWidgets(2));
   });
 }
