@@ -53,3 +53,4 @@ ios/Runner/Assets.xcassets/AppIcon.appiconset/*.png
 macos/Runner/Assets.xcassets/AppIcon.appiconset/*.png
 windows/runner/resources/app_icon.ico
 web/favicon.png
+web/icons/*.png
