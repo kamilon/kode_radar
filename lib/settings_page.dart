@@ -52,7 +52,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _openAzureDevOpsTokenSettings() async {
     if (!mounted) return;
-    
+
     // Show dialog to ask for organization name
     String? organization = await _showOrganizationDialog();
     if (organization != null && organization.isNotEmpty) {
@@ -63,7 +63,8 @@ class _SettingsPageState extends State<SettingsPage> {
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open Azure DevOps token settings')),
+          const SnackBar(
+              content: Text('Could not open Azure DevOps token settings')),
         );
       }
     }
@@ -119,7 +120,8 @@ class _SettingsPageState extends State<SettingsPage> {
             // GitHub Token Section
             _buildTokenSection(
               title: 'GitHub Access Token',
-              description: 'Required to access GitHub repositories, pull requests, and releases.',
+              description:
+                  'Required to access GitHub repositories, pull requests, and releases.',
               controller: _githubTokenController,
               hintText: 'Enter your GitHub token',
               permissions: [
@@ -135,11 +137,12 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
             const SizedBox(height: 32),
-            
+
             // Azure DevOps Token Section
             _buildTokenSection(
               title: 'Azure DevOps Access Token',
-              description: 'Required to access Azure DevOps repositories, pipelines, and builds.',
+              description:
+                  'Required to access Azure DevOps repositories, pipelines, and builds.',
               controller: _adoTokenController,
               hintText: 'Enter your Azure DevOps token',
               permissions: [
@@ -155,13 +158,14 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
             const SizedBox(height: 32),
-            
+
             // Save Button
             Center(
               child: ElevatedButton(
                 onPressed: _saveTokens,
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 ),
                 child: const Text('Save Tokens'),
               ),
@@ -200,7 +204,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Token input field
             TextField(
               controller: controller,
@@ -219,7 +223,7 @@ class _SettingsPageState extends State<SettingsPage> {
               obscureText: true,
             ),
             const SizedBox(height: 12),
-            
+
             // Create token button
             OutlinedButton.icon(
               onPressed: onCreateToken,
@@ -230,18 +234,21 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             const SizedBox(height: 8),
-            
+
             // Quick permissions info
             ExpansionTile(
               title: const Text('Required Permissions'),
               initiallyExpanded: false,
-              children: permissions.map((permission) => 
-                ListTile(
-                  leading: const Icon(Icons.check, size: 16),
-                  title: Text(permission, style: const TextStyle(fontSize: 14)),
-                  dense: true,
-                ),
-              ).toList(),
+              children: permissions
+                  .map(
+                    (permission) => ListTile(
+                      leading: const Icon(Icons.check, size: 16),
+                      title: Text(permission,
+                          style: const TextStyle(fontSize: 14)),
+                      dense: true,
+                    ),
+                  )
+                  .toList(),
             ),
           ],
         ),
@@ -270,9 +277,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 8),
                 ...permissions.map((permission) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text('• $permission'),
-                )),
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text('• $permission'),
+                    )),
                 const SizedBox(height: 16),
                 const Text(
                   'Recommended Token Lifetime:',
@@ -280,9 +287,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 8),
                 ...lifetimeRecommendations.map((recommendation) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text('• $recommendation'),
-                )),
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text('• $recommendation'),
+                    )),
                 const SizedBox(height: 16),
                 const Text(
                   'Security Tips:',
