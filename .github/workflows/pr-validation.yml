@@ -193,7 +193,7 @@ jobs:
         env:
           APP_BUNDLE_ID: ${{ env.APP_BUNDLE_ID }}
           APP_COMPANY: ${{ env.APP_COMPANY }}
-        run: flutter build macos --release
+        run: flutter build macos --release --no-codesign
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
