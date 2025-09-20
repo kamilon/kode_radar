@@ -23,10 +23,15 @@ class _RegisterAdoRepoPageState extends State<RegisterAdoRepoPage> {
     super.dispose();
   }
 
-  Future<void> _saveRepo(String organization, String project, String repoName) async {
+  Future<void> _saveRepo(
+      String organization, String project, String repoName) async {
     final prefs = await SharedPreferences.getInstance();
     final List<String> repos = prefs.getStringList('ado_repos') ?? [];
-    repos.add(jsonEncode({'organization': organization, 'project': project, 'repoName': repoName}));
+    repos.add(jsonEncode({
+      'organization': organization,
+      'project': project,
+      'repoName': repoName
+    }));
     await prefs.setStringList('ado_repos', repos);
   }
 
