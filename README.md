@@ -29,6 +29,22 @@ Note: This project has been almost entirely AI generated. I don't recommend usin
 - Flutter SDK (compatible version for this project)
 - Platform toolchains for the targets you are building (Android SDK/NDK, Xcode for iOS/macOS, CMake for Linux, Visual Studio for Windows)
 
+### Linux-specific Dependencies
+
+For Linux builds, the following system packages are required for system tray functionality (tray_manager package):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ninja-build libgtk-3-dev libayatana-appindicator3-dev
+```
+
+**Alternative packages:** If `libayatana-appindicator3-dev` is not available on your distribution, you can try:
+```bash
+sudo apt-get install -y ninja-build libgtk-3-dev libappindicator3-dev
+```
+
+These dependencies are needed because the `tray_manager` Flutter package requires system tray libraries to create and manage the application's system tray icon.
+
 ---
 
 ## Configurable build properties
