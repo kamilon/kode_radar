@@ -32,9 +32,12 @@ flutter:
     - assets/app_icon.png
 
 flutter_launcher_icons:
-  android: true
-  ios: true
-  macos: true
+  android:
+    generate: true
+  ios:
+    generate: true
+  macos:
+    generate: true
   windows:
     generate: true
   web:
