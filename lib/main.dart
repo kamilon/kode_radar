@@ -59,7 +59,7 @@ void main() async {
     if (e is SocketException) {
       if (kDebugMode) {
         print(
-          'SocketException: Check if the ports are already in use or if permissions are missing.');
+            'SocketException: Check if the ports are already in use or if permissions are missing.');
       }
     }
   }
@@ -460,7 +460,8 @@ class _MyHomePageState extends State<MyHomePage>
         DarwinNotificationDetails(
       presentAlert: true, // Ensure the alert is presented
       presentSound: true, // Ensure the sound is presented
-      interruptionLevel: InterruptionLevel.active, // Critical level for visibility
+      interruptionLevel:
+          InterruptionLevel.active, // Critical level for visibility
     );
 
     const NotificationDetails platformChannelSpecifics = NotificationDetails(
