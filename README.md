@@ -143,3 +143,17 @@ All supported platforms are built automatically to ensure compatibility:
 - **macOS** - Desktop application build without code signing for CI validation
 - **Linux** - Desktop application build with GTK dependencies
 - **Windows** - Desktop application build
+
+---
+
+## App Icon Management
+
+The app uses a single source icon located at `assets/app_icon.png` (1024x1024 PNG). Platform-specific icons are generated automatically using the `flutter_launcher_icons` package and should not be committed to version control.
+
+**To regenerate app icons after changing the source icon:**
+
+```bash
+dart run flutter_launcher_icons
+```
+
+The app icon configuration is in `pubspec.yaml` under the `flutter_icons` section.
