@@ -73,7 +73,9 @@ class RepoDiscoveryService {
     for (final item in data) {
       if (item is! Map) continue;
       final name = item['name'] as String?;
-      final project = item['project']?['name'] as String?;
+      final projectMap = item['project'];
+      if (projectMap is! Map) continue;
+      final project = projectMap['name'] as String?;
       if (name == null || project == null) continue;
       result.add(DiscoveredRepo(
         key: adoKey(organization, project, name),
