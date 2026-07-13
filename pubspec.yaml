@@ -31,9 +31,15 @@ flutter:
   assets:
     - assets/app_icon.png
 
-flutter_icons:
-  android: true
-  ios: true
+flutter_launcher_icons:
+  android:
+    generate: true
+  ios:
+    generate: true
   macos:
-    image_path: "assets/app_icon.png"
+    generate: true
+  windows:
+    generate: true
+  web:
+    generate: true
   image_path: "assets/app_icon.png"
