@@ -56,7 +56,7 @@ class _RegisterAdoRepoPageState extends State<RegisterAdoRepoPage> {
     super.dispose();
   }
 
-  Future<void> _saveRepo(
+  Future<bool> _saveRepo(
       String organization, String project, String repoName) async {
     final Map<String, String> repo = {
       'organization': organization,
@@ -68,16 +68,29 @@ class _RegisterAdoRepoPageState extends State<RegisterAdoRepoPage> {
     }
     final encoded = jsonEncode(repo);
     final index = widget.editIndex;
-    await RepoStore.update(RepoStore.adoKey, (repos) {
+    final newKey = RepoDiscoveryService.adoKey(organization, project, repoName);
+    final added = await RepoStore.update(RepoStore.adoKey, (repos) {
       if (index != null && index >= 0 && index < repos.length) {
         repos[index] = encoded; // Replace the existing entry when editing.
-      } else {
-        repos.add(encoded);
+        return true;
       }
+      // Add mode: skip if the same repo is already tracked.
+      for (final raw in repos) {
+        try {
+          final m = Map<String, String>.from(jsonDecode(raw) as Map);
+          final key = RepoDiscoveryService.adoKey(
+              m['organization'] ?? '', m['project'] ?? '', m['repoName'] ?? '');
+          if (key == newKey) return false; // duplicate
+        } catch (_) {}
+      }
+      repos.add(encoded);
+      return true;
     });
-    // Explicitly (re-)adding a repo overrides any prior "ignore".
-    await IgnoreStore.remove(
-        RepoDiscoveryService.adoKey(organization, project, repoName));
+    if (added) {
+      // Explicitly (re-)adding a repo overrides any prior "ignore".
+      await IgnoreStore.remove(newKey);
+    }
+    return added;
   }
 
   void _submitForm() {
@@ -86,13 +99,15 @@ class _RegisterAdoRepoPageState extends State<RegisterAdoRepoPage> {
       final project = _projectController.text.trim();
       final repoName = _repoNameController.text.trim();
 
-      _saveRepo(organization, project, repoName).then((_) {
+      _saveRepo(organization, project, repoName).then((added) {
         if (!mounted) return; // Ensure the widget is still mounted
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_isEditing
                 ? 'ADO Repository updated successfully!'
-                : 'ADO Repository saved successfully!'),
+                : added
+                    ? 'ADO Repository saved successfully!'
+                    : 'That repository is already tracked.'),
           ),
         );
         Navigator.pop(context);

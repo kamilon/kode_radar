@@ -176,7 +176,7 @@ class RepoDiscoveryService {
         return null;
       }
       if (response.statusCode != 200) {
-        throw 'GitHub returned status ${response.statusCode}';
+        throw Exception('GitHub returned status ${response.statusCode}');
       }
       final body = jsonDecode(response.body);
       if (body is! List || body.isEmpty) break;
@@ -199,7 +199,7 @@ class RepoDiscoveryService {
       'Authorization': 'Basic ${base64Encode(utf8.encode(':$secret'))}',
     }).timeout(_requestTimeout);
     if (response.statusCode != 200) {
-      throw 'Azure DevOps returned status ${response.statusCode}';
+      throw Exception('Azure DevOps returned status ${response.statusCode}');
     }
     final body = jsonDecode(response.body);
     final value = body is Map ? body['value'] : body;

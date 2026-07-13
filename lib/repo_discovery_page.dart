@@ -171,7 +171,7 @@ class _RepoDiscoveryPageState extends State<RepoDiscoveryPage> {
     try {
       final secret = await TokenStore.getSecret(tokenId);
       if (secret == null || secret.isEmpty) {
-        throw 'The selected token has no stored secret.';
+        throw Exception('The selected token has no stored secret.');
       }
       final result = await RepoDiscoveryService.fetch(
         provider: _provider,

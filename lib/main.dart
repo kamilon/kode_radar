@@ -247,18 +247,39 @@ class _MyHomePageState extends State<MyHomePage>
       };
 
       for (var repo in githubRepos) {
-        final repoMap = Map<String, String>.from(jsonDecode(repo));
-        final repoKey = 'GitHub: ${repoMap['owner']}/${repoMap['repoName']}';
-        await _fetchGithubData(repoMap['owner']!, repoMap['repoName']!, repoKey,
-            newData, repoMap['tokenId']);
+        try {
+          final repoMap = Map<String, String>.from(jsonDecode(repo));
+          final owner = repoMap['owner'];
+          final repoName = repoMap['repoName'];
+          if (owner == null || repoName == null) continue;
+          final repoKey = 'GitHub: $owner/$repoName';
+          await _fetchGithubData(
+              owner, repoName, repoKey, newData, repoMap['tokenId']);
+        } catch (e) {
+          // Skip a malformed entry rather than aborting the whole refresh.
+          if (kDebugMode) {
+            print('Skipping malformed github_repos entry: $e');
+          }
+        }
       }
 
       for (var repo in adoRepos) {
-        final repoMap = Map<String, String>.from(jsonDecode(repo));
-        final repoKey =
-            'ADO: ${repoMap['organization']}/${repoMap['project']}/${repoMap['repoName']}';
-        await _fetchAdoData(repoMap['organization']!, repoMap['project']!,
-            repoMap['repoName']!, repoKey, newData, repoMap['tokenId']);
+        try {
+          final repoMap = Map<String, String>.from(jsonDecode(repo));
+          final organization = repoMap['organization'];
+          final project = repoMap['project'];
+          final repoName = repoMap['repoName'];
+          if (organization == null || project == null || repoName == null) {
+            continue;
+          }
+          final repoKey = 'ADO: $organization/$project/$repoName';
+          await _fetchAdoData(organization, project, repoName, repoKey, newData,
+              repoMap['tokenId']);
+        } catch (e) {
+          if (kDebugMode) {
+            print('Skipping malformed ado_repos entry: $e');
+          }
+        }
       }
 
       if (mounted) {
