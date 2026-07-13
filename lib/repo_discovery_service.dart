@@ -52,7 +52,9 @@ class RepoDiscoveryService {
     final result = <DiscoveredRepo>[];
     for (final item in data) {
       if (item is! Map) continue;
-      final owner = item['owner']?['login'] as String?;
+      final ownerMap = item['owner'];
+      if (ownerMap is! Map) continue;
+      final owner = ownerMap['login'] as String?;
       final name = item['name'] as String?;
       if (owner == null || name == null) continue;
       result.add(DiscoveredRepo(
