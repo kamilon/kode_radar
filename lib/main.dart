@@ -4,7 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'register_github_repo.dart';
 import 'register_ado_repo.dart';
-import 'settings_page.dart'; // Import the settings page
+import 'manage_repos_page.dart';
+import 'manage_tokens_page.dart';
+import 'radar_page.dart';
+import 'auto_add_service.dart';
+import 'token_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http; // Import for HTTP requests
@@ -37,21 +41,25 @@ void main() async {
   );
   await _notificationsPlugin.initialize(initializationSettings);
 
-  await windowManager.ensureInitialized(); // Initialize window manager
-  WindowOptions windowOptions = const WindowOptions(
-    size: Size(800, 600),
-    center: true,
-    skipTaskbar: false,
-    title: 'Kode Radar',
-  );
-  windowManager.waitUntilReadyToShow(windowOptions, () async {
-    await windowManager.show();
-    await windowManager.focus();
-  });
+  if (_isDesktopPlatform) {
+    await windowManager.ensureInitialized(); // Initialize window manager
+    WindowOptions windowOptions = const WindowOptions(
+      size: Size(800, 600),
+      center: true,
+      skipTaskbar: false,
+      title: 'Kode Radar',
+    );
+    windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+  }
 
   try {
     runApp(const MyApp());
-    await _initializeSystemTray(); // Initialize the system tray
+    if (_isDesktopPlatform) {
+      await _initializeSystemTray(); // Initialize the system tray
+    }
   } catch (e) {
     if (kDebugMode) {
       print('Error starting listeners: $e');
@@ -64,6 +72,11 @@ void main() async {
     }
   }
 }
+
+/// Desktop platforms are the only ones with window/tray support; the app runs
+/// on mobile (iOS/Android) without these.
+bool get _isDesktopPlatform =>
+    !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
 
 Future<void> _initializeSystemTray() async {
   await trayManager.setIcon('assets/app_icon.png'); // Set the tray icon
@@ -130,10 +143,17 @@ class _MyHomePageState extends State<MyHomePage>
     'Pipelines': {},
   };
   bool _isLoading = true; // Add a loading state
+  bool _isFetching = false; // Guards against overlapping data-load cycles
   Timer? _updateTimer; // Add a timer for periodic updates
+  Timer? _autoAddTimer; // Timer for the auto-add discovery pass
+  Timer? _autoAddInitialTimer; // One-shot startup auto-add pass
+  bool _autoAddRunning = false; // Guards against overlapping auto-add passes
   final Map<String, Map<String, List<String>>> _previousData =
       {}; // Store previous data for comparison
   final Set<String> _notifiedItems = {}; // Track already notified items
+  // Repos whose existing PRs have been recorded as a baseline; a repo's first
+  // fetch is silent so newly-added repos don't spam notifications.
+  final Set<String> _baselinedRepos = {};
 
   @override
   void initState() {
@@ -142,12 +162,15 @@ class _MyHomePageState extends State<MyHomePage>
     _tabController = TabController(length: _data.keys.length, vsync: this);
     _loadRepos(initialLoad: true); // Perform the initial load
     _startLiveUpdates(); // Start periodic updates
+    _startAutoAdd(); // Start periodic auto-add of new repositories
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _updateTimer?.cancel(); // Cancel the timer when the widget is disposed
+    _autoAddTimer?.cancel();
+    _autoAddInitialTimer?.cancel();
     super.dispose();
   }
 
@@ -157,10 +180,38 @@ class _MyHomePageState extends State<MyHomePage>
     });
   }
 
+  void _startAutoAdd() {
+    // Run shortly after startup (once the initial load has settled), then on a
+    // longer interval than the live-data poll.
+    _autoAddInitialTimer = Timer(const Duration(seconds: 8), _runAutoAdd);
+    _autoAddTimer = Timer.periodic(
+      const Duration(minutes: 10),
+      (_) => _runAutoAdd(),
+    );
+  }
+
+  Future<void> _runAutoAdd() async {
+    if (_autoAddRunning) return; // Skip if a pass is already in flight.
+    _autoAddRunning = true;
+    try {
+      final added = await AutoAddService.run();
+      if (added > 0 && mounted) {
+        await _loadRepos(initialLoad: false);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Auto-add pass failed: $e');
+      }
+    } finally {
+      _autoAddRunning = false;
+    }
+  }
+
   Future<void> _loadNotifiedItems() async {
     final prefs = await SharedPreferences.getInstance();
     final notifiedItems = prefs.getStringList('notified_items') ?? [];
     _notifiedItems.addAll(notifiedItems);
+    _baselinedRepos.addAll(prefs.getStringList('baselined_repos') ?? []);
   }
 
   Future<void> _saveNotifiedItems() async {
@@ -168,61 +219,98 @@ class _MyHomePageState extends State<MyHomePage>
     await prefs.setStringList('notified_items', _notifiedItems.toList());
   }
 
-  Future<void> _loadRepos({required bool initialLoad}) async {
-    if (initialLoad) {
-      setState(() {
-        _isLoading = true; // Show loading indicator only for the initial load
-      });
-    }
-
+  Future<void> _saveBaselinedRepos() async {
     final prefs = await SharedPreferences.getInstance();
-    final List<String> githubRepos = prefs.getStringList('github_repos') ?? [];
-    final List<String> adoRepos = prefs.getStringList('ado_repos') ?? [];
-    final Map<String, Map<String, List<String>>> newData = {
-      'PRs': {},
-      'Builds': {},
-      'Releases': {},
-      'Pipelines': {},
-    };
+    await prefs.setStringList('baselined_repos', _baselinedRepos.toList());
+  }
 
-    for (var repo in githubRepos) {
-      final repoMap = Map<String, String>.from(jsonDecode(repo));
-      final repoKey = 'GitHub: ${repoMap['owner']}/${repoMap['repoName']}';
-      await _fetchGithubData(
-          repoMap['owner']!, repoMap['repoName']!, repoKey, newData);
-    }
+  Future<void> _loadRepos({required bool initialLoad}) async {
+    // Prevent overlapping fetch cycles (a slow cycle plus the 15s timer).
+    if (_isFetching) return;
+    _isFetching = true;
+    try {
+      if (initialLoad) {
+        setState(() {
+          _isLoading = true; // Show loading indicator only for the initial load
+        });
+      }
 
-    for (var repo in adoRepos) {
-      final repoMap = Map<String, String>.from(jsonDecode(repo));
-      final repoKey =
-          'ADO: ${repoMap['organization']}/${repoMap['project']}/${repoMap['repoName']}';
-      await _fetchAdoData(repoMap['organization']!, repoMap['project']!,
-          repoMap['repoName']!, repoKey, newData);
-    }
+      final prefs = await SharedPreferences.getInstance();
+      final List<String> githubRepos =
+          prefs.getStringList('github_repos') ?? [];
+      final List<String> adoRepos = prefs.getStringList('ado_repos') ?? [];
+      final Map<String, Map<String, List<String>>> newData = {
+        'PRs': {},
+        'Builds': {},
+        'Releases': {},
+        'Pipelines': {},
+      };
 
-    if (mounted) {
-      setState(() {
-        if (initialLoad || !_isDataEqual(_data, newData)) {
-          _previousData.clear();
-          _previousData.addAll(_data); // Save the current data as previous data
-          _data.clear();
-          _data.addAll(newData); // only if it has changed
+      for (var repo in githubRepos) {
+        try {
+          final repoMap = Map<String, String>.from(jsonDecode(repo));
+          final owner = repoMap['owner'];
+          final repoName = repoMap['repoName'];
+          if (owner == null || repoName == null) continue;
+          final repoKey = 'GitHub: $owner/$repoName';
+          await _fetchGithubData(
+              owner, repoName, repoKey, newData, repoMap['tokenId']);
+        } catch (e) {
+          // Skip a malformed entry rather than aborting the whole refresh.
+          if (kDebugMode) {
+            print('Skipping malformed github_repos entry: $e');
+          }
         }
+      }
 
-        if (initialLoad) {
-          _isLoading = false; // Hide loading indicator after the initial load
+      for (var repo in adoRepos) {
+        try {
+          final repoMap = Map<String, String>.from(jsonDecode(repo));
+          final organization = repoMap['organization'];
+          final project = repoMap['project'];
+          final repoName = repoMap['repoName'];
+          if (organization == null || project == null || repoName == null) {
+            continue;
+          }
+          final repoKey = 'ADO: $organization/$project/$repoName';
+          await _fetchAdoData(organization, project, repoName, repoKey, newData,
+              repoMap['tokenId']);
+        } catch (e) {
+          if (kDebugMode) {
+            print('Skipping malformed ado_repos entry: $e');
+          }
         }
-      });
+      }
+
+      if (mounted) {
+        setState(() {
+          if (initialLoad || !_isDataEqual(_data, newData)) {
+            _previousData.clear();
+            _previousData
+                .addAll(_data); // Save the current data as previous data
+            _data.clear();
+            _data.addAll(newData); // only if it has changed
+          }
+
+          if (initialLoad) {
+            _isLoading = false; // Hide loading indicator after the initial load
+          }
+        });
+      }
+    } finally {
+      _isFetching = false;
     }
   }
 
   Future<void> _fetchGithubData(String owner, String repoName, String repoKey,
-      Map<String, Map<String, List<String>>> newData) async {
+      Map<String, Map<String, List<String>>> newData, String? tokenId) async {
+    final token = await TokenStore.resolveGithubSecret(owner, tokenId: tokenId);
     await _fetchData(
       repoKey,
       'PRs',
       Uri.parse('https://api.github.com/repos/$owner/$repoName/pulls'),
       (data) async {
+        final bool isBaselined = _baselinedRepos.contains(repoKey);
         final List<String> prNotifications = [];
         return Future.value(data.map((pr) {
           final title = pr['title'] as String? ?? 'No Title';
@@ -232,13 +320,21 @@ class _MyHomePageState extends State<MyHomePage>
 
           final notificationKey = 'GitHub:$repoKey:PR#$number';
           if (!_notifiedItems.contains(notificationKey)) {
-            prNotifications.add('New PR #$number by $user: $title');
+            // Only notify once the repo has been baselined; the first fetch of
+            // a newly-added repo records existing PRs silently.
+            if (isBaselined) {
+              prNotifications.add('New PR #$number by $user: $title');
+            }
             _notifiedItems.add(notificationKey); // Mark as notified
           }
 
           return 'PR #$number by $user: $title ($comments comments)';
         }).toList())
             .then((prList) {
+          if (!isBaselined) {
+            _baselinedRepos.add(repoKey);
+            _saveBaselinedRepos();
+          }
           // Trigger notifications
           for (final notification in prNotifications) {
             _showNotification('New Pull Request', notification);
@@ -249,6 +345,7 @@ class _MyHomePageState extends State<MyHomePage>
       },
       true, // GitHub
       newData,
+      token,
     );
     await _fetchData(
       repoKey,
@@ -261,6 +358,7 @@ class _MyHomePageState extends State<MyHomePage>
       }).toList()),
       true, // GitHub
       newData,
+      token,
     );
   }
 
@@ -269,13 +367,17 @@ class _MyHomePageState extends State<MyHomePage>
       String project,
       String repoName,
       String repoKey,
-      Map<String, Map<String, List<String>>> newData) async {
+      Map<String, Map<String, List<String>>> newData,
+      String? tokenId) async {
+    final token =
+        await TokenStore.resolveAdoSecret(organization, tokenId: tokenId);
     await _fetchData(
       repoKey,
       'PRs',
       Uri.parse(
           'https://dev.azure.com/$organization/$project/_apis/git/repositories/$repoName/pullrequests?api-version=6.0'),
       (data) async {
+        final bool isBaselined = _baselinedRepos.contains(repoKey);
         final List<String> prNotifications = [];
         return Future.value(data.map((pr) {
           final title = pr['title'] as String? ?? 'No Title';
@@ -286,14 +388,20 @@ class _MyHomePageState extends State<MyHomePage>
 
           final notificationKey = 'ADO:$repoKey:PR#$id';
           if (!_notifiedItems.contains(notificationKey)) {
-            prNotifications
-                .add('New PR #$id by $creator: $title (Status: $status)');
+            if (isBaselined) {
+              prNotifications
+                  .add('New PR #$id by $creator: $title (Status: $status)');
+            }
             _notifiedItems.add(notificationKey); // Mark as notified
           }
 
           return 'PR #$id by $creator: $title (Status: $status)';
         }).toList())
             .then((prList) {
+          if (!isBaselined) {
+            _baselinedRepos.add(repoKey);
+            _saveBaselinedRepos();
+          }
           // Trigger notifications
           for (final notification in prNotifications) {
             _showNotification('New Pull Request', notification);
@@ -304,6 +412,7 @@ class _MyHomePageState extends State<MyHomePage>
       },
       false, // ADO
       newData,
+      token,
     );
     await _fetchData(
       repoKey,
@@ -319,7 +428,7 @@ class _MyHomePageState extends State<MyHomePage>
           final buildId = build['id'] as int?;
           if (buildId != null) {
             final stages =
-                await _fetchBuildStages(organization, project, buildId);
+                await _fetchBuildStages(organization, project, buildId, token);
             final stagesText = stages.map((stage) => '- $stage').join('\n');
             return '$name (Triggered by: $requestedBy)\nStages:\n$stagesText';
           }
@@ -328,6 +437,7 @@ class _MyHomePageState extends State<MyHomePage>
       },
       false, // ADO
       newData,
+      token,
     );
     await _fetchData(
       repoKey,
@@ -341,13 +451,13 @@ class _MyHomePageState extends State<MyHomePage>
       }).toList()),
       false, // ADO
       newData,
+      token,
     );
   }
 
   Future<List<String>> _fetchBuildStages(
-      String organization, String project, int buildId) async {
-    final token = await _getAdoToken();
-    if (token == null) return ['Token not set.'];
+      String organization, String project, int buildId, String? token) async {
+    if (token == null || token.isEmpty) return ['Token not set.'];
 
     try {
       final response = await http.get(
@@ -385,12 +495,11 @@ class _MyHomePageState extends State<MyHomePage>
         parseData, // Ensure parseData is consistently async
     bool isGithub,
     Map<String, Map<String, List<String>>> newData,
+    String? token,
   ) async {
-    final token = isGithub ? await _getGithubToken() : await _getAdoToken();
-
-    if (token == null) {
+    if (token == null || token.isEmpty) {
       newData[category]![repoKey] = [
-        'Token not set. Please configure it in settings.'
+        'Token not set. Add or assign a token via "Manage tokens".'
       ];
       return;
     }
@@ -435,16 +544,6 @@ class _MyHomePageState extends State<MyHomePage>
     return const DeepCollectionEquality().equals(oldData, newData);
   }
 
-  Future<String?> _getGithubToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('github_token');
-  }
-
-  Future<String?> _getAdoToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('ado_token');
-  }
-
   Future<void> _showNotification(String title, String body) async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
@@ -480,13 +579,24 @@ class _MyHomePageState extends State<MyHomePage>
         title: Text(widget.title),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
+            icon: const Icon(Icons.radar),
+            tooltip: 'Radar',
+            onPressed: () async {
+              await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const SettingsPage()),
+                MaterialPageRoute(builder: (_) => const RadarPage()),
               );
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.vpn_key),
+            tooltip: 'Manage tokens',
+            onPressed: _openManageTokens,
+          ),
+          IconButton(
+            icon: const Icon(Icons.folder_open),
+            tooltip: 'Manage repositories',
+            onPressed: _openManageRepos,
           ),
         ],
         bottom: TabBar(
@@ -520,37 +630,50 @@ class _MyHomePageState extends State<MyHomePage>
     if (!mounted) return; // Ensure the widget is still mounted
     showModalBottomSheet(
       context: context,
-      builder: (context) {
+      builder: (sheetContext) {
         return Wrap(
           children: [
             ListTile(
               leading: const Icon(Icons.add),
               title: const Text('Add GitHub Repository'),
               onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const RegisterGithubRepoPage()),
-                );
+                Navigator.pop(sheetContext);
+                _openRepoPage(const RegisterGithubRepoPage());
               },
             ),
             ListTile(
               leading: const Icon(Icons.add),
               title: const Text('Add ADO Repository'),
               onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const RegisterAdoRepoPage()),
-                );
+                Navigator.pop(sheetContext);
+                _openRepoPage(const RegisterAdoRepoPage());
               },
             ),
           ],
         );
       },
     );
+  }
+
+  /// Opens a repo-related page and refreshes the dashboard on return so that
+  /// added/edited/removed repositories are reflected without waiting for the
+  /// next poll cycle.
+  Future<void> _openRepoPage(Widget page) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => page),
+    );
+    if (mounted) {
+      _loadRepos(initialLoad: false);
+    }
+  }
+
+  Future<void> _openManageRepos() async {
+    await _openRepoPage(const ManageReposPage());
+  }
+
+  Future<void> _openManageTokens() async {
+    await _openRepoPage(const ManageTokensPage());
   }
 
   Widget _buildListView(Map<String, List<String>> data) {

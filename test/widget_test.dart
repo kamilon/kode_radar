@@ -7,9 +7,16 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kode_radar/main.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
+  });
+
   testWidgets('Kode Radar app loads and shows main content',
       (WidgetTester tester) async {
     // Build our app and trigger a frame.
@@ -18,29 +25,24 @@ void main() {
     // Verify that the app title is displayed
     expect(find.text('Kode Radar Home Page'), findsOneWidget);
 
-    // Verify that the settings icon is present
-    expect(find.byIcon(Icons.settings), findsOneWidget);
+    // Verify that the manage tokens and manage repositories actions are present
+    expect(find.byIcon(Icons.vpn_key), findsOneWidget);
+    expect(find.byIcon(Icons.folder_open), findsOneWidget);
 
     // Verify that the add button is present
     expect(find.byIcon(Icons.add), findsOneWidget);
   });
 
-  testWidgets('Settings page can be opened', (WidgetTester tester) async {
+  testWidgets('Manage Tokens page can be opened', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const MyApp());
 
-    // Tap the settings icon
-    await tester.tap(find.byIcon(Icons.settings));
+    // Tap the manage tokens icon
+    await tester.tap(find.byIcon(Icons.vpn_key));
     await tester.pumpAndSettle();
 
-    // Verify that we navigated to the settings page
-    expect(find.text('Settings'), findsOneWidget);
-
-    // Verify that token sections are present
-    expect(find.text('GitHub Access Token'), findsOneWidget);
-    expect(find.text('Azure DevOps Access Token'), findsOneWidget);
-
-    // Verify that create token buttons are present
-    expect(find.text('Create New Token'), findsNWidgets(2));
+    // Verify that we navigated to the manage tokens page
+    expect(find.text('Manage Tokens'), findsOneWidget);
+    expect(find.text('No tokens added yet.'), findsOneWidget);
   });
 }

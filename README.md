@@ -2,7 +2,7 @@
 
 [![PR Validation](https://github.com/kamilon/kode_radar/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/kamilon/kode_radar/actions/workflows/pr-validation.yml)
 
-Kode Radar is a lightweight Flutter application for tracking repositories hosted on GitHub and Azure DevOps. A core design principal for Kode Radar is that all user secrets are stored locally on all platforms. This is to ensure the application is safe to use for both personal and enterprise use cases. Kode Radar does not have any backend service and doesn't do any tracking.
+Kode Radar is a lightweight Flutter application for tracking repositories hosted on GitHub and Azure DevOps. A core design principle for Kode Radar is that all user secrets are stored locally on all platforms. Access tokens are persisted in the operating system's secure store (Keychain on iOS/macOS, Keystore-backed encryption on Android, libsecret on Linux, and Credential Manager on Windows) via `flutter_secure_storage`, never in plaintext. This is to ensure the application is safe to use for both personal and enterprise use cases. Kode Radar does not have any backend service and doesn't do any tracking.
 
 The repository contains multiplatform targets currently supporting:
 
@@ -31,19 +31,19 @@ Note: This project has been almost entirely AI generated. I don't recommend usin
 
 ### Linux-specific Dependencies
 
-For Linux builds, the following system packages are required for system tray functionality (tray_manager package):
+For Linux builds, the following system packages are required for system tray functionality (tray_manager package) and secure token storage (flutter_secure_storage, which uses libsecret):
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y ninja-build libgtk-3-dev libayatana-appindicator3-dev
+sudo apt-get install -y ninja-build libgtk-3-dev libayatana-appindicator3-dev libsecret-1-dev
 ```
 
 **Alternative packages:** If `libayatana-appindicator3-dev` is not available on your distribution, you can try:
 ```bash
-sudo apt-get install -y ninja-build libgtk-3-dev libappindicator3-dev
+sudo apt-get install -y ninja-build libgtk-3-dev libappindicator3-dev libsecret-1-dev
 ```
 
-These dependencies are needed because the `tray_manager` Flutter package requires system tray libraries to create and manage the application's system tray icon.
+These dependencies are needed because the `tray_manager` Flutter package requires system tray libraries to create and manage the application's system tray icon, and `flutter_secure_storage` requires `libsecret` to store access tokens in the Secret Service (e.g., GNOME Keyring) at runtime.
 
 ---
 

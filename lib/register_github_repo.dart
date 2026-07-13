@@ -1,9 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
+import 'ignore_store.dart';
+import 'repo_discovery_service.dart';
+import 'repo_store.dart';
+import 'token_store.dart';
+import 'token_override_field.dart';
+
 class RegisterGithubRepoPage extends StatefulWidget {
-  const RegisterGithubRepoPage({super.key});
+  const RegisterGithubRepoPage({
+    super.key,
+    this.editIndex,
+    this.initialOwner,
+    this.initialRepoName,
+    this.initialTokenId,
+  });
+
+  /// Index of the repository being edited in the stored `github_repos` list.
+  /// When null the page operates in "add" mode and appends a new entry.
+  final int? editIndex;
+  final String? initialOwner;
+  final String? initialRepoName;
+  final String? initialTokenId;
 
   @override
   State<RegisterGithubRepoPage> createState() => _RegisterGithubRepoPageState();
@@ -14,6 +32,18 @@ class _RegisterGithubRepoPageState extends State<RegisterGithubRepoPage> {
   final TextEditingController _ownerController = TextEditingController();
   final TextEditingController _repoNameController = TextEditingController();
 
+  String? _tokenId;
+
+  bool get _isEditing => widget.editIndex != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownerController.text = widget.initialOwner ?? '';
+    _repoNameController.text = widget.initialRepoName ?? '';
+    _tokenId = widget.initialTokenId;
+  }
+
   @override
   void dispose() {
     _ownerController.dispose();
@@ -21,22 +51,53 @@ class _RegisterGithubRepoPageState extends State<RegisterGithubRepoPage> {
     super.dispose();
   }
 
-  Future<void> _saveRepo(String owner, String repoName) async {
-    final prefs = await SharedPreferences.getInstance();
-    final List<String> repos = prefs.getStringList('github_repos') ?? [];
-    repos.add(jsonEncode({'owner': owner, 'repoName': repoName}));
-    await prefs.setStringList('github_repos', repos);
+  Future<bool> _saveRepo(String owner, String repoName) async {
+    final Map<String, String> repo = {'owner': owner, 'repoName': repoName};
+    if (_tokenId != null && _tokenId!.isNotEmpty) {
+      repo['tokenId'] = _tokenId!;
+    }
+    final encoded = jsonEncode(repo);
+    final index = widget.editIndex;
+    final newKey = RepoDiscoveryService.githubKey(owner, repoName);
+    final added = await RepoStore.update(RepoStore.githubKey, (repos) {
+      if (index != null && index >= 0 && index < repos.length) {
+        repos[index] = encoded; // Replace the existing entry when editing.
+        return true;
+      }
+      // Add mode: skip if the same repo is already tracked.
+      for (final raw in repos) {
+        try {
+          final m = Map<String, String>.from(jsonDecode(raw) as Map);
+          final key = RepoDiscoveryService.githubKey(
+              m['owner'] ?? '', m['repoName'] ?? '');
+          if (key == newKey) return false; // duplicate
+        } catch (_) {}
+      }
+      repos.add(encoded);
+      return true;
+    });
+    if (added) {
+      // Explicitly (re-)adding a repo overrides any prior "ignore".
+      await IgnoreStore.remove(newKey);
+    }
+    return added;
   }
 
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
-      final owner = _ownerController.text;
-      final repoName = _repoNameController.text;
+      final owner = _ownerController.text.trim();
+      final repoName = _repoNameController.text.trim();
 
-      _saveRepo(owner, repoName).then((_) {
+      _saveRepo(owner, repoName).then((added) {
         if (!mounted) return; // Ensure the widget is still mounted
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Repository saved successfully!')),
+          SnackBar(
+            content: Text(_isEditing
+                ? 'Repository updated successfully!'
+                : added
+                    ? 'Repository saved successfully!'
+                    : 'That repository is already tracked.'),
+          ),
         );
         Navigator.pop(context);
       });
@@ -47,7 +108,9 @@ class _RegisterGithubRepoPageState extends State<RegisterGithubRepoPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Register GitHub Repository'),
+        title: Text(_isEditing
+            ? 'Edit GitHub Repository'
+            : 'Register GitHub Repository'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -81,11 +144,17 @@ class _RegisterGithubRepoPageState extends State<RegisterGithubRepoPage> {
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
+              TokenOverrideField(
+                provider: TokenStore.providerGithub,
+                initialTokenId: widget.initialTokenId,
+                onChanged: (value) => _tokenId = value,
+              ),
               const SizedBox(height: 32),
               Center(
                 child: ElevatedButton(
                   onPressed: _submitForm,
-                  child: const Text('Submit'),
+                  child: Text(_isEditing ? 'Save' : 'Submit'),
                 ),
               ),
             ],
