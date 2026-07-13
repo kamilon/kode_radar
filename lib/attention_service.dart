@@ -273,13 +273,14 @@ class AttentionService {
     final repoDisplay = '$owner/$name';
     try {
       final secret =
-          await TokenStore.resolveGithubSecret(owner, tokenId: tokenId);
+          (await TokenStore.resolveGithubSecret(owner, tokenId: tokenId))
+              ?.trim();
       if (secret == null || secret.isEmpty) {
         return [_errorItem(repoDisplay, 'No token set')];
       }
       final response = await client.get(
-        Uri.parse(
-            'https://api.github.com/repos/$owner/$name/pulls?state=open&per_page=100'),
+        Uri.https('api.github.com', '/repos/$owner/$name/pulls',
+            {'state': 'open', 'per_page': '100'}),
         headers: {
           'Authorization': 'Bearer $secret',
           'Accept': 'application/vnd.github+json',
@@ -304,7 +305,8 @@ class AttentionService {
     final repoDisplay = '$organization/$project/$name';
     try {
       final secret =
-          await TokenStore.resolveAdoSecret(organization, tokenId: tokenId);
+          (await TokenStore.resolveAdoSecret(organization, tokenId: tokenId))
+              ?.trim();
       if (secret == null || secret.isEmpty) {
         return [_errorItem(repoDisplay, 'No token set')];
       }

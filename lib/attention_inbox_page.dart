@@ -38,9 +38,11 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         _loading = false;
       });
     } catch (e) {
+      debugPrint('AttentionInbox failed to load: $e');
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to load: $e';
+        _error =
+            'Something went wrong while loading your inbox. Pull down to try again.';
         _loading = false;
       });
     }
