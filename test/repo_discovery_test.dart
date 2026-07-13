@@ -18,6 +18,7 @@ void main() {
         'owner': {'login': 'flutter'},
       },
       {'name': 'no-owner'}, // skipped: missing owner
+      {'name': 'bad-owner', 'owner': 'not-a-map'}, // skipped: owner not a map
     ]);
 
     expect(repos.length, 2);
@@ -35,6 +36,7 @@ void main() {
         'project': {'name': 'Platform'},
       },
       {'name': 'orphan'}, // skipped: missing project
+      {'name': 'bad', 'project': 'not-a-map'}, // skipped: project not a map
     ]);
 
     expect(repos.length, 1);

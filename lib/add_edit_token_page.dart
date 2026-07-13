@@ -183,9 +183,16 @@ class _AddEditTokenPageState extends State<AddEditTokenPage> {
                       child: Text('Azure DevOps'),
                     ),
                   ],
-                  onChanged: (value) => setState(
-                    () => _provider = value ?? TokenStore.providerGithub,
-                  ),
+                  onChanged: (value) => setState(() {
+                    _provider = value ?? TokenStore.providerGithub;
+                    // Auto-add for Azure DevOps requires an organization scope;
+                    // don't leave it enabled when switching to a state where the
+                    // checkbox is disabled.
+                    if (_provider == TokenStore.providerAdo &&
+                        _scopeController.text.trim().isEmpty) {
+                      _autoAdd = false;
+                    }
+                  }),
                 ),
               const SizedBox(height: 16),
               TextFormField(
