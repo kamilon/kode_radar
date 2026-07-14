@@ -41,7 +41,7 @@ void main() async {
     iOS: initializationSettingsDarwin,
     macOS: initializationSettingsDarwin,
   );
-  await _notificationsPlugin.initialize(initializationSettings);
+  await _notificationsPlugin.initialize(settings: initializationSettings);
 
   if (_isDesktopPlatform) {
     await windowManager.ensureInitialized(); // Initialize window manager
@@ -570,7 +570,12 @@ class _MyHomePageState extends State<MyHomePage>
       iOS: darwinPlatformChannelSpecifics,
       macOS: darwinPlatformChannelSpecifics,
     );
-    await _notificationsPlugin.show(0, title, body, platformChannelSpecifics);
+    await _notificationsPlugin.show(
+      id: 0,
+      title: title,
+      body: body,
+      notificationDetails: platformChannelSpecifics,
+    );
   }
 
   @override

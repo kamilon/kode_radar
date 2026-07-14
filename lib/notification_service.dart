@@ -67,7 +67,7 @@ class NotificationService {
         iOS: DarwinInitializationSettings(),
         macOS: DarwinInitializationSettings(),
       );
-      await _plugin.initialize(settings);
+      await _plugin.initialize(settings: settings);
       _initialized = true;
     } catch (e) {
       debugPrint('Failed to initialize local notifications: $e');
@@ -89,10 +89,10 @@ class NotificationService {
       if (details == null) return;
 
       await _plugin.show(
-        _summaryNotificationId,
-        _summaryTitle(newItems.length),
-        _summaryBody(newItems),
-        details,
+        id: _summaryNotificationId,
+        title: _summaryTitle(newItems.length),
+        body: _summaryBody(newItems),
+        notificationDetails: details,
       );
     } catch (e) {
       debugPrint('Failed to show attention notification: $e');
