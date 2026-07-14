@@ -85,30 +85,32 @@ class _PeoplePageState extends State<PeoplePage> {
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('Your identity'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Marks "You" here and powers the Attention inbox\'s "Mine" '
-                'filter. Separate multiple entries with commas.',
-                style: TextStyle(fontSize: 12),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: ghController,
-                decoration: const InputDecoration(
-                  labelText: 'GitHub username(s)',
-                  hintText: 'octocat, ...',
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Marks "You" here and powers the Attention inbox\'s "Mine" '
+                  'filter. Separate multiple entries with commas.',
+                  style: TextStyle(fontSize: 12),
                 ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: adoController,
-                decoration: const InputDecoration(
-                  labelText: 'Azure DevOps display name(s)',
+                const SizedBox(height: 12),
+                TextField(
+                  controller: ghController,
+                  decoration: const InputDecoration(
+                    labelText: 'GitHub username(s)',
+                    hintText: 'octocat, ...',
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                TextField(
+                  controller: adoController,
+                  decoration: const InputDecoration(
+                    labelText: 'Azure DevOps display name(s)',
+                  ),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
