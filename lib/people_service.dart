@@ -101,7 +101,7 @@ class PeopleService {
         // 5 approved-with-suggestions, 0 waiting, -5 waiting-for-author,
         // -10 rejected.
         final vote = reviewer is Map ? reviewer['vote'] : null;
-        if (vote is int && vote != 0) continue;
+        if (vote != 0) continue;
         final name = _normalizeName(
           _nestedString(reviewer, 'displayName') ?? '',
         );
