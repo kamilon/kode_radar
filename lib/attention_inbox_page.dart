@@ -84,7 +84,10 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           const SizedBox(height: 140),
-          Icon(Icons.check_circle_outline, size: 56, color: Colors.green[400]),
+          Center(
+            child: Icon(Icons.check_circle_outline,
+                size: 56, color: Colors.green[400]),
+          ),
           const SizedBox(height: 12),
           const Center(child: Text('Nothing needs your attention right now.')),
           const SizedBox(height: 6),
@@ -109,7 +112,8 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
           return Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
             child: Text(
-              '${_items.length} item${_items.length == 1 ? '' : 's'} need attention'
+              '${_items.length} item${_items.length == 1 ? '' : 's'} '
+              'need${_items.length == 1 ? 's' : ''} attention'
               '${_lastChecked == null ? '' : ' · checked ${_relativeTime(_lastChecked!)}'}',
               style: TextStyle(color: Colors.grey[600], fontSize: 12),
             ),
@@ -154,12 +158,26 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
 
   Future<void> _open(String url) async {
     final uri = Uri.tryParse(url);
-    if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open $url')),
-      );
+    if (uri == null) {
+      _showOpenError(url);
+      return;
     }
+
+    final canLaunch = await canLaunchUrl(uri);
+    if (!mounted) return;
+    if (!canLaunch) {
+      _showOpenError(url);
+      return;
+    }
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!mounted) return;
+    if (!launched) _showOpenError(url);
+  }
+
+  void _showOpenError(String url) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Could not open $url')),
+    );
   }
 }
