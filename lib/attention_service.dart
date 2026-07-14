@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -300,7 +301,8 @@ class AttentionService {
       if (body is! List) return const [];
       return githubItems(repoDisplay: repoDisplay, prs: body, now: now);
     } catch (e) {
-      return [_errorItem(repoDisplay, 'Error: $e')];
+      debugPrint('AttentionService GitHub fetch failed for $repoDisplay: $e');
+      return [_errorItem(repoDisplay, 'Could not load pull requests')];
     }
   }
 
@@ -347,7 +349,8 @@ class AttentionService {
         now: now,
       );
     } catch (e) {
-      return [_errorItem(repoDisplay, 'Error: $e')];
+      debugPrint('AttentionService ADO fetch failed for $repoDisplay: $e');
+      return [_errorItem(repoDisplay, 'Could not load pull requests')];
     }
   }
 
