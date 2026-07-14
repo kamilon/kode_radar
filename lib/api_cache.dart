@@ -183,10 +183,11 @@ class ResponseCache {
   static const int maxEntries = 200;
 
   // Serializes read-modify-write access so concurrent GETs (bounded-concurrency
-  // fetches all share one cache) can't clobber each other's entries.
-  Future<void> _lock = Future<void>.value();
+  // fetches all share one cache) can't clobber each other's entries. Static so
+  // every ResponseCache instance serializes against the shared prefs key.
+  static Future<void> _lock = Future<void>.value();
 
-  Future<T> _runLocked<T>(Future<T> Function() action) {
+  static Future<T> _runLocked<T>(Future<T> Function() action) {
     final result = _lock.then((_) => action());
     _lock = result.then((_) {}, onError: (_) {});
     return result;
