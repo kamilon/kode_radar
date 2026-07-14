@@ -43,9 +43,10 @@ class AttentionItem {
 /// Computes a ranked, team-wide list of pull requests that need action across
 /// all monitored repos: waiting on review, changes requested (Azure DevOps
 /// only for now — GitHub changes-requested detection needs the reviews API and
-/// is a later milestone), or open a long time. It is NOT personalized to the
-/// current user yet — that needs identity (a later milestone). CI-failing repos
-/// are surfaced on the Radar, not here.
+/// is a later milestone), or open a long time. Items are optionally tagged as
+/// the current user's (`AttentionItem.isMine`) when GitHub logins / ADO names
+/// are supplied, and snoozed items are filtered out. CI-failing repos are
+/// surfaced on the Radar, not here.
 class AttentionService {
   AttentionService._();
 
