@@ -236,6 +236,68 @@ void main() {
     expect(items.single.url, isNull);
   });
 
+  test('githubItems tags isMine for the self login (author or reviewer)', () {
+    final items = AttentionService.githubItems(
+      repoDisplay: 'acme/api',
+      now: now,
+      selfGithubLogins: {'Me'},
+      prs: [
+        {
+          'number': 1,
+          'title': 't',
+          'user': {'login': 'alice'},
+          'created_at': daysAgo(1).toIso8601String(),
+          'requested_reviewers': [
+            {'login': 'me'}
+          ],
+        },
+        {
+          'number': 2,
+          'title': 't',
+          'user': {'login': 'me'},
+          'created_at': daysAgo(40).toIso8601String(),
+          'requested_reviewers': [],
+        },
+        {
+          'number': 3,
+          'title': 't',
+          'user': {'login': 'bob'},
+          'created_at': daysAgo(1).toIso8601String(),
+          'requested_reviewers': [
+            {'login': 'carol'}
+          ],
+        },
+      ],
+    );
+    final byId = {for (final i in items) i.id: i};
+    expect(byId['reviewRequested:acme/api:PR #1']!.isMine, isTrue);
+    expect(byId['oldOpenPr:acme/api:PR #2']!.isMine, isTrue);
+    expect(byId['reviewRequested:acme/api:PR #3']!.isMine, isFalse);
+  });
+
+  test('adoItems tags isMine matching self names with whitespace trimming', () {
+    final items = AttentionService.adoItems(
+      repoDisplay: 'org/proj/repo',
+      organization: 'org',
+      project: 'proj',
+      name: 'repo',
+      now: now,
+      selfAdoNames: {'  Jane Doe '},
+      prs: [
+        {
+          'pullRequestId': 5,
+          'title': 't',
+          'createdBy': {'displayName': 'Jane Doe'},
+          'creationDate': daysAgo(1).toIso8601String(),
+          'reviewers': [
+            {'vote': 0, 'displayName': 'Someone'}
+          ],
+        },
+      ],
+    );
+    expect(items.single.isMine, isTrue);
+  });
+
   group('computeAll', () {
     setUp(() {
       TestWidgetsFlutterBinding.ensureInitialized();
@@ -287,6 +349,50 @@ void main() {
       expect(items, hasLength(1));
       expect(items.single.category, 'reviewRequested');
       expect(items.single.ageDays, 10);
+    });
+
+    test('filters out snoozed item ids', () async {
+      final token = await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'Acme',
+        scope: 'acme',
+        secret: 'ghp_secret',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('github_repos', [
+        jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': token.id}),
+      ]);
+      final client = MockClient((request) async {
+        if (request.url.path == '/repos/acme/api/pulls') {
+          return http.Response(
+            jsonEncode([
+              {
+                'number': 7,
+                'title': 't',
+                'user': {'login': 'a'},
+                'created_at': '2020-01-01T00:00:00Z',
+                'requested_reviewers': [
+                  {'login': 'b'}
+                ],
+                'html_url': 'https://github.com/acme/api/pull/7',
+              },
+            ]),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      });
+
+      final now = DateTime.parse('2020-01-11T00:00:00Z');
+      final all = await AttentionService.computeAll(client: client, now: now);
+      expect(all, hasLength(1));
+
+      final filtered = await AttentionService.computeAll(
+        client: client,
+        now: now,
+        snoozedIds: {all.single.id},
+      );
+      expect(filtered, isEmpty);
     });
   });
 }

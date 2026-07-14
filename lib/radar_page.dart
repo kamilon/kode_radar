@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'activity_service.dart';
+import 'app_http.dart';
 
 class RadarPage extends StatefulWidget {
   const RadarPage({super.key});
@@ -28,7 +29,8 @@ class _RadarPageState extends State<RadarPage> {
     });
 
     try {
-      final activities = await ActivityService.computeAll();
+      final activities =
+          await ActivityService.computeAll(client: AppHttp.client);
       if (!mounted) return;
       setState(() {
         _activities = activities;
