@@ -29,8 +29,25 @@ void main() {
     expect(find.byIcon(Icons.vpn_key), findsOneWidget);
     expect(find.byIcon(Icons.folder_open), findsOneWidget);
 
+    // Verify that the attention inbox action is present
+    expect(find.byIcon(Icons.inbox), findsOneWidget);
+
     // Verify that the add button is present
     expect(find.byIcon(Icons.add), findsOneWidget);
+  });
+
+  testWidgets('Attention inbox can be opened', (WidgetTester tester) async {
+    await tester.pumpWidget(const MyApp());
+
+    // Tap the attention inbox icon
+    await tester.tap(find.byIcon(Icons.inbox));
+    await tester.pumpAndSettle();
+
+    // Verify that we navigated to the Attention inbox page and it renders its
+    // empty state (no repositories are configured in the test environment).
+    expect(find.widgetWithText(AppBar, 'Attention'), findsOneWidget);
+    expect(
+        find.text('Nothing needs your attention right now.'), findsOneWidget);
   });
 
   testWidgets('Manage Tokens page can be opened', (WidgetTester tester) async {

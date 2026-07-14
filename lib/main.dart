@@ -7,6 +7,7 @@ import 'register_ado_repo.dart';
 import 'manage_repos_page.dart';
 import 'manage_tokens_page.dart';
 import 'radar_page.dart';
+import 'attention_inbox_page.dart';
 import 'auto_add_service.dart';
 import 'token_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -578,6 +579,16 @@ class _MyHomePageState extends State<MyHomePage>
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.inbox),
+            tooltip: 'Attention',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AttentionInboxPage()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.radar),
             tooltip: 'Radar',
