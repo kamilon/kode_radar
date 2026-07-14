@@ -133,8 +133,48 @@ class CachedHttpClient extends http.BaseClient {
         retryAfter: parsed.retryAfter,
       );
     }
-    _rateLimits[scopeKey] =
-        (_rateLimits[scopeKey] ?? const RateLimitStatus()).merge(parsed);
+    _rateLimits[scopeKey] = _mergeRateLimit(_rateLimits[scopeKey], parsed);
+  }
+
+  /// Conservatively merges a rate-limit [update] into the [existing] state so
+  /// out-of-order concurrent responses can't inflate the remaining budget. A
+  /// strictly newer window (later resetAt) replaces the old values; otherwise
+  /// we keep the lowest remaining, latest reset, and longest retry-after.
+  static RateLimitStatus _mergeRateLimit(
+    RateLimitStatus? existing,
+    RateLimitStatus update,
+  ) {
+    if (existing == null) return update;
+    final existingReset = existing.resetAt;
+    final updateReset = update.resetAt;
+    if (existingReset != null &&
+        updateReset != null &&
+        updateReset.isAfter(existingReset)) {
+      return update; // new window
+    }
+    int? remaining;
+    if (existing.remaining != null && update.remaining != null) {
+      remaining = existing.remaining! < update.remaining!
+          ? existing.remaining
+          : update.remaining;
+    } else {
+      remaining = update.remaining ?? existing.remaining;
+    }
+    DateTime? resetAt = existing.resetAt;
+    if (updateReset != null &&
+        (resetAt == null || updateReset.isAfter(resetAt))) {
+      resetAt = updateReset;
+    }
+    Duration? retryAfter = existing.retryAfter;
+    if (update.retryAfter != null &&
+        (retryAfter == null || update.retryAfter! > retryAfter)) {
+      retryAfter = update.retryAfter;
+    }
+    return RateLimitStatus(
+      remaining: remaining,
+      resetAt: resetAt,
+      retryAfter: retryAfter,
+    );
   }
 }
 

@@ -74,7 +74,7 @@ class AttentionService {
     required DateTime now,
     Set<String> selfGithubLogins = const {},
   }) {
-    final self = selfGithubLogins.map((e) => e.toLowerCase()).toSet();
+    final self = selfGithubLogins.map((e) => e.trim().toLowerCase()).toSet();
     final items = <AttentionItem>[];
     for (final pr in prs) {
       if (pr is! Map) continue;
@@ -94,13 +94,13 @@ class AttentionService {
       if (reviewers is List) {
         for (final r in reviewers) {
           final login = _nestedString(r, 'login');
-          if (login != null) reviewerLogins.add(login.toLowerCase());
+          if (login != null) reviewerLogins.add(login.trim().toLowerCase());
         }
       }
       final waitingOnReview = (reviewers is List && reviewers.isNotEmpty) ||
           (teams is List && teams.isNotEmpty);
       final mine = self.isNotEmpty &&
-          (self.contains(author.toLowerCase()) ||
+          (self.contains(author.trim().toLowerCase()) ||
               reviewerLogins.any(self.contains));
 
       if (waitingOnReview) {
@@ -125,7 +125,7 @@ class AttentionService {
     required DateTime now,
     Set<String> selfAdoNames = const {},
   }) {
-    final self = selfAdoNames.map((e) => e.toLowerCase()).toSet();
+    final self = selfAdoNames.map((e) => e.trim().toLowerCase()).toSet();
     final items = <AttentionItem>[];
     for (final pr in prs) {
       if (pr is! Map) continue;
@@ -149,13 +149,13 @@ class AttentionService {
           if (r is! Map) continue;
           votes.add(r['vote']);
           final dn = _stringValue(r, 'displayName');
-          if (dn != null) reviewerNames.add(dn.toLowerCase());
+          if (dn != null) reviewerNames.add(dn.trim().toLowerCase());
         }
       }
       final changesRequested = votes.any((v) => v is int && v < 0);
       final waitingOnReview = votes.any((v) => v == 0);
       final mine = self.isNotEmpty &&
-          (self.contains(author.toLowerCase()) ||
+          (self.contains(author.trim().toLowerCase()) ||
               reviewerNames.any(self.contains));
 
       if (changesRequested) {

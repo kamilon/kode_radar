@@ -80,54 +80,59 @@ class _PeoplePageState extends State<PeoplePage> {
     if (!mounted) return;
     final ghController = TextEditingController(text: gh);
     final adoController = TextEditingController(text: ado);
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Your identity'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Marks "You" here and powers the Attention inbox\'s "Mine" '
-              'filter. Separate multiple entries with commas.',
-              style: TextStyle(fontSize: 12),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ghController,
-              decoration: const InputDecoration(
-                labelText: 'GitHub username(s)',
-                hintText: 'octocat, ...',
+    try {
+      final saved = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Your identity'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Marks "You" here and powers the Attention inbox\'s "Mine" '
+                'filter. Separate multiple entries with commas.',
+                style: TextStyle(fontSize: 12),
               ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: adoController,
-              decoration: const InputDecoration(
-                labelText: 'Azure DevOps display name(s)',
+              const SizedBox(height: 12),
+              TextField(
+                controller: ghController,
+                decoration: const InputDecoration(
+                  labelText: 'GitHub username(s)',
+                  hintText: 'octocat, ...',
+                ),
               ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: adoController,
+                decoration: const InputDecoration(
+                  labelText: 'Azure DevOps display name(s)',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Save'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    if (saved == true) {
-      await IdentityStore.setSelfGithubLogins(_parseLogins(ghController.text));
-      await IdentityStore.setSelfAdoNames(_parseNames(adoController.text));
-      await _loadPeople();
+      );
+      if (saved == true) {
+        await IdentityStore.setSelfGithubLogins(
+            _parseLogins(ghController.text));
+        await IdentityStore.setSelfAdoNames(_parseNames(adoController.text));
+        if (!mounted) return;
+        await _loadPeople();
+      }
+    } finally {
+      ghController.dispose();
+      adoController.dispose();
     }
-    ghController.dispose();
-    adoController.dispose();
   }
 
   /// GitHub logins never contain whitespace, so split on commas or whitespace.
