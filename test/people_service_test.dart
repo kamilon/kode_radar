@@ -7,7 +7,6 @@ void main() {
 
   test('aggregateGithub counts authors and requested reviewers', () {
     final people = PeopleService.aggregateGithub(
-      repoDisplay: 'acme/api',
       now: now,
       prs: [
         {
@@ -90,7 +89,6 @@ void main() {
 
   test('aggregateAdo counts only pending (vote 0) reviewers', () {
     final people = PeopleService.aggregateAdo(
-      repoDisplay: 'org/project/repo',
       now: now,
       prs: [
         {
@@ -118,7 +116,6 @@ void main() {
   test('malformed entries do not throw', () {
     expect(
       () => PeopleService.aggregateGithub(
-        repoDisplay: 'acme/api',
         now: now,
         prs: [
           'not-a-map',
@@ -136,7 +133,6 @@ void main() {
     );
 
     final people = PeopleService.aggregateAdo(
-      repoDisplay: 'org/project/repo',
       now: now,
       prs: [
         null,

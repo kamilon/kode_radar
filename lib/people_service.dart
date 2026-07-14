@@ -15,7 +15,6 @@ class PeopleService {
   static const Duration _requestTimeout = Duration(seconds: 20);
 
   static List<Person> aggregateGithub({
-    required String repoDisplay,
     required List<dynamic> prs,
     required DateTime now,
     Set<String> self = const {},
@@ -66,7 +65,6 @@ class PeopleService {
   }
 
   static List<Person> aggregateAdo({
-    required String repoDisplay,
     required List<dynamic> prs,
     required DateTime now,
     Set<String> self = const {},
@@ -280,7 +278,6 @@ class PeopleService {
       final body = jsonDecode(response.body);
       if (body is! List) return const <Person>[];
       return aggregateGithub(
-        repoDisplay: repoDisplay,
         prs: body,
         now: now,
         self: self,
@@ -323,7 +320,6 @@ class PeopleService {
       final value = body is Map ? body['value'] : body;
       if (value is! List) return const <Person>[];
       return aggregateAdo(
-        repoDisplay: repoDisplay,
         prs: value,
         now: now,
         self: self,

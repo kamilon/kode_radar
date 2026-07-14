@@ -7,30 +7,46 @@ class SnoozeStore {
 
   static const String _storageKey = 'snoozed_attention';
 
+  // Serializes read-modify-write access so rapid swipes / Undo can't clobber
+  // one another's persisted state.
+  static Future<void> _lock = Future<void>.value();
+
+  static Future<T> _runLocked<T>(Future<T> Function() action) {
+    final result = _lock.then((_) => action());
+    _lock = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
   static Future<Set<String>> snoozedIds() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = _readFrom(prefs);
-    final pruned = pruneExpired(raw, DateTime.now());
-    if (!_mapsEqual(raw, pruned)) {
-      await _writeTo(prefs, pruned);
-    }
-    return pruned.keys.toSet();
+    return _runLocked(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = _readFrom(prefs);
+      final pruned = pruneExpired(raw, DateTime.now());
+      if (!_mapsEqual(raw, pruned)) {
+        await _writeTo(prefs, pruned);
+      }
+      return pruned.keys.toSet();
+    });
   }
 
   static Future<void> snooze(String id, {Duration? forDuration}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = _readFrom(prefs);
-    raw[id] = forDuration == null
-        ? null
-        : DateTime.now().add(forDuration).millisecondsSinceEpoch;
-    await _writeTo(prefs, raw);
+    return _runLocked(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = _readFrom(prefs);
+      raw[id] = forDuration == null
+          ? null
+          : DateTime.now().add(forDuration).millisecondsSinceEpoch;
+      await _writeTo(prefs, raw);
+    });
   }
 
   static Future<void> unsnooze(String id) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = _readFrom(prefs);
-    raw.remove(id);
-    await _writeTo(prefs, raw);
+    return _runLocked(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = _readFrom(prefs);
+      raw.remove(id);
+      await _writeTo(prefs, raw);
+    });
   }
 
   static Future<bool> isSnoozed(String id) async {

@@ -124,24 +124,38 @@ class ResponseCache {
   static const String prefsKey = 'api_response_cache';
   static const int maxEntries = 200;
 
-  Future<CachedResponse?> get(String key) async {
-    final prefs = await SharedPreferences.getInstance();
-    final entries = _readEntries(prefs);
-    final cached = entries[key];
-    if (cached == null) return null;
+  // Serializes read-modify-write access so concurrent GETs (bounded-concurrency
+  // fetches all share one cache) can't clobber each other's entries.
+  Future<void> _lock = Future<void>.value();
 
-    final touched = cached.copyWith(lastUsed: DateTime.now().toUtc());
-    entries[key] = touched;
-    await _writeEntries(prefs, entries);
-    return touched;
+  Future<T> _runLocked<T>(Future<T> Function() action) {
+    final result = _lock.then((_) => action());
+    _lock = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
+  Future<CachedResponse?> get(String key) async {
+    return _runLocked(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final entries = _readEntries(prefs);
+      final cached = entries[key];
+      if (cached == null) return null;
+
+      final touched = cached.copyWith(lastUsed: DateTime.now().toUtc());
+      entries[key] = touched;
+      await _writeEntries(prefs, entries);
+      return touched;
+    });
   }
 
   Future<void> put(String key, CachedResponse resp) async {
-    final prefs = await SharedPreferences.getInstance();
-    final entries = _readEntries(prefs);
-    entries[key] = resp.copyWith(lastUsed: DateTime.now().toUtc());
-    _evictOldEntries(entries);
-    await _writeEntries(prefs, entries);
+    return _runLocked(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final entries = _readEntries(prefs);
+      entries[key] = resp.copyWith(lastUsed: DateTime.now().toUtc());
+      _evictOldEntries(entries);
+      await _writeEntries(prefs, entries);
+    });
   }
 
   Map<String, CachedResponse> _readEntries(SharedPreferences prefs) {
@@ -408,10 +422,14 @@ Map<String, String> _stringMap(dynamic value) {
 }
 
 String _stableHash(String value) {
-  var hash = 0x811c9dc5;
+  // 64-bit FNV-1a (via BigInt to stay exact on all platforms) so auth-scope
+  // collisions are negligible and token-scoped cache isolation holds.
+  final mask = (BigInt.one << 64) - BigInt.one;
+  final prime = BigInt.parse('1099511628211'); // 0x100000001b3
+  var hash = BigInt.parse('14695981039346656037'); // 0xcbf29ce484222325
   for (final codeUnit in value.codeUnits) {
-    hash ^= codeUnit;
-    hash = (hash * 0x01000193) & 0xffffffff;
+    hash = (hash ^ BigInt.from(codeUnit)) & mask;
+    hash = (hash * prime) & mask;
   }
-  return hash.toRadixString(16).padLeft(8, '0');
+  return hash.toRadixString(16).padLeft(16, '0');
 }
