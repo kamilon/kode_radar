@@ -36,9 +36,11 @@ class AttentionItem {
 }
 
 /// Computes a ranked, team-wide list of pull requests that need action across
-/// all monitored repos (waiting on review, changes requested, or open a long
-/// time). It is NOT personalized to the current user yet — that needs identity
-/// (a later milestone). CI-failing repos are surfaced on the Radar, not here.
+/// all monitored repos: waiting on review, changes requested (Azure DevOps
+/// only for now — GitHub changes-requested detection needs the reviews API and
+/// is a later milestone), or open a long time. It is NOT personalized to the
+/// current user yet — that needs identity (a later milestone). CI-failing repos
+/// are surfaced on the Radar, not here.
 class AttentionService {
   AttentionService._();
 
@@ -70,9 +72,9 @@ class AttentionService {
       if (pr is! Map) continue;
       if (pr['draft'] == true) continue;
       final number = pr['number'];
-      final title = pr['title'] as String? ?? 'Untitled PR';
+      final title = _stringValue(pr, 'title') ?? 'Untitled PR';
       final author = _nestedString(pr['user'], 'login') ?? 'unknown';
-      final url = pr['html_url'] as String?;
+      final url = _stringValue(pr, 'html_url');
       final age = _ageDays(pr['created_at'], now);
 
       // Waiting on review = individual reviewers still requested, or a team
@@ -108,7 +110,7 @@ class AttentionService {
       if (pr is! Map) continue;
       if (pr['isDraft'] == true) continue;
       final id = pr['pullRequestId'];
-      final title = pr['title'] as String? ?? 'Untitled PR';
+      final title = _stringValue(pr, 'title') ?? 'Untitled PR';
       final author = _nestedString(pr['createdBy'], 'displayName') ?? 'unknown';
       final age = _ageDays(pr['creationDate'], now);
       final url = id == null
@@ -209,7 +211,7 @@ class AttentionService {
   }
 
   static String? _nestedString(dynamic map, String key) =>
-      map is Map ? map[key] as String? : null;
+      map is Map && map[key] is String ? map[key] as String : null;
 
   static String? _stringValue(Map map, String key) {
     final value = map[key];

@@ -214,6 +214,28 @@ void main() {
     expect(items, isEmpty);
   });
 
+  test('non-string title/user/url fields fall back instead of throwing', () {
+    final items = AttentionService.githubItems(
+      repoDisplay: 'acme/api',
+      now: now,
+      prs: [
+        {
+          'number': 9,
+          'title': 123,
+          'user': {'login': 42},
+          'created_at': daysAgo(2).toIso8601String(),
+          'requested_reviewers': [
+            {'login': 'bob'}
+          ],
+          'html_url': 99,
+        },
+      ],
+    );
+    expect(items.single.category, 'reviewRequested');
+    expect(items.single.title, 'PR #9 waiting on review');
+    expect(items.single.url, isNull);
+  });
+
   group('computeAll', () {
     setUp(() {
       TestWidgetsFlutterBinding.ensureInitialized();
