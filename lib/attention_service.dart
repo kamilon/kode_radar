@@ -18,6 +18,7 @@ class AttentionItem {
     required this.repoDisplay,
     this.url,
     this.ageDays,
+    this.isMine = false,
   });
 
   /// Stable identity for the item (enables list keys and future snooze).
@@ -34,6 +35,9 @@ class AttentionItem {
   final String repoDisplay;
   final String? url;
   final int? ageDays;
+
+  /// True when the current user is the PR author or a requested reviewer.
+  final bool isMine;
 }
 
 /// Computes a ranked, team-wide list of pull requests that need action across
@@ -67,7 +71,9 @@ class AttentionService {
     required String repoDisplay,
     required List<dynamic> prs,
     required DateTime now,
+    Set<String> selfGithubLogins = const {},
   }) {
+    final self = selfGithubLogins.map((e) => e.toLowerCase()).toSet();
     final items = <AttentionItem>[];
     for (final pr in prs) {
       if (pr is! Map) continue;
@@ -83,15 +89,26 @@ class AttentionService {
       // submit a review, so a non-empty list means "still waiting".)
       final reviewers = pr['requested_reviewers'];
       final teams = pr['requested_teams'];
+      final reviewerLogins = <String>{};
+      if (reviewers is List) {
+        for (final r in reviewers) {
+          final login = _nestedString(r, 'login');
+          if (login != null) reviewerLogins.add(login.toLowerCase());
+        }
+      }
       final waitingOnReview = (reviewers is List && reviewers.isNotEmpty) ||
           (teams is List && teams.isNotEmpty);
+      final mine = self.isNotEmpty &&
+          (self.contains(author.toLowerCase()) ||
+              reviewerLogins.any(self.contains));
 
       if (waitingOnReview) {
         items.add(_reviewRequested(
-            repoDisplay, 'PR #$number', title, author, age, url));
+            repoDisplay, 'PR #$number', title, author, age, url,
+            isMine: mine));
       } else if ((age ?? 0) > oldOpenPrDays) {
-        items
-            .add(_oldOpen(repoDisplay, 'PR #$number', title, author, age, url));
+        items.add(_oldOpen(repoDisplay, 'PR #$number', title, author, age, url,
+            isMine: mine));
       }
     }
     return items;
@@ -105,7 +122,9 @@ class AttentionService {
     required String name,
     required List<dynamic> prs,
     required DateTime now,
+    Set<String> selfAdoNames = const {},
   }) {
+    final self = selfAdoNames.map((e) => e.toLowerCase()).toSet();
     final items = <AttentionItem>[];
     for (final pr in prs) {
       if (pr is! Map) continue;
@@ -122,27 +141,41 @@ class AttentionService {
       // ADO reviewer votes: 10 approved, 5 approved-with-suggestions,
       // 0 no vote yet, -5 waiting for author, -10 rejected.
       final reviewers = pr['reviewers'];
-      final votes = reviewers is List
-          ? reviewers.whereType<Map>().map((r) => r['vote']).toList()
-          : const [];
+      final votes = <dynamic>[];
+      final reviewerNames = <String>{};
+      if (reviewers is List) {
+        for (final r in reviewers) {
+          if (r is! Map) continue;
+          votes.add(r['vote']);
+          final dn = _stringValue(r, 'displayName');
+          if (dn != null) reviewerNames.add(dn.toLowerCase());
+        }
+      }
       final changesRequested = votes.any((v) => v is int && v < 0);
       final waitingOnReview = votes.any((v) => v == 0);
+      final mine = self.isNotEmpty &&
+          (self.contains(author.toLowerCase()) ||
+              reviewerNames.any(self.contains));
 
       if (changesRequested) {
-        items.add(
-            _changesRequested(repoDisplay, 'PR #$id', title, author, age, url));
+        items.add(_changesRequested(
+            repoDisplay, 'PR #$id', title, author, age, url,
+            isMine: mine));
       } else if (waitingOnReview) {
-        items.add(
-            _reviewRequested(repoDisplay, 'PR #$id', title, author, age, url));
+        items.add(_reviewRequested(
+            repoDisplay, 'PR #$id', title, author, age, url,
+            isMine: mine));
       } else if ((age ?? 0) > oldOpenPrDays) {
-        items.add(_oldOpen(repoDisplay, 'PR #$id', title, author, age, url));
+        items.add(_oldOpen(repoDisplay, 'PR #$id', title, author, age, url,
+            isMine: mine));
       }
     }
     return items;
   }
 
   static AttentionItem _reviewRequested(String repoDisplay, String prLabel,
-      String title, String author, int? ageDays, String? url) {
+      String title, String author, int? ageDays, String? url,
+      {bool isMine = false}) {
     return AttentionItem(
       id: 'reviewRequested:$repoDisplay:$prLabel',
       category: 'reviewRequested',
@@ -153,11 +186,13 @@ class AttentionService {
       repoDisplay: repoDisplay,
       url: url,
       ageDays: ageDays,
+      isMine: isMine,
     );
   }
 
   static AttentionItem _changesRequested(String repoDisplay, String prLabel,
-      String title, String author, int? ageDays, String? url) {
+      String title, String author, int? ageDays, String? url,
+      {bool isMine = false}) {
     return AttentionItem(
       id: 'changesRequested:$repoDisplay:$prLabel',
       category: 'changesRequested',
@@ -168,11 +203,13 @@ class AttentionService {
       repoDisplay: repoDisplay,
       url: url,
       ageDays: ageDays,
+      isMine: isMine,
     );
   }
 
   static AttentionItem _oldOpen(String repoDisplay, String prLabel,
-      String title, String author, int? ageDays, String? url) {
+      String title, String author, int? ageDays, String? url,
+      {bool isMine = false}) {
     return AttentionItem(
       id: 'oldOpenPr:$repoDisplay:$prLabel',
       category: 'oldOpenPr',
@@ -182,6 +219,7 @@ class AttentionService {
       repoDisplay: repoDisplay,
       url: url,
       ageDays: ageDays,
+      isMine: isMine,
     );
   }
 
@@ -225,6 +263,9 @@ class AttentionService {
     http.Client? client,
     int concurrency = 5,
     DateTime? now,
+    Set<String> selfGithubLogins = const {},
+    Set<String> selfAdoNames = const {},
+    Set<String> snoozedIds = const {},
   }) async {
     final httpClient = client ?? http.Client();
     final effectiveNow = now ?? DateTime.now();
@@ -244,8 +285,8 @@ class AttentionService {
         final name = _stringValue(map, 'repoName');
         if (owner == null || name == null) continue;
         final tokenId = _stringValue(map, 'tokenId');
-        tasks.add(() =>
-            _githubRepoItems(httpClient, owner, name, tokenId, effectiveNow));
+        tasks.add(() => _githubRepoItems(
+            httpClient, owner, name, tokenId, effectiveNow, selfGithubLogins));
       }
 
       for (final raw in adoRepos) {
@@ -256,12 +297,15 @@ class AttentionService {
         final name = _stringValue(map, 'repoName');
         if (organization == null || project == null || name == null) continue;
         final tokenId = _stringValue(map, 'tokenId');
-        tasks.add(() => _adoRepoItems(
-            httpClient, organization, project, name, tokenId, effectiveNow));
+        tasks.add(() => _adoRepoItems(httpClient, organization, project, name,
+            tokenId, effectiveNow, selfAdoNames));
       }
 
       final grouped = await _runBounded(tasks, concurrency);
-      final items = grouped.expand((e) => e).toList();
+      final items = grouped
+          .expand((e) => e)
+          .where((item) => !snoozedIds.contains(item.id))
+          .toList();
 
       items.sort((a, b) {
         final bySeverity = b.severity.compareTo(a.severity);
@@ -274,8 +318,13 @@ class AttentionService {
     }
   }
 
-  static Future<List<AttentionItem>> _githubRepoItems(http.Client client,
-      String owner, String name, String? tokenId, DateTime now) async {
+  static Future<List<AttentionItem>> _githubRepoItems(
+      http.Client client,
+      String owner,
+      String name,
+      String? tokenId,
+      DateTime now,
+      Set<String> selfGithubLogins) async {
     final repoDisplay = '$owner/$name';
     try {
       final secret =
@@ -299,7 +348,11 @@ class AttentionService {
       }
       final body = jsonDecode(response.body);
       if (body is! List) return const [];
-      return githubItems(repoDisplay: repoDisplay, prs: body, now: now);
+      return githubItems(
+          repoDisplay: repoDisplay,
+          prs: body,
+          now: now,
+          selfGithubLogins: selfGithubLogins);
     } catch (e) {
       debugPrint('AttentionService GitHub fetch failed for $repoDisplay: $e');
       return [_errorItem(repoDisplay, 'Could not load pull requests')];
@@ -312,7 +365,8 @@ class AttentionService {
       String project,
       String name,
       String? tokenId,
-      DateTime now) async {
+      DateTime now,
+      Set<String> selfAdoNames) async {
     final repoDisplay = '$organization/$project/$name';
     try {
       final secret =
@@ -347,6 +401,7 @@ class AttentionService {
         name: name,
         prs: value,
         now: now,
+        selfAdoNames: selfAdoNames,
       );
     } catch (e) {
       debugPrint('AttentionService ADO fetch failed for $repoDisplay: $e');

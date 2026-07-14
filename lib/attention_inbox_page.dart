@@ -1,10 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'app_http.dart';
 import 'attention_service.dart';
+import 'identity_store.dart';
+import 'notification_service.dart';
+import 'snooze_store.dart';
 
 /// Shows a ranked list of items that need the user's attention across all
-/// monitored repositories (PRs waiting on review, stale PRs, and errors).
+/// monitored repositories (PRs waiting on review, changes requested, stale PRs,
+/// and errors). Supports snooze/dismiss and a "Mine" filter.
 class AttentionInboxPage extends StatefulWidget {
   const AttentionInboxPage({super.key});
 
@@ -15,6 +22,8 @@ class AttentionInboxPage extends StatefulWidget {
 class _AttentionInboxPageState extends State<AttentionInboxPage> {
   List<AttentionItem> _items = const [];
   bool _loading = true;
+  bool _mineOnly = false;
+  bool _identitySet = false;
   String? _error;
   DateTime? _lastChecked;
 
@@ -24,19 +33,32 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
     _load();
   }
 
+  List<AttentionItem> get _visibleItems =>
+      _mineOnly ? _items.where((i) => i.isMine).toList() : _items;
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final items = await AttentionService.computeAll();
+      final snoozed = await SnoozeStore.snoozedIds();
+      final selfGithub = await IdentityStore.selfGithubLogins();
+      final selfAdo = await IdentityStore.selfAdoNames();
+      final items = await AttentionService.computeAll(
+        client: AppHttp.client,
+        snoozedIds: snoozed,
+        selfGithubLogins: selfGithub,
+        selfAdoNames: selfAdo,
+      );
       if (!mounted) return;
       setState(() {
         _items = items;
+        _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
         _lastChecked = DateTime.now();
         _loading = false;
       });
+      unawaited(NotificationService.notifyNewAttention(items));
     } catch (e) {
       debugPrint('AttentionInbox failed to load: $e');
       if (!mounted) return;
@@ -54,6 +76,13 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       appBar: AppBar(
         title: const Text('Attention'),
         actions: [
+          IconButton(
+            icon: Icon(_mineOnly ? Icons.person : Icons.groups),
+            tooltip:
+                _mineOnly ? 'Showing yours — tap for all' : 'Show only mine',
+            onPressed:
+                _loading ? null : () => setState(() => _mineOnly = !_mineOnly),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
@@ -79,58 +108,137 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       );
     }
 
-    if (_items.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          const SizedBox(height: 140),
-          Center(
-            child: Icon(Icons.check_circle_outline,
-                size: 56, color: Colors.green[400]),
-          ),
-          const SizedBox(height: 12),
-          const Center(child: Text('Nothing needs your attention right now.')),
-          const SizedBox(height: 6),
-          Center(
-            child: Text(
-              _lastChecked == null
-                  ? 'Pull down to refresh.'
-                  : 'Checked ${_relativeTime(_lastChecked!)} · pull down to refresh.',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
-            ),
-          ),
-        ],
-      );
-    }
+    final visible = _visibleItems;
+    if (visible.isEmpty) return _buildEmptyState();
 
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: _items.length + 1,
+      itemCount: visible.length + 1,
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
-        if (index == 0) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-            child: Text(
-              '${_items.length} item${_items.length == 1 ? '' : 's'} '
-              'need${_items.length == 1 ? 's' : ''} attention'
-              '${_lastChecked == null ? '' : ' · checked ${_relativeTime(_lastChecked!)}'}',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
-            ),
-          );
-        }
-        final item = _items[index - 1];
-        final visual = _visualFor(item.category);
-        return ListTile(
-          key: ValueKey(item.id),
-          leading: Icon(visual.icon, color: visual.color),
-          title: Text(item.title),
-          subtitle: Text(item.subtitle),
-          trailing:
-              item.url != null ? const Icon(Icons.open_in_new, size: 16) : null,
-          onTap: item.url == null ? null : () => _open(item.url!),
-        );
+        if (index == 0) return _buildHeader(visible.length);
+        return _buildItemTile(visible[index - 1]);
       },
+    );
+  }
+
+  Widget _buildEmptyState() {
+    final String message;
+    if (_items.isEmpty) {
+      message = 'Nothing needs your attention right now.';
+    } else if (_mineOnly && !_identitySet) {
+      message = 'Set your identity in People to use the "Mine" filter.';
+    } else {
+      message = 'None of the current items are yours.';
+    }
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        const SizedBox(height: 140),
+        Center(
+          child: Icon(Icons.check_circle_outline,
+              size: 56, color: Colors.green[400]),
+        ),
+        const SizedBox(height: 12),
+        Center(child: Text(message, textAlign: TextAlign.center)),
+        const SizedBox(height: 6),
+        Center(
+          child: Text(
+            _lastChecked == null
+                ? 'Pull down to refresh.'
+                : 'Checked ${_relativeTime(_lastChecked!)} · pull down to refresh.',
+            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeader(int count) {
+    final noun = 'item${count == 1 ? '' : 's'}';
+    final label = _mineOnly
+        ? '$count $noun yours'
+        : '$count $noun need${count == 1 ? 's' : ''} attention';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: Text(
+        '$label${_lastChecked == null ? '' : ' · checked ${_relativeTime(_lastChecked!)}'}',
+        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+      ),
+    );
+  }
+
+  Widget _buildItemTile(AttentionItem item) {
+    final visual = _visualFor(item.category);
+    return Dismissible(
+      key: ValueKey(item.id),
+      background: _swipeBackground(
+        alignment: Alignment.centerLeft,
+        color: Colors.blueGrey,
+        icon: Icons.snooze,
+        label: 'Snooze 1 day',
+      ),
+      secondaryBackground: _swipeBackground(
+        alignment: Alignment.centerRight,
+        color: Colors.red,
+        icon: Icons.notifications_off,
+        label: 'Dismiss',
+      ),
+      onDismissed: (direction) => _onDismissed(item, direction),
+      child: ListTile(
+        leading: Icon(visual.icon, color: visual.color),
+        title: Text(item.title),
+        subtitle: Text(item.subtitle),
+        trailing:
+            item.url != null ? const Icon(Icons.open_in_new, size: 16) : null,
+        onTap: item.url == null ? null : () => _open(item.url!),
+      ),
+    );
+  }
+
+  Widget _swipeBackground({
+    required Alignment alignment,
+    required Color color,
+    required IconData icon,
+    required String label,
+  }) {
+    return Container(
+      color: color,
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white),
+          const SizedBox(width: 8),
+          Text(label, style: const TextStyle(color: Colors.white)),
+        ],
+      ),
+    );
+  }
+
+  void _onDismissed(AttentionItem item, DismissDirection direction) {
+    final dismissForever = direction == DismissDirection.endToStart;
+    // Remove synchronously so the dismissed widget is gone before the next
+    // build, then persist the snooze in the background.
+    setState(() => _items = _items.where((i) => i.id != item.id).toList());
+    final pending = dismissForever
+        ? SnoozeStore.snooze(item.id)
+        : SnoozeStore.snooze(item.id, forDuration: const Duration(days: 1));
+    unawaited(pending);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(dismissForever ? 'Dismissed' : 'Snoozed for 1 day'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () async {
+            await pending; // ensure the snooze write finished before undoing
+            await SnoozeStore.unsnooze(item.id);
+            if (!mounted) return;
+            await _load();
+          },
+        ),
+      ),
     );
   }
 
