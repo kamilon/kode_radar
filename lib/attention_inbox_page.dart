@@ -232,7 +232,11 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () async {
-            await pending; // ensure the snooze write finished before undoing
+            // Ensure the snooze write finished before undoing, but never let a
+            // persistence error prevent the undo/reload.
+            try {
+              await pending;
+            } catch (_) {}
             await SnoozeStore.unsnooze(item.id);
             if (!mounted) return;
             await _load();

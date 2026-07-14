@@ -13,15 +13,33 @@ class CachedHttpClient extends http.BaseClient {
   final ResponseCache _cache;
   final Map<String, RateLimitStatus> _rateLimits = <String, RateLimitStatus>{};
 
-  /// Merged GitHub rate-limit view across api.github.com token scopes.
+  /// Worst-case merged GitHub rate-limit view across api.github.com token
+  /// scopes (lowest remaining, latest reset, largest retry-after).
   RateLimitStatus get githubRateLimit {
-    var result = const RateLimitStatus();
+    int? remaining;
+    DateTime? resetAt;
+    Duration? retryAfter;
     for (final entry in _rateLimits.entries) {
-      if (entry.key.startsWith('api.github.com|')) {
-        result = result.merge(entry.value);
+      if (!entry.key.startsWith('api.github.com|')) continue;
+      final status = entry.value;
+      if (status.remaining != null &&
+          (remaining == null || status.remaining! < remaining)) {
+        remaining = status.remaining;
+      }
+      if (status.resetAt != null &&
+          (resetAt == null || status.resetAt!.isAfter(resetAt))) {
+        resetAt = status.resetAt;
+      }
+      if (status.retryAfter != null &&
+          (retryAfter == null || status.retryAfter! > retryAfter)) {
+        retryAfter = status.retryAfter;
       }
     }
-    return result;
+    return RateLimitStatus(
+      remaining: remaining,
+      resetAt: resetAt,
+      retryAfter: retryAfter,
+    );
   }
 
   String _scopeKey(http.BaseRequest request) {
