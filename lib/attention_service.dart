@@ -221,8 +221,10 @@ class AttentionService {
   static Future<List<AttentionItem>> computeAll({
     http.Client? client,
     int concurrency = 5,
+    DateTime? now,
   }) async {
     final httpClient = client ?? http.Client();
+    final effectiveNow = now ?? DateTime.now();
     try {
       final prefs = await SharedPreferences.getInstance();
       final githubRepos =
@@ -239,7 +241,8 @@ class AttentionService {
         final name = _stringValue(map, 'repoName');
         if (owner == null || name == null) continue;
         final tokenId = _stringValue(map, 'tokenId');
-        tasks.add(() => _githubRepoItems(httpClient, owner, name, tokenId));
+        tasks.add(() =>
+            _githubRepoItems(httpClient, owner, name, tokenId, effectiveNow));
       }
 
       for (final raw in adoRepos) {
@@ -250,8 +253,8 @@ class AttentionService {
         final name = _stringValue(map, 'repoName');
         if (organization == null || project == null || name == null) continue;
         final tokenId = _stringValue(map, 'tokenId');
-        tasks.add(() =>
-            _adoRepoItems(httpClient, organization, project, name, tokenId));
+        tasks.add(() => _adoRepoItems(
+            httpClient, organization, project, name, tokenId, effectiveNow));
       }
 
       final grouped = await _runBounded(tasks, concurrency);
@@ -268,8 +271,8 @@ class AttentionService {
     }
   }
 
-  static Future<List<AttentionItem>> _githubRepoItems(
-      http.Client client, String owner, String name, String? tokenId) async {
+  static Future<List<AttentionItem>> _githubRepoItems(http.Client client,
+      String owner, String name, String? tokenId, DateTime now) async {
     final repoDisplay = '$owner/$name';
     try {
       final secret =
@@ -293,15 +296,19 @@ class AttentionService {
       }
       final body = jsonDecode(response.body);
       if (body is! List) return const [];
-      return githubItems(
-          repoDisplay: repoDisplay, prs: body, now: DateTime.now());
+      return githubItems(repoDisplay: repoDisplay, prs: body, now: now);
     } catch (e) {
       return [_errorItem(repoDisplay, 'Error: $e')];
     }
   }
 
-  static Future<List<AttentionItem>> _adoRepoItems(http.Client client,
-      String organization, String project, String name, String? tokenId) async {
+  static Future<List<AttentionItem>> _adoRepoItems(
+      http.Client client,
+      String organization,
+      String project,
+      String name,
+      String? tokenId,
+      DateTime now) async {
     final repoDisplay = '$organization/$project/$name';
     try {
       final secret =
@@ -335,7 +342,7 @@ class AttentionService {
         project: project,
         name: name,
         prs: value,
-        now: DateTime.now(),
+        now: now,
       );
     } catch (e) {
       return [_errorItem(repoDisplay, 'Error: $e')];

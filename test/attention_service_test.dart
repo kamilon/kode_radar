@@ -1,5 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kode_radar/attention_service.dart';
+import 'package:kode_radar/token_store.dart';
 
 void main() {
   final now = DateTime.parse('2026-07-13T12:00:00Z');
@@ -205,5 +212,59 @@ void main() {
       ],
     );
     expect(items, isEmpty);
+  });
+
+  group('computeAll', () {
+    setUp(() {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      FlutterSecureStorage.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('uses the injected clock so age is deterministic (not wall clock)',
+        () async {
+      final token = await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'Acme',
+        scope: 'acme',
+        secret: 'ghp_secret',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('github_repos', [
+        jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': token.id}),
+      ]);
+
+      final client = MockClient((request) async {
+        if (request.url.path == '/repos/acme/api/pulls') {
+          return http.Response(
+            jsonEncode([
+              {
+                'number': 7,
+                'title': 'Waiting',
+                'user': {'login': 'alice'},
+                // Created a decade before the injected clock; if the code used
+                // the wall clock this age would be far larger than 10 days.
+                'created_at': '2020-01-01T00:00:00Z',
+                'requested_reviewers': [
+                  {'login': 'bob'}
+                ],
+                'html_url': 'https://github.com/acme/api/pull/7',
+              },
+            ]),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      });
+
+      final items = await AttentionService.computeAll(
+        client: client,
+        now: DateTime.parse('2020-01-11T00:00:00Z'),
+      );
+
+      expect(items, hasLength(1));
+      expect(items.single.category, 'reviewRequested');
+      expect(items.single.ageDays, 10);
+    });
   });
 }
