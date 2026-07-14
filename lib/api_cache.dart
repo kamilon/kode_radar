@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 class CachedHttpClient extends http.BaseClient {
   CachedHttpClient({http.Client? inner, ResponseCache? cache})
@@ -178,76 +177,26 @@ class CachedHttpClient extends http.BaseClient {
   }
 }
 
+/// In-memory (per-isolate) response cache. Bodies are never persisted to disk,
+/// so private-repo data is never written unencrypted and cache hits incur no
+/// disk writes. The cache resets on app restart (a within-session cache is what
+/// matters for rate-limit relief).
 class ResponseCache {
-  static const String prefsKey = 'api_response_cache';
   static const int maxEntries = 200;
 
-  // Serializes read-modify-write access so concurrent GETs (bounded-concurrency
-  // fetches all share one cache) can't clobber each other's entries. Static so
-  // every ResponseCache instance serializes against the shared prefs key.
-  static Future<void> _lock = Future<void>.value();
-
-  static Future<T> _runLocked<T>(Future<T> Function() action) {
-    final result = _lock.then((_) => action());
-    _lock = result.then((_) {}, onError: (_) {});
-    return result;
-  }
+  final Map<String, CachedResponse> _entries = <String, CachedResponse>{};
 
   Future<CachedResponse?> get(String key) async {
-    return _runLocked(() async {
-      final prefs = await SharedPreferences.getInstance();
-      final entries = _readEntries(prefs);
-      final cached = entries[key];
-      if (cached == null) return null;
-
-      final touched = cached.copyWith(lastUsed: DateTime.now().toUtc());
-      entries[key] = touched;
-      await _writeEntries(prefs, entries);
-      return touched;
-    });
+    final cached = _entries[key];
+    if (cached == null) return null;
+    final touched = cached.copyWith(lastUsed: DateTime.now().toUtc());
+    _entries[key] = touched;
+    return touched;
   }
 
   Future<void> put(String key, CachedResponse resp) async {
-    return _runLocked(() async {
-      final prefs = await SharedPreferences.getInstance();
-      final entries = _readEntries(prefs);
-      entries[key] = resp.copyWith(lastUsed: DateTime.now().toUtc());
-      _evictOldEntries(entries);
-      await _writeEntries(prefs, entries);
-    });
-  }
-
-  Map<String, CachedResponse> _readEntries(SharedPreferences prefs) {
-    final raw = prefs.getString(prefsKey);
-    if (raw == null || raw.isEmpty) return <String, CachedResponse>{};
-
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) return <String, CachedResponse>{};
-      final entries = <String, CachedResponse>{};
-      for (final entry in decoded.entries) {
-        final key = entry.key;
-        final value = entry.value;
-        if (key is! String || value is! Map) continue;
-        final cached = CachedResponse.fromJson(
-          Map<String, dynamic>.from(value),
-        );
-        if (cached != null) entries[key] = cached;
-      }
-      return entries;
-    } catch (_) {
-      return <String, CachedResponse>{};
-    }
-  }
-
-  Future<void> _writeEntries(
-    SharedPreferences prefs,
-    Map<String, CachedResponse> entries,
-  ) async {
-    await prefs.setString(
-      prefsKey,
-      jsonEncode(entries.map((key, value) => MapEntry(key, value.toJson()))),
-    );
+    _entries[key] = resp.copyWith(lastUsed: DateTime.now().toUtc());
+    _evictOldEntries(_entries);
   }
 
   void _evictOldEntries(Map<String, CachedResponse> entries) {
@@ -277,41 +226,6 @@ class CachedResponse {
   final DateTime storedAt;
   final DateTime lastUsed;
   final Map<String, String> headers;
-
-  Map<String, dynamic> toJson() {
-    return {
-      'etag': etag,
-      'body': body,
-      'statusCode': statusCode,
-      'storedAt': storedAt.toUtc().toIso8601String(),
-      'lastUsed': lastUsed.toUtc().toIso8601String(),
-      'headers': headers,
-    };
-  }
-
-  static CachedResponse? fromJson(Map<String, dynamic> json) {
-    final etag = json['etag'];
-    final body = json['body'];
-    final statusCode = _intValue(json['statusCode']);
-    final storedAt = _dateValue(json['storedAt']);
-    if (etag is! String ||
-        body is! String ||
-        statusCode == null ||
-        storedAt == null) {
-      return null;
-    }
-
-    final headers = _stringMap(json['headers']);
-    headers.putIfAbsent('etag', () => etag);
-    return CachedResponse(
-      etag: etag,
-      body: body,
-      statusCode: statusCode,
-      storedAt: storedAt,
-      lastUsed: _dateValue(json['lastUsed']) ?? storedAt,
-      headers: headers,
-    );
-  }
 
   CachedResponse copyWith({
     String? etag,
@@ -454,30 +368,6 @@ String? _headerValue(Map<String, String> headers, String name) {
     if (entry.key.toLowerCase() == lowerName) return entry.value;
   }
   return null;
-}
-
-int? _intValue(dynamic value) {
-  if (value is int) return value;
-  if (value is String) return int.tryParse(value);
-  return null;
-}
-
-DateTime? _dateValue(dynamic value) {
-  if (value is! String) return null;
-  return DateTime.tryParse(value);
-}
-
-Map<String, String> _stringMap(dynamic value) {
-  final map = <String, String>{};
-  if (value is! Map) return map;
-  for (final entry in value.entries) {
-    final key = entry.key;
-    final entryValue = entry.value;
-    if (key is String && entryValue is String) {
-      map[key] = entryValue;
-    }
-  }
-  return map;
 }
 
 String _stableHash(String value) {
