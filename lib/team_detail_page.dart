@@ -45,8 +45,9 @@ class _TeamDetailPageState extends State<TeamDetailPage> {
     });
     try {
       // Fetch repo activity and the feed concurrently, both scoped to the
-      // team's repositories. Future.wait ensures both are awaited even if one
-      // fails (no unhandled async error).
+      // team's repositories. Future.wait attaches error handlers to both
+      // futures, so a failure in either is caught here rather than surfacing as
+      // an unhandled async error.
       final results = await Future.wait([
         ActivityService.computeAll(
           client: AppHttp.client,
@@ -177,6 +178,9 @@ class _TeamDetailPageState extends State<TeamDetailPage> {
 
   Widget _buildActivityTab() {
     if (_error != null) return _errorList();
+    if (_team.repoKeys.isEmpty) {
+      return _centeredMessage('No repositories assigned to this team.');
+    }
     if (_events.isEmpty) {
       final days = ActivityFeedService.defaultLookback.inDays;
       final message = _failedSources > 0
