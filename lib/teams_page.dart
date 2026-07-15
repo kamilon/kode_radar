@@ -67,9 +67,9 @@ class _TeamsPageState extends State<TeamsPage> {
     }
   }
 
-  /// Aggregate the team's member-repo activity-score series into one trend by
-  /// summing the most-recent points (aligned newest-first, shorter series
-  /// contribute where they have data).
+  /// Aggregates the team's member-repo snapshots into a single day-bucketed
+  /// activity-score series (ascending by day), so repos with uneven capture
+  /// histories align by date rather than by list index.
   List<num> _teamSeries(Team team, Map<String, List<MetricSnapshot>> history) {
     // Bucket member-repo snapshots by calendar day and sum activityScore per
     // day, so repos with different capture histories align by date (not by
@@ -240,7 +240,8 @@ class _TeamsPageState extends State<TeamsPage> {
   String _relativeTime(DateTime? value) {
     if (value == null) return 'no activity';
     final diff = DateTime.now().difference(value);
-    if (diff.isNegative || diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.isNegative || diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${diff.inDays}d ago';
   }
