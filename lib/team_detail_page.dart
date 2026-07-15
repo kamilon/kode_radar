@@ -44,9 +44,11 @@ class _TeamDetailPageState extends State<TeamDetailPage> {
       _error = null;
     });
     try {
-      // Fetch repo activity and the (team-scoped) feed concurrently.
+      // Fetch repo activity and the feed concurrently, both scoped to the
+      // team's repositories.
       final activitiesFuture = ActivityService.computeAll(
         client: AppHttp.client,
+        onlyRepoKeys: _team.repoKeys,
       );
       final feedFuture = ActivityFeedService.computeAll(
         client: AppHttp.client,
@@ -60,7 +62,9 @@ class _TeamDetailPageState extends State<TeamDetailPage> {
               final byScore = b.activityScore.compareTo(a.activityScore);
               return byScore != 0
                   ? byScore
-                  : a.displayName.compareTo(b.displayName);
+                  : a.displayName.toLowerCase().compareTo(
+                      b.displayName.toLowerCase(),
+                    );
             });
       if (!mounted) return;
       setState(() {
@@ -108,10 +112,11 @@ class _TeamDetailPageState extends State<TeamDetailPage> {
                 children: [
                   _buildHeader(),
                   const Divider(height: 1),
-                  ?activitySourceNotice(
-                    failedSources: _failedSources,
-                    truncated: _truncated,
-                  ),
+                  if (_error == null)
+                    ?activitySourceNotice(
+                      failedSources: _failedSources,
+                      truncated: _truncated,
+                    ),
                   Expanded(
                     child: TabBarView(
                       children: [_buildReposTab(), _buildActivityTab()],

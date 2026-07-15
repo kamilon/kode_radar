@@ -465,6 +465,7 @@ class ActivityService {
   static Future<List<RepoActivity>> computeAll({
     http.Client? client,
     int concurrency = 5,
+    Set<String>? onlyRepoKeys,
   }) async {
     final httpClient = client ?? http.Client();
     try {
@@ -485,6 +486,7 @@ class ActivityService {
           final name = _stringValue(decoded, 'repoName');
           if (owner == null || name == null) continue;
           final repoKey = RepoDiscoveryService.githubKey(owner, name);
+          if (onlyRepoKeys != null && !onlyRepoKeys.contains(repoKey)) continue;
           final tokenId = _stringValue(decoded, 'tokenId');
           tasks.add(() async {
             try {
@@ -528,6 +530,7 @@ class ActivityService {
             project,
             name,
           );
+          if (onlyRepoKeys != null && !onlyRepoKeys.contains(repoKey)) continue;
           final tokenId = _stringValue(decoded, 'tokenId');
           tasks.add(() async {
             try {

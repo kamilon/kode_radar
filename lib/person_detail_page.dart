@@ -80,7 +80,7 @@ class _PersonDetailPageState extends State<PersonDetailPage> {
         children: [
           _buildHeader(),
           const Divider(height: 1),
-          if (!_loading)
+          if (!_loading && _error == null)
             ?activitySourceNotice(
               failedSources: _failedSources,
               truncated: _truncated,

@@ -174,6 +174,7 @@ class _TeamsPageState extends State<TeamsPage> {
         final team = _teams[index];
         final rollup = _rollups[team.id];
         return Card(
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () => Navigator.push(
               context,
