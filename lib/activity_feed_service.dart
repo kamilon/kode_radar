@@ -410,6 +410,34 @@ class ActivityFeedService {
     return result;
   }
 
+  /// Filters [events] to those authored by a person with the given provider
+  /// identities (GitHub logins matched case-insensitively; ADO display names
+  /// matched case-insensitively/trimmed).
+  static List<ActivityEvent> eventsForActor(
+    List<ActivityEvent> events, {
+    Set<String> githubLogins = const {},
+    Set<String> adoNames = const {},
+  }) {
+    final gh = githubLogins.map((e) => e.trim().toLowerCase()).toSet();
+    final ado = adoNames.map((e) => e.trim().toLowerCase()).toSet();
+    return events.where((event) {
+      final actor = event.actor.trim().toLowerCase();
+      if (actor.isEmpty) return false;
+      if (event.provider == 'github') return gh.contains(actor);
+      if (event.provider == 'ado') return ado.contains(actor);
+      return false;
+    }).toList();
+  }
+
+  /// Filters [events] to those in any of the given repository [repoKeys].
+  static List<ActivityEvent> eventsForRepoKeys(
+    List<ActivityEvent> events,
+    Set<String> repoKeys,
+  ) {
+    if (repoKeys.isEmpty) return const [];
+    return events.where((event) => repoKeys.contains(event.repoKey)).toList();
+  }
+
   /// Sorts newest-first, de-duplicates by id, and keeps only events at or after
   /// [since] (capped at [maxEvents]).
   static List<ActivityEvent> mergeAndWindow(
@@ -441,6 +469,9 @@ class ActivityFeedService {
     Duration lookback = defaultLookback,
     Set<String> selfGithubLogins = const {},
     Set<String> selfAdoNames = const {},
+    Set<String>? onlyRepoKeys,
+    Set<String> actorGithubLogins = const {},
+    Set<String> actorAdoNames = const {},
   }) async {
     final httpClient = client ?? http.Client();
     final effectiveNow = (now ?? DateTime.now()).toUtc();
@@ -460,6 +491,12 @@ class ActivityFeedService {
         final owner = _str(map, 'owner');
         final name = _str(map, 'repoName');
         if (owner == null || name == null) continue;
+        if (onlyRepoKeys != null &&
+            !onlyRepoKeys.contains(
+              RepoDiscoveryService.githubKey(owner, name),
+            )) {
+          continue;
+        }
         final tokenId = _str(map, 'tokenId');
         tasks.add(
           () => _githubRepoEvents(
@@ -480,6 +517,12 @@ class ActivityFeedService {
         final project = _str(map, 'project');
         final name = _str(map, 'repoName');
         if (organization == null || project == null || name == null) continue;
+        if (onlyRepoKeys != null &&
+            !onlyRepoKeys.contains(
+              RepoDiscoveryService.adoKey(organization, project, name),
+            )) {
+          continue;
+        }
         final tokenId = _str(map, 'tokenId');
         tasks.add(
           () => _adoRepoEvents(
@@ -496,8 +539,21 @@ class ActivityFeedService {
 
       final outcomes = await _runBounded(tasks, concurrency);
       final combined = _FetchOutcome.merge(outcomes);
+      // Apply person/repo scoping BEFORE the maxEvents cap so a quiet person or
+      // team can't be evicted by unrelated high-volume repositories.
+      var events = combined.events;
+      if (actorGithubLogins.isNotEmpty || actorAdoNames.isNotEmpty) {
+        events = eventsForActor(
+          events,
+          githubLogins: actorGithubLogins,
+          adoNames: actorAdoNames,
+        );
+      }
+      if (onlyRepoKeys != null) {
+        events = eventsForRepoKeys(events, onlyRepoKeys);
+      }
       return ActivityFeedResult(
-        events: mergeAndWindow(combined.events, since),
+        events: mergeAndWindow(events, since),
         failedSources: combined.failedCount,
         truncated: combined.truncated,
       );

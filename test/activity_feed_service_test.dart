@@ -359,6 +359,51 @@ void main() {
     });
   });
 
+  group('eventsForActor / eventsForRepoKeys', () {
+    ActivityEvent ev(String id, String provider, String actor, String rk) =>
+        ActivityEvent(
+          id: id,
+          type: ActivityType.push,
+          provider: provider,
+          repoKey: rk,
+          repoDisplay: rk,
+          actor: actor,
+          title: 't',
+          subtitle: 's',
+          occurredAt: DateTime.parse('2026-07-14T00:00:00Z'),
+        );
+
+    test('eventsForActor matches provider identities case-insensitively', () {
+      final events = [
+        ev('1', 'github', 'OctoCat', 'github:acme/api'),
+        ev('2', 'github', 'someoneelse', 'github:acme/api'),
+        ev('3', 'ado', 'Jane Doe', 'ado:contoso/web/site'),
+        ev('4', 'ado', 'Other Person', 'ado:contoso/web/site'),
+        ev('5', 'github', '', 'github:acme/api'),
+      ];
+      final mine = ActivityFeedService.eventsForActor(
+        events,
+        githubLogins: {'octocat'},
+        adoNames: {'jane doe'},
+      );
+      expect(mine.map((e) => e.id).toList(), ['1', '3']);
+    });
+
+    test('eventsForRepoKeys filters by repo key; empty set yields nothing', () {
+      final events = [
+        ev('1', 'github', 'a', 'github:acme/api'),
+        ev('2', 'github', 'b', 'github:acme/web'),
+        ev('3', 'ado', 'c', 'ado:contoso/web/site'),
+      ];
+      final teamEvents = ActivityFeedService.eventsForRepoKeys(events, {
+        'github:acme/api',
+        'ado:contoso/web/site',
+      });
+      expect(teamEvents.map((e) => e.id).toList(), ['1', '3']);
+      expect(ActivityFeedService.eventsForRepoKeys(events, {}), isEmpty);
+    });
+  });
+
   group('computeAll', () {
     setUp(() {
       TestWidgetsFlutterBinding.ensureInitialized();
@@ -597,5 +642,108 @@ void main() {
         expect(result.truncated, isFalse);
       },
     );
+
+    test('actorGithubLogins scopes the feed to a person', () async {
+      final gh = await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'Acme',
+        scope: 'acme',
+        secret: 'ghp_secret',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('github_repos', [
+        jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': gh.id}),
+        jsonEncode({'owner': 'acme', 'repoName': 'web', 'tokenId': gh.id}),
+      ]);
+      final client = MockClient((request) async {
+        final path = request.url.path;
+        if (path == '/repos/acme/api/events') {
+          return http.Response(
+            jsonEncode([
+              {
+                'id': '1',
+                'type': 'PullRequestEvent',
+                'actor': {'login': 'alice'},
+                'created_at': '2026-07-14T11:00:00Z',
+                'payload': {
+                  'action': 'opened',
+                  'pull_request': {'number': 1, 'title': 'A'},
+                },
+              },
+            ]),
+            200,
+          );
+        }
+        if (path == '/repos/acme/web/events') {
+          return http.Response(
+            jsonEncode([
+              {
+                'id': '2',
+                'type': 'PullRequestEvent',
+                'actor': {'login': 'bob'},
+                'created_at': '2026-07-14T12:00:00Z',
+                'payload': {
+                  'action': 'opened',
+                  'pull_request': {'number': 2, 'title': 'B'},
+                },
+              },
+            ]),
+            200,
+          );
+        }
+        return http.Response(jsonEncode({'workflow_runs': []}), 200);
+      });
+
+      final result = await ActivityFeedService.computeAll(
+        client: client,
+        now: DateTime.parse('2026-07-15T12:00:00Z'),
+        actorGithubLogins: {'alice'},
+      );
+      expect(result.events, isNotEmpty);
+      expect(result.events.map((e) => e.actor).toSet(), {'alice'});
+    });
+
+    test('onlyRepoKeys scopes the feed to selected repositories', () async {
+      final gh = await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'Acme',
+        scope: 'acme',
+        secret: 'ghp_secret',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('github_repos', [
+        jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': gh.id}),
+        jsonEncode({'owner': 'acme', 'repoName': 'web', 'tokenId': gh.id}),
+      ]);
+      final client = MockClient((request) async {
+        final path = request.url.path;
+        if (path == '/repos/acme/api/events') {
+          return http.Response(
+            jsonEncode([
+              {
+                'id': '1',
+                'type': 'PushEvent',
+                'actor': {'login': 'alice'},
+                'created_at': '2026-07-14T11:00:00Z',
+                'payload': {'ref': 'refs/heads/main', 'size': 1},
+              },
+            ]),
+            200,
+          );
+        }
+        return http.Response(jsonEncode({'workflow_runs': []}), 200);
+      });
+
+      final result = await ActivityFeedService.computeAll(
+        client: client,
+        now: DateTime.parse('2026-07-15T12:00:00Z'),
+        onlyRepoKeys: {'github:acme/api'},
+      );
+      expect(result.events, isNotEmpty);
+      expect(
+        result.events.every((e) => e.repoKey == 'github:acme/api'),
+        isTrue,
+      );
+    });
   });
 }

@@ -8,6 +8,7 @@ import 'metric_snapshot.dart';
 import 'metric_store.dart';
 import 'sparkline.dart';
 import 'team.dart';
+import 'team_detail_page.dart';
 import 'team_service.dart';
 import 'team_store.dart';
 
@@ -173,58 +174,67 @@ class _TeamsPageState extends State<TeamsPage> {
         final team = _teams[index];
         final rollup = _rollups[team.id];
         return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        team.name,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                    Sparkline(values: _series[team.id] ?? const []),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (team.repoKeys.isEmpty)
-                  Text(
-                    'No repositories assigned yet.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  )
-                else if (rollup == null || rollup.repoCount == 0)
-                  Text(
-                    'No data yet — assigned repos are loading or failed to '
-                    'fetch.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  )
-                else
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
+          child: InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => TeamDetailPage(team: team)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      _metric(Icons.folder, '${rollup.repoCount} repos'),
-                      _metric(Icons.merge_type, '${rollup.openPrs} open PRs'),
-                      _metric(
-                        Icons.rate_review,
-                        '${rollup.needsReview} review requested',
-                      ),
-                      _metric(
-                        Icons.people,
-                        '${rollup.contributors.length} contributors',
-                      ),
-                      _metric(Icons.update, _relativeTime(rollup.lastActivity)),
-                      if (rollup.oldestOpenPrAgeDays != null)
-                        _metric(
-                          Icons.schedule,
-                          'oldest ${rollup.oldestOpenPrAgeDays}d',
+                      Expanded(
+                        child: Text(
+                          team.name,
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
+                      ),
+                      Sparkline(values: _series[team.id] ?? const []),
                     ],
                   ),
-              ],
+                  const SizedBox(height: 8),
+                  if (team.repoKeys.isEmpty)
+                    Text(
+                      'No repositories assigned yet.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    )
+                  else if (rollup == null || rollup.repoCount == 0)
+                    Text(
+                      'No data yet — assigned repos are loading or failed to '
+                      'fetch.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    )
+                  else
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        _metric(Icons.folder, '${rollup.repoCount} repos'),
+                        _metric(Icons.merge_type, '${rollup.openPrs} open PRs'),
+                        _metric(
+                          Icons.rate_review,
+                          '${rollup.needsReview} review requested',
+                        ),
+                        _metric(
+                          Icons.people,
+                          '${rollup.contributors.length} contributors',
+                        ),
+                        _metric(
+                          Icons.update,
+                          _relativeTime(rollup.lastActivity),
+                        ),
+                        if (rollup.oldestOpenPrAgeDays != null)
+                          _metric(
+                            Icons.schedule,
+                            'oldest ${rollup.oldestOpenPrAgeDays}d',
+                          ),
+                      ],
+                    ),
+                ],
+              ),
             ),
           ),
         );
