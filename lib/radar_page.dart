@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'activity_service.dart';
 import 'app_http.dart';
+import 'metric_store.dart';
+import 'sparkline.dart';
 
 class RadarPage extends StatefulWidget {
   const RadarPage({super.key});
@@ -13,6 +17,7 @@ class RadarPage extends StatefulWidget {
 
 class _RadarPageState extends State<RadarPage> {
   List<RepoActivity> _activities = const [];
+  Map<String, List<num>> _series = const {};
   bool _loading = true;
   String? _error;
 
@@ -32,9 +37,18 @@ class _RadarPageState extends State<RadarPage> {
       final activities = await ActivityService.computeAll(
         client: AppHttp.client,
       );
+      // Record a trend snapshot (deduped ~1/day), then load per-repo series.
+      await MetricStore.capture(activities);
+      final history = await MetricStore.all();
       if (!mounted) return;
       setState(() {
         _activities = activities;
+        _series = {
+          for (final a in activities)
+            a.repoKey: (history[a.repoKey] ?? const [])
+                .map((s) => s.activityScore)
+                .toList(),
+        };
         _loading = false;
       });
     } catch (e) {
@@ -143,6 +157,10 @@ class _RadarPageState extends State<RadarPage> {
                       ),
                     ],
                   ),
+                  if ((_series[activity.repoKey] ?? const []).length >= 2) ...[
+                    const SizedBox(height: 8),
+                    Sparkline(values: _series[activity.repoKey]!, width: 120),
+                  ],
                   if (activity.oldestOpenPrAgeDays != null) ...[
                     const SizedBox(height: 6),
                     Text(
