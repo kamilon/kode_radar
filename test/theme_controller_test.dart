@@ -8,6 +8,11 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    ThemeController.instance.debugReset();
+  });
+
+  tearDown(() {
+    ThemeController.instance.debugReset();
   });
 
   test('parseMode maps stored strings to ThemeMode (default system)', () {

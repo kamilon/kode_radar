@@ -29,8 +29,13 @@ final FlutterLocalNotificationsPlugin _notificationsPlugin =
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load the persisted light/dark/system theme preference.
-  await ThemeController.instance.load();
+  // Load the persisted light/dark/system theme preference; fall back to the
+  // system default if storage is unavailable rather than failing to launch.
+  try {
+    await ThemeController.instance.load();
+  } catch (e) {
+    debugPrint('Failed to load theme preference: $e');
+  }
 
   // Initialize local notifications
   const AndroidInitializationSettings initializationSettingsAndroid =

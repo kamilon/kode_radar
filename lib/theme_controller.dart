@@ -33,15 +33,23 @@ class ThemeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Updates and persists the theme mode.
+  /// Updates and persists the theme mode. Persists first so a failed write
+  /// never leaves the UI on a mode that won't survive a restart.
   Future<void> setMode(ThemeMode mode) async {
     if (mode == _mode) return;
-    _mode = mode;
-    notifyListeners();
     await _runLocked(() async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(storageKey, mode.name);
     });
+    _mode = mode;
+    notifyListeners();
+  }
+
+  /// Resets the in-memory mode to the default. For tests only, to keep the
+  /// singleton hermetic across test files.
+  @visibleForTesting
+  void debugReset() {
+    _mode = ThemeMode.system;
   }
 
   /// Parses a stored value into a [ThemeMode], defaulting to system.
