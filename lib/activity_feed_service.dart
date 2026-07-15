@@ -79,9 +79,14 @@ class ActivityFeedService {
           final noun = count == 1 ? 'commit' : 'commits';
           final before = _str(payload, 'before');
           final head = _str(payload, 'head');
-          final url = (before != null && head != null)
-              ? 'https://github.com/$repoDisplay/compare/$before...$head'
-              : 'https://github.com/$repoDisplay/commits/$branch';
+          final String url;
+          if (before != null && head != null) {
+            url = 'https://github.com/$repoDisplay/compare/$before...$head';
+          } else if (branch.isEmpty) {
+            url = 'https://github.com/$repoDisplay/commits';
+          } else {
+            url = 'https://github.com/$repoDisplay/commits/$branch';
+          }
           result.add(
             ActivityEvent(
               id: 'gh-event:${eventId ?? '$repoKey:${occurredAt.toIso8601String()}'}',
@@ -91,7 +96,8 @@ class ActivityFeedService {
               repoDisplay: repoDisplay,
               actor: actor,
               title:
-                  '${actor.isEmpty ? 'Someone' : actor} pushed $count $noun to $branch',
+                  '${actor.isEmpty ? 'Someone' : actor} pushed $count $noun'
+                  '${branch.isEmpty ? '' : ' to $branch'}',
               subtitle: repoDisplay,
               occurredAt: occurredAt,
               url: url,
@@ -807,7 +813,7 @@ class ActivityFeedService {
       }
     }
 
-    final workerCount = concurrency.clamp(1, tasks.length);
+    final workerCount = concurrency.clamp(1, tasks.length).toInt();
     await Future.wait(List.generate(workerCount, (_) => worker()));
     return results;
   }

@@ -149,6 +149,28 @@ void main() {
       expect(events.single.type, ActivityType.prClosed);
       expect(events.single.title, 'alice closed PR #8');
     });
+
+    test(
+      'push with a missing ref omits the branch suffix and trailing slash',
+      () {
+        final events = ActivityFeedService.githubEventsToActivity(
+          repoDisplay: repoDisplay,
+          repoKey: repoKey,
+          events: [
+            {
+              'id': '10',
+              'type': 'PushEvent',
+              'actor': {'login': 'alice'},
+              'created_at': '2026-07-14T10:00:00Z',
+              'payload': {'size': 2},
+            },
+          ],
+        );
+        expect(events.single.type, ActivityType.push);
+        expect(events.single.title, 'alice pushed 2 commits');
+        expect(events.single.url, 'https://github.com/acme/api/commits');
+      },
+    );
   });
 
   group('githubRunsToActivity', () {
