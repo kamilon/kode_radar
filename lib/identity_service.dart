@@ -29,6 +29,16 @@ class IdentityService {
 
   static const Duration _requestTimeout = Duration(seconds: 20);
 
+  // Serializes the read-modify-write persistence step so concurrent
+  // detectSelf(persist: true, merge: true) calls can't clobber each other.
+  static Future<void> _lock = Future<void>.value();
+
+  static Future<T> _runLocked<T>(Future<T> Function() action) {
+    final result = _lock.then((_) => action());
+    _lock = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
   // ---- Pure, testable parsers ----------------------------------------------
 
   static String? parseGithubLogin(dynamic body) {
@@ -82,18 +92,20 @@ class IdentityService {
       final adoNames = <String>{for (final name in adoResults) ?name};
 
       if (persist) {
-        if (merge) {
-          final existingGithub = await IdentityStore.selfGithubLogins();
-          final existingAdo = await IdentityStore.selfAdoNames();
-          await IdentityStore.setSelfGithubLogins({
-            ...existingGithub,
-            ...githubLogins,
-          });
-          await IdentityStore.setSelfAdoNames({...existingAdo, ...adoNames});
-        } else {
-          await IdentityStore.setSelfGithubLogins(githubLogins);
-          await IdentityStore.setSelfAdoNames(adoNames);
-        }
+        await _runLocked(() async {
+          if (merge) {
+            final existingGithub = await IdentityStore.selfGithubLogins();
+            final existingAdo = await IdentityStore.selfAdoNames();
+            await IdentityStore.setSelfGithubLogins({
+              ...existingGithub,
+              ...githubLogins,
+            });
+            await IdentityStore.setSelfAdoNames({...existingAdo, ...adoNames});
+          } else {
+            await IdentityStore.setSelfGithubLogins(githubLogins);
+            await IdentityStore.setSelfAdoNames(adoNames);
+          }
+        });
       }
 
       return IdentityDetectionResult(
