@@ -36,6 +36,9 @@ void main() {
     // Verify that the Teams action is present
     expect(find.byIcon(Icons.groups), findsOneWidget);
 
+    // Verify that the appearance (theme) action is present
+    expect(find.byIcon(Icons.brightness_6), findsOneWidget);
+
     // Verify that the add button is present
     expect(find.byIcon(Icons.add), findsOneWidget);
   });
