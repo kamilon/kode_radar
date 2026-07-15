@@ -220,7 +220,7 @@ class _TeamDetailPageState extends State<TeamDetailPage> {
         return (icon: Icons.check_circle, color: Colors.green);
       case 'failure':
         return (icon: Icons.error, color: Colors.red);
-      case 'pending':
+      case 'running':
         return (icon: Icons.hourglass_empty, color: Colors.orange);
       default:
         return (icon: Icons.help_outline, color: Colors.grey);
