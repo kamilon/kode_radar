@@ -761,7 +761,10 @@ class ActivityFeedService {
       if (date == null) continue;
       if (oldest == null || date.isBefore(oldest)) oldest = date;
     }
-    return oldest == null || !oldest.isBefore(since);
+    // Only assert truncation when provable: an unknown oldest date (all items
+    // unparseable) is treated as not truncated.
+    if (oldest == null) return false;
+    return !oldest.isBefore(since);
   }
 
   static ActivityEvent _adoPrEvent({
