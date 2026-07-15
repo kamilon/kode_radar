@@ -79,11 +79,15 @@ class _ManageReposPageState extends State<ManageReposPage> {
   /// Atomically removes a repo AND adds its key to the ignore list under the
   /// shared lock, so an in-flight auto-add pass can't re-add it in between.
   Future<void> _removeAndIgnore(
-      String storageKey, int index, String ignoreKey) async {
+    String storageKey,
+    int index,
+    String ignoreKey,
+  ) async {
     await RepoStore.runLocked(() async {
       final prefs = await SharedPreferences.getInstance();
-      final repos =
-          List<String>.of(prefs.getStringList(storageKey) ?? const []);
+      final repos = List<String>.of(
+        prefs.getStringList(storageKey) ?? const [],
+      );
       if (index >= 0 && index < repos.length) {
         repos.removeAt(index);
       }
@@ -150,8 +154,9 @@ class _ManageReposPageState extends State<ManageReposPage> {
             if (canIgnore)
               TextButton(
                 style: TextButton.styleFrom(foregroundColor: Colors.red),
-                onPressed: () => Navigator.of(dialogContext)
-                    .pop(_DeleteChoice.removeAndIgnore),
+                onPressed: () => Navigator.of(
+                  dialogContext,
+                ).pop(_DeleteChoice.removeAndIgnore),
                 child: const Text('Remove & ignore'),
               ),
           ],
@@ -235,7 +240,8 @@ class _ManageReposPageState extends State<ManageReposPage> {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const RegisterGithubRepoPage()),
+                      builder: (_) => const RegisterGithubRepoPage(),
+                    ),
                   );
                   await _loadRepos();
                 },
@@ -248,7 +254,8 @@ class _ManageReposPageState extends State<ManageReposPage> {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const RegisterAdoRepoPage()),
+                      builder: (_) => const RegisterAdoRepoPage(),
+                    ),
                   );
                   await _loadRepos();
                 },
@@ -290,7 +297,8 @@ class _ManageReposPageState extends State<ManageReposPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              'Added $added ${added == 1 ? 'repository' : 'repositories'}.'),
+            'Added $added ${added == 1 ? 'repository' : 'repositories'}.',
+          ),
         ),
       );
     }

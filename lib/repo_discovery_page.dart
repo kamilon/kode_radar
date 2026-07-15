@@ -91,15 +91,24 @@ class _RepoDiscoveryPageState extends State<RepoDiscoveryPage> {
     for (final raw in prefs.getStringList('github_repos') ?? const []) {
       try {
         final map = Map<String, String>.from(jsonDecode(raw) as Map);
-        keys.add(RepoDiscoveryService.githubKey(
-            map['owner'] ?? '', map['repoName'] ?? ''));
+        keys.add(
+          RepoDiscoveryService.githubKey(
+            map['owner'] ?? '',
+            map['repoName'] ?? '',
+          ),
+        );
       } catch (_) {}
     }
     for (final raw in prefs.getStringList('ado_repos') ?? const []) {
       try {
         final map = Map<String, String>.from(jsonDecode(raw) as Map);
-        keys.add(RepoDiscoveryService.adoKey(map['organization'] ?? '',
-            map['project'] ?? '', map['repoName'] ?? ''));
+        keys.add(
+          RepoDiscoveryService.adoKey(
+            map['organization'] ?? '',
+            map['project'] ?? '',
+            map['repoName'] ?? '',
+          ),
+        );
       } catch (_) {}
     }
     if (!mounted) return;
@@ -197,8 +206,9 @@ class _RepoDiscoveryPageState extends State<RepoDiscoveryPage> {
   Future<void> _addSelected() async {
     setState(() => _adding = true);
     final storageKey = _isGithub ? RepoStore.githubKey : RepoStore.adoKey;
-    final selectedRepos =
-        _repos.where((r) => _selected.contains(r.key)).toList();
+    final selectedRepos = _repos
+        .where((r) => _selected.contains(r.key))
+        .toList();
     final tokenId = (_assignToken && _tokenId != null && _tokenId!.isNotEmpty)
         ? _tokenId
         : null;
@@ -210,11 +220,18 @@ class _RepoDiscoveryPageState extends State<RepoDiscoveryPage> {
       for (final raw in repos) {
         try {
           final m = Map<String, String>.from(jsonDecode(raw) as Map);
-          existing.add(_isGithub
-              ? RepoDiscoveryService.githubKey(
-                  m['owner'] ?? '', m['repoName'] ?? '')
-              : RepoDiscoveryService.adoKey(m['organization'] ?? '',
-                  m['project'] ?? '', m['repoName'] ?? ''));
+          existing.add(
+            _isGithub
+                ? RepoDiscoveryService.githubKey(
+                    m['owner'] ?? '',
+                    m['repoName'] ?? '',
+                  )
+                : RepoDiscoveryService.adoKey(
+                    m['organization'] ?? '',
+                    m['project'] ?? '',
+                    m['repoName'] ?? '',
+                  ),
+          );
         } catch (_) {}
       }
       var count = 0;
@@ -280,9 +297,8 @@ class _RepoDiscoveryPageState extends State<RepoDiscoveryPage> {
             ],
             onChanged: _fetching
                 ? null
-                : (value) => _onProviderChanged(
-                      value ?? TokenStore.providerGithub,
-                    ),
+                : (value) =>
+                      _onProviderChanged(value ?? TokenStore.providerGithub),
           ),
           const SizedBox(height: 12),
           if (_loadingTokens)
@@ -297,12 +313,16 @@ class _RepoDiscoveryPageState extends State<RepoDiscoveryPage> {
                 border: OutlineInputBorder(),
               ),
               items: _tokens
-                  .map((t) => DropdownMenuItem(
-                        value: t.id,
-                        child: Text(t.isDefault
+                  .map(
+                    (t) => DropdownMenuItem(
+                      value: t.id,
+                      child: Text(
+                        t.isDefault
                             ? '${t.label} (default)'
-                            : '${t.label} (${t.scope})'),
-                      ))
+                            : '${t.label} (${t.scope})',
+                      ),
+                    ),
+                  )
                   .toList(),
               onChanged: (value) => setState(() {
                 _tokenId = value;
@@ -402,8 +422,9 @@ class _RepoDiscoveryPageState extends State<RepoDiscoveryPage> {
         final checked =
             !ignored && (alreadyAdded || _selected.contains(repo.key));
 
-        final String? subtitle =
-            ignored ? 'Ignored' : (alreadyAdded ? 'Already monitored' : null);
+        final String? subtitle = ignored
+            ? 'Ignored'
+            : (alreadyAdded ? 'Already monitored' : null);
 
         // Trailing action: un-ignore an ignored repo, or ignore a selectable one.
         Widget? trailing;
@@ -429,12 +450,12 @@ class _RepoDiscoveryPageState extends State<RepoDiscoveryPage> {
           onChanged: disabled
               ? null
               : (value) => setState(() {
-                    if (value == true) {
-                      _selected.add(repo.key);
-                    } else {
-                      _selected.remove(repo.key);
-                    }
-                  }),
+                  if (value == true) {
+                    _selected.add(repo.key);
+                  } else {
+                    _selected.remove(repo.key);
+                  }
+                }),
         );
       },
     );

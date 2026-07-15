@@ -57,11 +57,14 @@ class _RegisterAdoRepoPageState extends State<RegisterAdoRepoPage> {
   }
 
   Future<bool> _saveRepo(
-      String organization, String project, String repoName) async {
+    String organization,
+    String project,
+    String repoName,
+  ) async {
     final Map<String, String> repo = {
       'organization': organization,
       'project': project,
-      'repoName': repoName
+      'repoName': repoName,
     };
     if (_tokenId != null && _tokenId!.isNotEmpty) {
       repo['tokenId'] = _tokenId!;
@@ -79,7 +82,10 @@ class _RegisterAdoRepoPageState extends State<RegisterAdoRepoPage> {
         try {
           final m = Map<String, String>.from(jsonDecode(raw) as Map);
           final key = RepoDiscoveryService.adoKey(
-              m['organization'] ?? '', m['project'] ?? '', m['repoName'] ?? '');
+            m['organization'] ?? '',
+            m['project'] ?? '',
+            m['repoName'] ?? '',
+          );
           if (key == newKey) return false; // duplicate
         } catch (_) {}
       }
@@ -103,11 +109,13 @@ class _RegisterAdoRepoPageState extends State<RegisterAdoRepoPage> {
         if (!mounted) return; // Ensure the widget is still mounted
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isEditing
-                ? 'ADO Repository updated successfully!'
-                : added
-                    ? 'ADO Repository saved successfully!'
-                    : 'That repository is already tracked.'),
+            content: Text(
+              _isEditing
+                  ? 'ADO Repository updated successfully!'
+                  : added
+                  ? 'ADO Repository saved successfully!'
+                  : 'That repository is already tracked.',
+            ),
           ),
         );
         Navigator.pop(context);
@@ -120,7 +128,8 @@ class _RegisterAdoRepoPageState extends State<RegisterAdoRepoPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-            _isEditing ? 'Edit ADO Repository' : 'Register ADO Repository'),
+          _isEditing ? 'Edit ADO Repository' : 'Register ADO Repository',
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -131,9 +140,7 @@ class _RegisterAdoRepoPageState extends State<RegisterAdoRepoPage> {
             children: [
               TextFormField(
                 controller: _organizationController,
-                decoration: const InputDecoration(
-                  labelText: 'Organization',
-                ),
+                decoration: const InputDecoration(labelText: 'Organization'),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter the organization';
@@ -144,9 +151,7 @@ class _RegisterAdoRepoPageState extends State<RegisterAdoRepoPage> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _projectController,
-                decoration: const InputDecoration(
-                  labelText: 'Project',
-                ),
+                decoration: const InputDecoration(labelText: 'Project'),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter the project';
@@ -157,9 +162,7 @@ class _RegisterAdoRepoPageState extends State<RegisterAdoRepoPage> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _repoNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Repository Name',
-                ),
+                decoration: const InputDecoration(labelText: 'Repository Name'),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter the repository name';

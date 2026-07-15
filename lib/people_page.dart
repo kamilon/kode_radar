@@ -67,10 +67,7 @@ class _PeoplePageState extends State<PeoplePage> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadPeople,
-              child: _buildContent(),
-            ),
+          : RefreshIndicator(onRefresh: _loadPeople, child: _buildContent()),
     );
   }
 
@@ -126,7 +123,8 @@ class _PeoplePageState extends State<PeoplePage> {
       );
       if (saved == true) {
         await IdentityStore.setSelfGithubLogins(
-            _parseLogins(ghController.text));
+          _parseLogins(ghController.text),
+        );
         await IdentityStore.setSelfAdoNames(_parseNames(adoController.text));
         if (!mounted) return;
         await _loadPeople();
@@ -179,10 +177,7 @@ class _PeoplePageState extends State<PeoplePage> {
           Center(
             child: Padding(
               padding: EdgeInsets.all(24),
-              child: Text(
-                'No people found yet.',
-                textAlign: TextAlign.center,
-              ),
+              child: Text('No people found yet.', textAlign: TextAlign.center),
             ),
           ),
         ],
@@ -192,7 +187,7 @@ class _PeoplePageState extends State<PeoplePage> {
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
       itemCount: _people.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final person = _people[index];
         return ListTile(

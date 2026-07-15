@@ -26,7 +26,9 @@ void main() {
     expect(repos.first.repo, {'owner': 'Flutter', 'repoName': 'flutter'});
     // Key is case-insensitive.
     expect(
-        repos.first.key, RepoDiscoveryService.githubKey('flutter', 'FLUTTER'));
+      repos.first.key,
+      RepoDiscoveryService.githubKey('flutter', 'FLUTTER'),
+    );
   });
 
   test('parses Azure DevOps repos with project info', () {
@@ -52,39 +54,41 @@ void main() {
     );
   });
 
-  test('falls back to /user/repos filtered by owner for a personal scope',
-      () async {
-    final client = MockClient((request) async {
-      if (request.url.path == '/orgs/octocat/repos') {
-        return http.Response('{"message": "Not Found"}', 404);
-      }
-      if (request.url.path == '/user/repos') {
-        return http.Response(
-          jsonEncode([
-            {
-              'name': 'hello',
-              'owner': {'login': 'octocat'},
-            },
-            {
-              'name': 'other',
-              'owner': {'login': 'someoneelse'},
-            },
-          ]),
-          200,
-        );
-      }
-      return http.Response('[]', 200);
-    });
+  test(
+    'falls back to /user/repos filtered by owner for a personal scope',
+    () async {
+      final client = MockClient((request) async {
+        if (request.url.path == '/orgs/octocat/repos') {
+          return http.Response('{"message": "Not Found"}', 404);
+        }
+        if (request.url.path == '/user/repos') {
+          return http.Response(
+            jsonEncode([
+              {
+                'name': 'hello',
+                'owner': {'login': 'octocat'},
+              },
+              {
+                'name': 'other',
+                'owner': {'login': 'someoneelse'},
+              },
+            ]),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      });
 
-    final result = await RepoDiscoveryService.fetch(
-      provider: TokenStore.providerGithub,
-      secret: 'ghp_secret',
-      org: 'octocat',
-      client: client,
-    );
+      final result = await RepoDiscoveryService.fetch(
+        provider: TokenStore.providerGithub,
+        secret: 'ghp_secret',
+        org: 'octocat',
+        client: client,
+      );
 
-    // Only the owner's repo survives the filter.
-    expect(result.repos.length, 1);
-    expect(result.repos.single.display, 'octocat/hello');
-  });
+      // Only the owner's repo survives the filter.
+      expect(result.repos.length, 1);
+      expect(result.repos.single.display, 'octocat/hello');
+    },
+  );
 }

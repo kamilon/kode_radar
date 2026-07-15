@@ -44,8 +44,10 @@ class IdentityStore {
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! List) return <String>{};
-      return _normalizedSorted(decoded.whereType<String>().toSet(), normalize)
-          .toSet();
+      return _normalizedSorted(
+        decoded.whereType<String>().toSet(),
+        normalize,
+      ).toSet();
     } catch (_) {
       return <String>{};
     }
@@ -55,8 +57,10 @@ class IdentityStore {
     Iterable<String> values,
     String Function(String) normalize,
   ) {
-    final normalized =
-        values.map(normalize).where((value) => value.isNotEmpty).toSet();
+    final normalized = values
+        .map(normalize)
+        .where((value) => value.isNotEmpty)
+        .toSet();
     return normalized.toList()..sort();
   }
 

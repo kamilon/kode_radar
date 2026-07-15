@@ -50,20 +50,20 @@ class TokenInfo {
       );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'provider': provider,
-        'label': label,
-        'scope': scope,
-        'autoAdd': autoAdd,
-      };
+    'id': id,
+    'provider': provider,
+    'label': label,
+    'scope': scope,
+    'autoAdd': autoAdd,
+  };
 
   factory TokenInfo.fromJson(Map<String, dynamic> json) => TokenInfo(
-        id: json['id'] as String,
-        provider: json['provider'] as String? ?? TokenStore.providerGithub,
-        label: json['label'] as String? ?? '',
-        scope: json['scope'] as String? ?? '',
-        autoAdd: json['autoAdd'] as bool? ?? false,
-      );
+    id: json['id'] as String,
+    provider: json['provider'] as String? ?? TokenStore.providerGithub,
+    label: json['label'] as String? ?? '',
+    scope: json['scope'] as String? ?? '',
+    autoAdd: json['autoAdd'] as bool? ?? false,
+  );
 }
 
 /// Manages multiple GitHub / Azure DevOps access tokens.
@@ -113,8 +113,9 @@ class TokenStore {
     }
     // Single-flight the migration so concurrent first-run callers share one
     // pass rather than racing to migrate/persist independently.
-    return _migrationFuture ??=
-        _migrateLegacy(prefs).whenComplete(() => _migrationFuture = null);
+    return _migrationFuture ??= _migrateLegacy(
+      prefs,
+    ).whenComplete(() => _migrationFuture = null);
   }
 
   /// Returns the tokens registered for a given provider.
@@ -220,10 +221,7 @@ class TokenStore {
 
   /// Resolves the secret to use for a GitHub repo owned by [owner], honoring an
   /// optional explicit [tokenId] override.
-  static Future<String?> resolveGithubSecret(
-    String owner, {
-    String? tokenId,
-  }) =>
+  static Future<String?> resolveGithubSecret(String owner, {String? tokenId}) =>
       _resolve(providerGithub, owner, tokenId);
 
   /// Resolves the secret to use for an Azure DevOps [organization], honoring an
@@ -231,8 +229,7 @@ class TokenStore {
   static Future<String?> resolveAdoSecret(
     String organization, {
     String? tokenId,
-  }) =>
-      _resolve(providerAdo, organization, tokenId);
+  }) => _resolve(providerAdo, organization, tokenId);
 
   static Future<String?> _resolve(
     String provider,

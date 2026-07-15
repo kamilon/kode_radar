@@ -57,11 +57,13 @@ class RepoDiscoveryService {
       final owner = ownerMap['login'] as String?;
       final name = item['name'] as String?;
       if (owner == null || name == null) continue;
-      result.add(DiscoveredRepo(
-        key: githubKey(owner, name),
-        display: '$owner/$name',
-        repo: {'owner': owner, 'repoName': name},
-      ));
+      result.add(
+        DiscoveredRepo(
+          key: githubKey(owner, name),
+          display: '$owner/$name',
+          repo: {'owner': owner, 'repoName': name},
+        ),
+      );
     }
     return result;
   }
@@ -79,15 +81,17 @@ class RepoDiscoveryService {
       if (projectMap is! Map) continue;
       final project = projectMap['name'] as String?;
       if (name == null || project == null) continue;
-      result.add(DiscoveredRepo(
-        key: adoKey(organization, project, name),
-        display: '$project/$name',
-        repo: {
-          'organization': organization,
-          'project': project,
-          'repoName': name,
-        },
-      ));
+      result.add(
+        DiscoveredRepo(
+          key: adoKey(organization, project, name),
+          display: '$project/$name',
+          repo: {
+            'organization': organization,
+            'project': project,
+            'repoName': name,
+          },
+        ),
+      );
     }
     return result;
   }
@@ -168,10 +172,15 @@ class RepoDiscoveryService {
     // Cap pagination to avoid runaway requests.
     for (var page = 1; page <= 10; page++) {
       final uri = Uri.parse('$base?per_page=100&page=$page');
-      final response = await client.get(uri, headers: {
-        'Authorization': 'Bearer $secret',
-        'Accept': 'application/vnd.github+json',
-      }).timeout(_requestTimeout);
+      final response = await client
+          .get(
+            uri,
+            headers: {
+              'Authorization': 'Bearer $secret',
+              'Accept': 'application/vnd.github+json',
+            },
+          )
+          .timeout(_requestTimeout);
       if (response.statusCode == 404 && allow404 && page == 1) {
         return null;
       }
@@ -194,10 +203,16 @@ class RepoDiscoveryService {
     String org,
   ) async {
     final uri = Uri.parse(
-        'https://dev.azure.com/$org/_apis/git/repositories?api-version=6.0');
-    final response = await client.get(uri, headers: {
-      'Authorization': 'Basic ${base64Encode(utf8.encode(':$secret'))}',
-    }).timeout(_requestTimeout);
+      'https://dev.azure.com/$org/_apis/git/repositories?api-version=6.0',
+    );
+    final response = await client
+        .get(
+          uri,
+          headers: {
+            'Authorization': 'Basic ${base64Encode(utf8.encode(':$secret'))}',
+          },
+        )
+        .timeout(_requestTimeout);
     if (response.statusCode != 200) {
       throw Exception('Azure DevOps returned status ${response.statusCode}');
     }

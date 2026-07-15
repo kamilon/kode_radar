@@ -19,49 +19,51 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('adds new repos for an auto-add token and skips existing ones',
-      () async {
-    final token = await TokenStore.addToken(
-      provider: TokenStore.providerGithub,
-      label: 'Acme',
-      scope: 'acme',
-      secret: 'ghp_secret',
-      autoAdd: true,
-    );
+  test(
+    'adds new repos for an auto-add token and skips existing ones',
+    () async {
+      final token = await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'Acme',
+        scope: 'acme',
+        secret: 'ghp_secret',
+        autoAdd: true,
+      );
 
-    final client = MockClient((request) async {
-      if (request.url.path == '/orgs/acme/repos' &&
-          request.url.queryParameters['page'] == '1') {
-        return http.Response(
-          jsonEncode([
-            {
-              'name': 'api',
-              'owner': {'login': 'acme'},
-            },
-            {
-              'name': 'web',
-              'owner': {'login': 'acme'},
-            },
-          ]),
-          200,
-        );
-      }
-      return http.Response('[]', 200);
-    });
+      final client = MockClient((request) async {
+        if (request.url.path == '/orgs/acme/repos' &&
+            request.url.queryParameters['page'] == '1') {
+          return http.Response(
+            jsonEncode([
+              {
+                'name': 'api',
+                'owner': {'login': 'acme'},
+              },
+              {
+                'name': 'web',
+                'owner': {'login': 'acme'},
+              },
+            ]),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      });
 
-    final added = await AutoAddService.run(client: client);
-    expect(added, 2);
+      final added = await AutoAddService.run(client: client);
+      expect(added, 2);
 
-    final prefs = await SharedPreferences.getInstance();
-    final repos = prefs.getStringList('github_repos') ?? [];
-    expect(repos.length, 2);
-    final first = Map<String, String>.from(jsonDecode(repos.first));
-    expect(first['owner'], 'acme');
-    expect(first['tokenId'], token.id);
+      final prefs = await SharedPreferences.getInstance();
+      final repos = prefs.getStringList('github_repos') ?? [];
+      expect(repos.length, 2);
+      final first = Map<String, String>.from(jsonDecode(repos.first));
+      expect(first['owner'], 'acme');
+      expect(first['tokenId'], token.id);
 
-    // A second pass adds nothing since everything is already monitored.
-    expect(await AutoAddService.run(client: client), 0);
-  });
+      // A second pass adds nothing since everything is already monitored.
+      expect(await AutoAddService.run(client: client), 0);
+    },
+  );
 
   test('does nothing when no token has auto-add enabled', () async {
     await TokenStore.addToken(

@@ -71,9 +71,9 @@ class _ManageIgnoredPageState extends State<ManageIgnoredPage> {
     await IgnoreStore.remove(key);
     await _load();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Un-ignored "$label".')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Un-ignored "$label".')));
   }
 
   @override

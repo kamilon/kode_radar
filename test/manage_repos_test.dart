@@ -11,8 +11,9 @@ void main() {
     FlutterSecureStorage.setMockInitialValues({});
   });
 
-  testWidgets('lists registered GitHub and ADO repositories',
-      (WidgetTester tester) async {
+  testWidgets('lists registered GitHub and ADO repositories', (
+    WidgetTester tester,
+  ) async {
     SharedPreferences.setMockInitialValues({
       'github_repos': [
         jsonEncode({'owner': 'flutter', 'repoName': 'flutter'}),
@@ -33,8 +34,9 @@ void main() {
     expect(find.text('org/proj/repo'), findsOneWidget);
   });
 
-  testWidgets('deletes a repository after confirmation',
-      (WidgetTester tester) async {
+  testWidgets('deletes a repository after confirmation', (
+    WidgetTester tester,
+  ) async {
     SharedPreferences.setMockInitialValues({
       'github_repos': [
         jsonEncode({'owner': 'flutter', 'repoName': 'flutter'}),
@@ -61,16 +63,14 @@ void main() {
     expect(prefs.getStringList('github_repos'), isEmpty);
   });
 
-  testWidgets('shows an empty state when no repositories are tracked',
-      (WidgetTester tester) async {
+  testWidgets('shows an empty state when no repositories are tracked', (
+    WidgetTester tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
 
     await tester.pumpWidget(const MaterialApp(home: ManageReposPage()));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('No repositories are being tracked yet.'),
-      findsOneWidget,
-    );
+    expect(find.text('No repositories are being tracked yet.'), findsOneWidget);
   });
 }

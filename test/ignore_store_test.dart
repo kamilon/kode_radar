@@ -41,10 +41,7 @@ void main() {
   });
 
   test('remove deletes an ignored key', () async {
-    await IgnoreStore.addAll([
-      'github:owner/repo',
-      'ado:org/project/repo',
-    ]);
+    await IgnoreStore.addAll(['github:owner/repo', 'ado:org/project/repo']);
 
     await IgnoreStore.remove('github:owner/repo');
 

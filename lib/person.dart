@@ -8,8 +8,8 @@ class Person {
     this.reviewRequests = 0,
     this.lastSeen,
     this.isSelf = false,
-  })  : githubLogins = Set.unmodifiable(githubLogins),
-        adoNames = Set.unmodifiable(adoNames);
+  }) : githubLogins = Set.unmodifiable(githubLogins),
+       adoNames = Set.unmodifiable(adoNames);
 
   final String key;
   final String displayName;

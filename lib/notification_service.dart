@@ -67,7 +67,13 @@ class NotificationService {
         iOS: DarwinInitializationSettings(),
         macOS: DarwinInitializationSettings(),
       );
-      await _plugin.initialize(settings);
+      await _plugin.initialize(settings: settings);
+      // Android 13+ (API 33+) requires the runtime POST_NOTIFICATIONS grant.
+      await _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.requestNotificationsPermission();
       _initialized = true;
     } catch (e) {
       debugPrint('Failed to initialize local notifications: $e');
@@ -89,10 +95,10 @@ class NotificationService {
       if (details == null) return;
 
       await _plugin.show(
-        _summaryNotificationId,
-        _summaryTitle(newItems.length),
-        _summaryBody(newItems),
-        details,
+        id: _summaryNotificationId,
+        title: _summaryTitle(newItems.length),
+        body: _summaryBody(newItems),
+        notificationDetails: details,
       );
     } catch (e) {
       debugPrint('Failed to show attention notification: $e');
@@ -104,18 +110,18 @@ class NotificationService {
 
     return switch (defaultTargetPlatform) {
       TargetPlatform.android => const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: _channelDescription,
-          ),
+        android: AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          channelDescription: _channelDescription,
         ),
+      ),
       TargetPlatform.iOS => const NotificationDetails(
-          iOS: DarwinNotificationDetails(),
-        ),
+        iOS: DarwinNotificationDetails(),
+      ),
       TargetPlatform.macOS => const NotificationDetails(
-          macOS: DarwinNotificationDetails(),
-        ),
+        macOS: DarwinNotificationDetails(),
+      ),
       _ => null,
     };
   }
@@ -125,8 +131,7 @@ class NotificationService {
     return switch (defaultTargetPlatform) {
       TargetPlatform.android ||
       TargetPlatform.iOS ||
-      TargetPlatform.macOS =>
-        true,
+      TargetPlatform.macOS => true,
       _ => false,
     };
   }

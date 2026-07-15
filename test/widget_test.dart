@@ -17,8 +17,9 @@ void main() {
     FlutterSecureStorage.setMockInitialValues({});
   });
 
-  testWidgets('Kode Radar app loads and shows main content',
-      (WidgetTester tester) async {
+  testWidgets('Kode Radar app loads and shows main content', (
+    WidgetTester tester,
+  ) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const MyApp());
 
@@ -47,7 +48,9 @@ void main() {
     // empty state (no repositories are configured in the test environment).
     expect(find.widgetWithText(AppBar, 'Attention'), findsOneWidget);
     expect(
-        find.text('Nothing needs your attention right now.'), findsOneWidget);
+      find.text('Nothing needs your attention right now.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Manage Tokens page can be opened', (WidgetTester tester) async {

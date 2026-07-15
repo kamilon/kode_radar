@@ -45,7 +45,9 @@ void main() {
     expect(bob.reviewRequests, 2);
     expect(carol.reviewRequests, 1);
     expect(
-        people.any((person) => person.key == 'github:draft-author'), isFalse);
+      people.any((person) => person.key == 'github:draft-author'),
+      isFalse,
+    );
   });
 
   test('mergePeople merges shared logins, sums counts, and marks self', () {
@@ -105,10 +107,12 @@ void main() {
 
     // Only the author + the pending reviewer are registered.
     expect(people, hasLength(2));
-    final reviewSum =
-        people.map((p) => p.reviewRequests).fold<int>(0, (a, b) => a + b);
-    final authorSum =
-        people.map((p) => p.authoredOpenPrs).fold<int>(0, (a, b) => a + b);
+    final reviewSum = people
+        .map((p) => p.reviewRequests)
+        .fold<int>(0, (a, b) => a + b);
+    final authorSum = people
+        .map((p) => p.authoredOpenPrs)
+        .fold<int>(0, (a, b) => a + b);
     expect(reviewSum, 1);
     expect(authorSum, 1);
   });

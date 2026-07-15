@@ -45,9 +45,7 @@ class PeopleService {
       final reviewers = pr['requested_reviewers'];
       if (reviewers is! List) continue;
       for (final reviewer in reviewers) {
-        final login = _normalizeLogin(
-          _nestedString(reviewer, 'login') ?? '',
-        );
+        final login = _normalizeLogin(_nestedString(reviewer, 'login') ?? '');
         if (login.isEmpty) continue;
         final person = people.putIfAbsent(
           login,
@@ -107,10 +105,7 @@ class PeopleService {
         );
         final key = _adoIdentity(name);
         if (key.isEmpty) continue;
-        final person = people.putIfAbsent(
-          key,
-          () => _MutablePerson.ado(name),
-        );
+        final person = people.putIfAbsent(key, () => _MutablePerson.ado(name));
         person.reviewRequests++;
         person.markSelf(selfNames.contains(key));
         person.see(lastSeen);
@@ -258,30 +253,29 @@ class PeopleService {
   ) async {
     final repoDisplay = '$owner/$name';
     try {
-      final secret =
-          (await TokenStore.resolveGithubSecret(owner, tokenId: tokenId))
-              ?.trim();
+      final secret = (await TokenStore.resolveGithubSecret(
+        owner,
+        tokenId: tokenId,
+      ))?.trim();
       if (secret == null || secret.isEmpty) return const <Person>[];
 
-      final response = await client.get(
-        Uri.https('api.github.com', '/repos/$owner/$name/pulls', {
-          'state': 'open',
-          'per_page': '100',
-        }),
-        headers: {
-          'Authorization': 'Bearer $secret',
-          'Accept': 'application/vnd.github+json',
-        },
-      ).timeout(_requestTimeout);
+      final response = await client
+          .get(
+            Uri.https('api.github.com', '/repos/$owner/$name/pulls', {
+              'state': 'open',
+              'per_page': '100',
+            }),
+            headers: {
+              'Authorization': 'Bearer $secret',
+              'Accept': 'application/vnd.github+json',
+            },
+          )
+          .timeout(_requestTimeout);
       if (response.statusCode != 200) return const <Person>[];
 
       final body = jsonDecode(response.body);
       if (body is! List) return const <Person>[];
-      return aggregateGithub(
-        prs: body,
-        now: now,
-        self: self,
-      );
+      return aggregateGithub(prs: body, now: now, self: self);
     } catch (e) {
       debugPrint('PeopleService GitHub fetch failed for $repoDisplay: $e');
       return const <Person>[];
@@ -299,31 +293,30 @@ class PeopleService {
   ) async {
     final repoDisplay = '$organization/$project/$name';
     try {
-      final secret =
-          (await TokenStore.resolveAdoSecret(organization, tokenId: tokenId))
-              ?.trim();
+      final secret = (await TokenStore.resolveAdoSecret(
+        organization,
+        tokenId: tokenId,
+      ))?.trim();
       if (secret == null || secret.isEmpty) return const <Person>[];
 
-      final response = await client.get(
-        Uri.https(
-          'dev.azure.com',
-          '/$organization/$project/_apis/git/repositories/$name/pullrequests',
-          {'searchCriteria.status': 'active', 'api-version': '6.0'},
-        ),
-        headers: {
-          'Authorization': 'Basic ${base64Encode(utf8.encode(':$secret'))}',
-        },
-      ).timeout(_requestTimeout);
+      final response = await client
+          .get(
+            Uri.https(
+              'dev.azure.com',
+              '/$organization/$project/_apis/git/repositories/$name/pullrequests',
+              {'searchCriteria.status': 'active', 'api-version': '6.0'},
+            ),
+            headers: {
+              'Authorization': 'Basic ${base64Encode(utf8.encode(':$secret'))}',
+            },
+          )
+          .timeout(_requestTimeout);
       if (response.statusCode != 200) return const <Person>[];
 
       final body = jsonDecode(response.body);
       final value = body is Map ? body['value'] : body;
       if (value is! List) return const <Person>[];
-      return aggregateAdo(
-        prs: value,
-        now: now,
-        self: self,
-      );
+      return aggregateAdo(prs: value, now: now, self: self);
     } catch (e) {
       debugPrint('PeopleService ADO fetch failed for $repoDisplay: $e');
       return const <Person>[];
@@ -381,9 +374,7 @@ class PeopleService {
       if (byReviewRequests != 0) return byReviewRequests;
       final byAuthoredOpenPrs = b.authoredOpenPrs.compareTo(a.authoredOpenPrs);
       if (byAuthoredOpenPrs != 0) return byAuthoredOpenPrs;
-      return a.displayName.toLowerCase().compareTo(
-            b.displayName.toLowerCase(),
-          );
+      return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
     });
   }
 
@@ -407,8 +398,10 @@ class _MutablePerson {
 
   factory _MutablePerson.ado(String name) {
     final trimmed = PeopleService._normalizeName(name);
-    final person = _MutablePerson('ado:${PeopleService._adoIdentity(name)}',
-        trimmed.isEmpty ? name : trimmed);
+    final person = _MutablePerson(
+      'ado:${PeopleService._adoIdentity(name)}',
+      trimmed.isEmpty ? name : trimmed,
+    );
     person.addAdoName(name);
     return person;
   }
@@ -464,15 +457,16 @@ class _MutablePerson {
     final stableKey = logins.isNotEmpty
         ? 'github:${logins.first}'
         : adoKeys.isNotEmpty
-            ? 'ado:${adoKeys.first}'
-            : key;
+        ? 'ado:${adoKeys.first}'
+        : key;
     final fallbackName = logins.isNotEmpty
         ? logins.first
         : adoKeys.isNotEmpty
-            ? adoNames[adoKeys.first]!
-            : stableKey;
-    final shownName =
-        displayName.trim().isEmpty ? fallbackName : displayName.trim();
+        ? adoNames[adoKeys.first]!
+        : stableKey;
+    final shownName = displayName.trim().isEmpty
+        ? fallbackName
+        : displayName.trim();
 
     return Person(
       key: stableKey,

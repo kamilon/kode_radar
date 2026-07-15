@@ -129,8 +129,12 @@ class ActivityService {
 
     final result = _lowerString(build['result']);
     if (result == 'succeeded') return 'success';
-    if (const {'failed', 'canceled', 'cancelled', 'partiallysucceeded'}
-        .contains(result)) {
+    if (const {
+      'failed',
+      'canceled',
+      'cancelled',
+      'partiallysucceeded',
+    }.contains(result)) {
       return 'failure';
     }
 
@@ -158,8 +162,9 @@ class ActivityService {
     // Attention weighting: failing CI and long-stuck PRs raise the score so
     // repos that need a human bubble up, not just busy ones.
     final ciBonus = ciStatus == 'failure' ? 5 : 0;
-    final staleBonus =
-        (oldestOpenPrAgeDays != null && oldestOpenPrAgeDays > 14) ? 3 : 0;
+    final staleBonus = (oldestOpenPrAgeDays != null && oldestOpenPrAgeDays > 14)
+        ? 3
+        : 0;
     return openPrCount +
         (needsReviewCount * 2) +
         recencyBonus +
@@ -193,8 +198,9 @@ class ActivityService {
       if (item is! Map) continue;
       final reviewers = item['reviewers'];
       if (reviewers is List &&
-          reviewers.any((reviewer) =>
-              reviewer is Map && _intValue(reviewer['vote']) == 0)) {
+          reviewers.any(
+            (reviewer) => reviewer is Map && _intValue(reviewer['vote']) == 0,
+          )) {
         count++;
       }
     }
@@ -359,10 +365,7 @@ class ActivityService {
               Uri.https(
                 'dev.azure.com',
                 '/$organization/$project/_apis/git/repositories/$name/pullrequests',
-                {
-                  'searchCriteria.status': 'active',
-                  'api-version': '6.0',
-                },
+                {'searchCriteria.status': 'active', 'api-version': '6.0'},
               ),
               headers: headers,
             )
@@ -485,8 +488,10 @@ class ActivityService {
           final tokenId = _stringValue(decoded, 'tokenId');
           tasks.add(() async {
             try {
-              final secret =
-                  await TokenStore.resolveGithubSecret(owner, tokenId: tokenId);
+              final secret = await TokenStore.resolveGithubSecret(
+                owner,
+                tokenId: tokenId,
+              );
               return await computeForGithub(
                 owner: owner,
                 name: name,
@@ -518,8 +523,11 @@ class ActivityService {
           if (organization == null || project == null || name == null) {
             continue;
           }
-          final repoKey =
-              RepoDiscoveryService.adoKey(organization, project, name);
+          final repoKey = RepoDiscoveryService.adoKey(
+            organization,
+            project,
+            name,
+          );
           final tokenId = _stringValue(decoded, 'tokenId');
           tasks.add(() async {
             try {
@@ -560,8 +568,8 @@ class ActivityService {
         final byScore = b.activityScore.compareTo(a.activityScore);
         if (byScore != 0) return byScore;
         return a.displayName.toLowerCase().compareTo(
-              b.displayName.toLowerCase(),
-            );
+          b.displayName.toLowerCase(),
+        );
       });
       return activities;
     } finally {
