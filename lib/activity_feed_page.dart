@@ -272,7 +272,8 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
     if (_events.isEmpty && _failedSources > 0) {
       message = 'Couldn\'t load activity right now. Pull down to retry.';
     } else if (_events.isEmpty) {
-      message = 'No recent activity in the last 14 days.';
+      final days = ActivityFeedService.defaultLookback.inDays;
+      message = 'No recent activity in the last $days days.';
     } else if (_mineOnly && !_identitySet) {
       message = 'Set your identity in People to use the "Mine" filter.';
     } else {

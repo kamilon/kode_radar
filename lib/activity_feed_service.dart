@@ -225,6 +225,9 @@ class ActivityFeedService {
       final name =
           _str(run, 'name') ?? _str(run, 'display_title') ?? 'Workflow';
       final branch = _str(run, 'head_branch');
+      final branchSuffix = (branch == null || branch.isEmpty)
+          ? ''
+          : ' on $branch';
       final actor =
           _nested(run['actor'], 'login') ??
           _nested(run['triggering_actor'], 'login') ??
@@ -239,7 +242,7 @@ class ActivityFeedService {
           repoKey: repoKey,
           repoDisplay: repoDisplay,
           actor: actor,
-          title: 'CI failed: $name${branch == null ? '' : ' on $branch'}',
+          title: 'CI failed: $name$branchSuffix',
           subtitle: repoDisplay,
           occurredAt: occurredAt,
           url: _str(run, 'html_url'),

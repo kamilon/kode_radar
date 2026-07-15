@@ -211,6 +211,26 @@ void main() {
       expect(events.single.title, 'CI failed: CI on main');
       expect(events.single.isMine, isTrue);
     });
+
+    test('omits the branch suffix when head_branch is empty', () {
+      final events = ActivityFeedService.githubRunsToActivity(
+        repoDisplay: repoDisplay,
+        repoKey: repoKey,
+        body: {
+          'workflow_runs': [
+            {
+              'id': 201,
+              'name': 'CI',
+              'status': 'completed',
+              'conclusion': 'failure',
+              'head_branch': '',
+              'updated_at': '2026-07-14T09:00:00Z',
+            },
+          ],
+        },
+      );
+      expect(events.single.title, 'CI failed: CI');
+    });
   });
 
   group('adoPrsToActivity', () {
