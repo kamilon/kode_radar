@@ -33,16 +33,18 @@ class ThemeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Updates and persists the theme mode. Persists first so a failed write
-  /// never leaves the UI on a mode that won't survive a restart.
+  /// Updates and persists the theme mode. The check-persist-update runs inside
+  /// the lock so concurrent changes serialize correctly, and the UI is only
+  /// notified after a successful persist that actually changed the mode.
   Future<void> setMode(ThemeMode mode) async {
-    if (mode == _mode) return;
-    await _runLocked(() async {
+    final changed = await _runLocked(() async {
+      if (mode == _mode) return false;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(storageKey, mode.name);
+      _mode = mode;
+      return true;
     });
-    _mode = mode;
-    notifyListeners();
+    if (changed) notifyListeners();
   }
 
   /// Resets the in-memory mode to the default. For tests only, to keep the
