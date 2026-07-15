@@ -815,7 +815,18 @@ class _MyHomePageState extends State<MyHomePage>
       ),
     );
     if (selected != null) {
-      await ThemeController.instance.setMode(selected);
+      try {
+        await ThemeController.instance.setMode(selected);
+      } catch (e) {
+        debugPrint('Failed to save theme preference: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not save appearance preference.'),
+            ),
+          );
+        }
+      }
     }
   }
 
