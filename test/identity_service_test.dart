@@ -19,6 +19,7 @@ void main() {
 
   test('parseGithubLogin and parseAdoName are null-tolerant', () {
     expect(IdentityService.parseGithubLogin({'login': ' octocat '}), 'octocat');
+    expect(IdentityService.parseGithubLogin({'login': 'OctoCat'}), 'octocat');
     expect(IdentityService.parseGithubLogin({'login': 42}), isNull);
     expect(IdentityService.parseGithubLogin('nope'), isNull);
     expect(

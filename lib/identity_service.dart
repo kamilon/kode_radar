@@ -34,7 +34,9 @@ class IdentityService {
   static String? parseGithubLogin(dynamic body) {
     if (body is! Map) return null;
     final login = body['login'];
-    return login is String && login.trim().isNotEmpty ? login.trim() : null;
+    if (login is! String) return null;
+    final normalized = login.trim().toLowerCase();
+    return normalized.isNotEmpty ? normalized : null;
   }
 
   static String? parseAdoName(dynamic body) {

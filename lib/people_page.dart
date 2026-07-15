@@ -187,10 +187,11 @@ class _PeoplePageState extends State<PeoplePage> {
     }
   }
 
-  /// GitHub logins never contain whitespace, so split on commas or whitespace.
+  /// GitHub logins never contain whitespace and are case-insensitive, so split
+  /// on commas or whitespace and lowercase to match [IdentityStore] semantics.
   Set<String> _parseLogins(String value) => value
       .split(RegExp(r'[,\s]+'))
-      .map((e) => e.trim())
+      .map((e) => e.trim().toLowerCase())
       .where((e) => e.isNotEmpty)
       .toSet();
 
