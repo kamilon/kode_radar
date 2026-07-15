@@ -33,8 +33,8 @@ void main() async {
   // system default if storage is unavailable rather than failing to launch.
   try {
     await ThemeController.instance.load();
-  } catch (e) {
-    debugPrint('Failed to load theme preference: $e');
+  } catch (e, stackTrace) {
+    debugPrint('Failed to load theme preference: $e\n$stackTrace');
   }
 
   // Initialize local notifications

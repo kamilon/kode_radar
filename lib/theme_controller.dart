@@ -50,6 +50,7 @@ class ThemeController extends ChangeNotifier {
   @visibleForTesting
   void debugReset() {
     _mode = ThemeMode.system;
+    _lock = Future<void>.value();
   }
 
   /// Parses a stored value into a [ThemeMode], defaulting to system.
