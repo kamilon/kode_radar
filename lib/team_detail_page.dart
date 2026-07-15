@@ -45,9 +45,8 @@ class _TeamDetailPageState extends State<TeamDetailPage> {
     });
     try {
       // Fetch repo activity and the feed concurrently, both scoped to the
-      // team's repositories. Future.wait attaches error handlers to both
-      // futures, so a failure in either is caught here rather than surfacing as
-      // an unhandled async error.
+      // team's repositories. The awaited Future.wait sits inside the try/catch,
+      // so a failure in either fetch is handled here.
       final results = await Future.wait([
         ActivityService.computeAll(
           client: AppHttp.client,

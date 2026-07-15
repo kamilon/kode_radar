@@ -96,7 +96,10 @@ class _PersonDetailPageState extends State<PersonDetailPage> {
   }
 
   Widget _buildHeader() {
-    final identities = [..._person.githubLogins, ..._person.adoNames];
+    final identities = [
+      ...(_person.githubLogins.toList()..sort()),
+      ...(_person.adoNames.toList()..sort()),
+    ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Column(
