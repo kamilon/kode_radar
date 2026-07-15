@@ -82,7 +82,6 @@ class _PeoplePageState extends State<PeoplePage> {
     try {
       final saved = await showDialog<bool>(
         context: context,
-        barrierDismissible: false,
         builder: (dialogContext) => StatefulBuilder(
           builder: (dialogContext, setDialogState) => PopScope(
             canPop: !detecting,

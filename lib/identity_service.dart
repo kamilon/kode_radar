@@ -6,7 +6,8 @@ import 'package:http/http.dart' as http;
 import 'identity_store.dart';
 import 'token_store.dart';
 
-/// What identity auto-detection found (and stored).
+/// What identity auto-detection found. These identities are persisted to
+/// [IdentityStore] only when `detectSelf` is called with `persist: true`.
 class IdentityDetectionResult {
   const IdentityDetectionResult({
     required this.githubLogins,
