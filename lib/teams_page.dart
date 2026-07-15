@@ -190,9 +190,15 @@ class _TeamsPageState extends State<TeamsPage> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                if (rollup == null || rollup.repoCount == 0)
+                if (team.repoKeys.isEmpty)
                   Text(
                     'No repositories assigned yet.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  )
+                else if (rollup == null || rollup.repoCount == 0)
+                  Text(
+                    'No data yet — assigned repos are loading or failed to '
+                    'fetch.',
                     style: Theme.of(context).textTheme.bodySmall,
                   )
                 else
