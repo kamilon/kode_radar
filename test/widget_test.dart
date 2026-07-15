@@ -33,8 +33,22 @@ void main() {
     // Verify that the attention inbox action is present
     expect(find.byIcon(Icons.inbox), findsOneWidget);
 
+    // Verify that the Teams action is present
+    expect(find.byIcon(Icons.groups), findsOneWidget);
+
     // Verify that the add button is present
     expect(find.byIcon(Icons.add), findsOneWidget);
+  });
+
+  testWidgets('Teams page can be opened', (WidgetTester tester) async {
+    await tester.pumpWidget(const MyApp());
+
+    await tester.tap(find.byIcon(Icons.groups));
+    await tester.pumpAndSettle();
+
+    // Navigated to the Teams page; empty state since no teams are configured.
+    expect(find.widgetWithText(AppBar, 'Teams'), findsOneWidget);
+    expect(find.text('No teams yet.'), findsOneWidget);
   });
 
   testWidgets('Attention inbox can be opened', (WidgetTester tester) async {
