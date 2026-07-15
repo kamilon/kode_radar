@@ -76,18 +76,14 @@ class _TokenOverrideFieldState extends State<TokenOverrideField> {
           child: Text('Auto (match by owner/org)'),
         ),
         ..._tokens.map(
-          (token) => DropdownMenuItem(
-            value: token.id,
-            child: Text(_label(token)),
-          ),
+          (token) =>
+              DropdownMenuItem(value: token.id, child: Text(_label(token))),
         ),
       ],
       onChanged: _loaded
           ? (value) {
               setState(() => _selected = value ?? '');
-              widget.onChanged(
-                (value == null || value.isEmpty) ? null : value,
-              );
+              widget.onChanged((value == null || value.isEmpty) ? null : value);
             }
           : null,
     );

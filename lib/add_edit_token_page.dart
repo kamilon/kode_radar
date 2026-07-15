@@ -84,9 +84,9 @@ class _AddEditTokenPageState extends State<AddEditTokenPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save token: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to save token: $e')));
       return;
     }
     if (!mounted) return;
@@ -112,9 +112,9 @@ class _AddEditTokenPageState extends State<AddEditTokenPage> {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open $url')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not open $url')));
     }
   }
 
@@ -253,31 +253,33 @@ class _AddEditTokenPageState extends State<AddEditTokenPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              Builder(builder: (context) {
-                final scopeEmpty = _scopeController.text.trim().isEmpty;
-                final adoNeedsScope =
-                    _provider == TokenStore.providerAdo && scopeEmpty;
-                return CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  value: _autoAdd,
-                  onChanged: adoNeedsScope
-                      ? null
-                      : (value) => setState(() => _autoAdd = value ?? false),
-                  title: const Text('Automatically add new repositories'),
-                  subtitle: Text(
-                    adoNeedsScope
-                        ? 'Enter an organization scope above to enable auto-add '
-                            'for Azure DevOps.'
-                        : isGithub
-                            ? 'Periodically adds repos this token can see'
+              Builder(
+                builder: (context) {
+                  final scopeEmpty = _scopeController.text.trim().isEmpty;
+                  final adoNeedsScope =
+                      _provider == TokenStore.providerAdo && scopeEmpty;
+                  return CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: _autoAdd,
+                    onChanged: adoNeedsScope
+                        ? null
+                        : (value) => setState(() => _autoAdd = value ?? false),
+                    title: const Text('Automatically add new repositories'),
+                    subtitle: Text(
+                      adoNeedsScope
+                          ? 'Enter an organization scope above to enable auto-add '
+                                'for Azure DevOps.'
+                          : isGithub
+                          ? 'Periodically adds repos this token can see'
                                 '${scopeEmpty ? ' (all accessible repos)' : ' in "${_scopeController.text.trim()}"'}. '
                                 'A removed repo will be re-added while this is on.'
-                            : 'Periodically adds repos in the organization above. '
+                          : 'Periodically adds repos in the organization above. '
                                 'A removed repo will be re-added while this is on.',
-                  ),
-                );
-              }),
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 24),
               Center(
                 child: ElevatedButton(

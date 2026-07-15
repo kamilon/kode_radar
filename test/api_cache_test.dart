@@ -47,7 +47,8 @@ void main() {
 
   test('exhausted rate limit serves a cached GET response', () async {
     var calls = 0;
-    final resetSeconds = DateTime.utc(2100).millisecondsSinceEpoch ~/
+    final resetSeconds =
+        DateTime.utc(2100).millisecondsSinceEpoch ~/
         Duration.millisecondsPerSecond;
     final inner = MockClient((_) async {
       calls++;
@@ -76,35 +77,47 @@ void main() {
     expect(client.githubRateLimit.resetAt, DateTime.utc(2100));
   });
 
-  test('an exhausted GitHub scope does not gate other hosts (Azure DevOps)',
-      () async {
-    final resetSeconds = DateTime.utc(2100).millisecondsSinceEpoch ~/
-        Duration.millisecondsPerSecond;
-    var adoCalls = 0;
-    final inner = MockClient((request) async {
-      if (request.url.host == 'api.github.com') {
-        return http.Response('gh', 200, headers: {
-          'etag': '"gh"',
-          'x-ratelimit-remaining': '0',
-          'x-ratelimit-reset': '$resetSeconds',
-        });
-      }
-      adoCalls++;
-      return http.Response('ado', 200);
-    });
-    final client = CachedHttpClient(inner: inner);
-    addTearDown(client.close);
+  test(
+    'an exhausted GitHub scope does not gate other hosts (Azure DevOps)',
+    () async {
+      final resetSeconds =
+          DateTime.utc(2100).millisecondsSinceEpoch ~/
+          Duration.millisecondsPerSecond;
+      var adoCalls = 0;
+      final inner = MockClient((request) async {
+        if (request.url.host == 'api.github.com') {
+          return http.Response(
+            'gh',
+            200,
+            headers: {
+              'etag': '"gh"',
+              'x-ratelimit-remaining': '0',
+              'x-ratelimit-reset': '$resetSeconds',
+            },
+          );
+        }
+        adoCalls++;
+        return http.Response('ado', 200);
+      });
+      final client = CachedHttpClient(inner: inner);
+      addTearDown(client.close);
 
-    // Exhaust the GitHub scope.
-    await client.get(Uri.parse('https://api.github.com/repos/acme/api/pulls'));
-    // Azure DevOps must still reach the network (not gated by GitHub's limit).
-    final adoResponse = await client.get(Uri.parse(
-        'https://dev.azure.com/org/proj/_apis/git/repositories/r/pullrequests'));
+      // Exhaust the GitHub scope.
+      await client.get(
+        Uri.parse('https://api.github.com/repos/acme/api/pulls'),
+      );
+      // Azure DevOps must still reach the network (not gated by GitHub's limit).
+      final adoResponse = await client.get(
+        Uri.parse(
+          'https://dev.azure.com/org/proj/_apis/git/repositories/r/pullrequests',
+        ),
+      );
 
-    expect(adoResponse.statusCode, 200);
-    expect(adoResponse.body, 'ado');
-    expect(adoCalls, 1);
-  });
+      expect(adoResponse.statusCode, 200);
+      expect(adoResponse.body, 'ado');
+      expect(adoCalls, 1);
+    },
+  );
 
   test('parseRateLimit parses GitHub rate limit headers', () {
     final resetAt = DateTime.utc(2026, 7, 14, 8, 30);

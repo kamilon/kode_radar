@@ -81,9 +81,9 @@ class _ManageTokensPageState extends State<ManageTokensPage> {
     await TokenStore.deleteToken(token.id);
     await _load();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Removed "${token.label}".')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Removed "${token.label}".')));
   }
 
   @override
@@ -121,10 +121,12 @@ class _ManageTokensPageState extends State<ManageTokensPage> {
       );
     }
 
-    final github =
-        _tokens.where((t) => t.provider == TokenStore.providerGithub).toList();
-    final ado =
-        _tokens.where((t) => t.provider == TokenStore.providerAdo).toList();
+    final github = _tokens
+        .where((t) => t.provider == TokenStore.providerGithub)
+        .toList();
+    final ado = _tokens
+        .where((t) => t.provider == TokenStore.providerAdo)
+        .toList();
 
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),

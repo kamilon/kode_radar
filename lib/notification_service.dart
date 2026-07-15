@@ -104,18 +104,18 @@ class NotificationService {
 
     return switch (defaultTargetPlatform) {
       TargetPlatform.android => const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: _channelDescription,
-          ),
+        android: AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          channelDescription: _channelDescription,
         ),
+      ),
       TargetPlatform.iOS => const NotificationDetails(
-          iOS: DarwinNotificationDetails(),
-        ),
+        iOS: DarwinNotificationDetails(),
+      ),
       TargetPlatform.macOS => const NotificationDetails(
-          macOS: DarwinNotificationDetails(),
-        ),
+        macOS: DarwinNotificationDetails(),
+      ),
       _ => null,
     };
   }
@@ -125,8 +125,7 @@ class NotificationService {
     return switch (defaultTargetPlatform) {
       TargetPlatform.android ||
       TargetPlatform.iOS ||
-      TargetPlatform.macOS =>
-        true,
+      TargetPlatform.macOS => true,
       _ => false,
     };
   }

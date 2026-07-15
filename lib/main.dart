@@ -32,10 +32,10 @@ void main() async {
       AndroidInitializationSettings('@mipmap/ic_launcher');
   const DarwinInitializationSettings initializationSettingsDarwin =
       DarwinInitializationSettings(
-    requestAlertPermission: true,
-    requestBadgePermission: true,
-    requestSoundPermission: true,
-  );
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
   const InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
     iOS: initializationSettingsDarwin,
@@ -69,7 +69,8 @@ void main() async {
     if (e is SocketException) {
       if (kDebugMode) {
         print(
-            'SocketException: Check if the ports are already in use or if permissions are missing.');
+          'SocketException: Check if the ports are already in use or if permissions are missing.',
+        );
       }
     }
   }
@@ -82,10 +83,14 @@ bool get _isDesktopPlatform =>
 
 Future<void> _initializeSystemTray() async {
   await trayManager.setIcon('assets/app_icon.png'); // Set the tray icon
-  trayManager.setContextMenu(Menu(items: [
-    MenuItem(key: 'show', label: 'Show App'),
-    MenuItem(key: 'exit', label: 'Exit'),
-  ]));
+  trayManager.setContextMenu(
+    Menu(
+      items: [
+        MenuItem(key: 'show', label: 'Show App'),
+        MenuItem(key: 'exit', label: 'Exit'),
+      ],
+    ),
+  );
 
   trayManager.addListener(_TrayManagerListener());
 }
@@ -256,7 +261,12 @@ class _MyHomePageState extends State<MyHomePage>
           if (owner == null || repoName == null) continue;
           final repoKey = 'GitHub: $owner/$repoName';
           await _fetchGithubData(
-              owner, repoName, repoKey, newData, repoMap['tokenId']);
+            owner,
+            repoName,
+            repoKey,
+            newData,
+            repoMap['tokenId'],
+          );
         } catch (e) {
           // Skip a malformed entry rather than aborting the whole refresh.
           if (kDebugMode) {
@@ -275,8 +285,14 @@ class _MyHomePageState extends State<MyHomePage>
             continue;
           }
           final repoKey = 'ADO: $organization/$project/$repoName';
-          await _fetchAdoData(organization, project, repoName, repoKey, newData,
-              repoMap['tokenId']);
+          await _fetchAdoData(
+            organization,
+            project,
+            repoName,
+            repoKey,
+            newData,
+            repoMap['tokenId'],
+          );
         } catch (e) {
           if (kDebugMode) {
             print('Skipping malformed ado_repos entry: $e');
@@ -288,8 +304,9 @@ class _MyHomePageState extends State<MyHomePage>
         setState(() {
           if (initialLoad || !_isDataEqual(_data, newData)) {
             _previousData.clear();
-            _previousData
-                .addAll(_data); // Save the current data as previous data
+            _previousData.addAll(
+              _data,
+            ); // Save the current data as previous data
             _data.clear();
             _data.addAll(newData); // only if it has changed
           }
@@ -304,8 +321,13 @@ class _MyHomePageState extends State<MyHomePage>
     }
   }
 
-  Future<void> _fetchGithubData(String owner, String repoName, String repoKey,
-      Map<String, Map<String, List<String>>> newData, String? tokenId) async {
+  Future<void> _fetchGithubData(
+    String owner,
+    String repoName,
+    String repoKey,
+    Map<String, Map<String, List<String>>> newData,
+    String? tokenId,
+  ) async {
     final token = await TokenStore.resolveGithubSecret(owner, tokenId: tokenId);
     await _fetchData(
       repoKey,
@@ -314,25 +336,26 @@ class _MyHomePageState extends State<MyHomePage>
       (data) async {
         final bool isBaselined = _baselinedRepos.contains(repoKey);
         final List<String> prNotifications = [];
-        return Future.value(data.map((pr) {
-          final title = pr['title'] as String? ?? 'No Title';
-          final number = pr['number'] as int? ?? 0;
-          final user = pr['user']?['login'] as String? ?? 'Unknown User';
-          final comments = pr['comments'] as int? ?? 0;
+        return Future.value(
+          data.map((pr) {
+            final title = pr['title'] as String? ?? 'No Title';
+            final number = pr['number'] as int? ?? 0;
+            final user = pr['user']?['login'] as String? ?? 'Unknown User';
+            final comments = pr['comments'] as int? ?? 0;
 
-          final notificationKey = 'GitHub:$repoKey:PR#$number';
-          if (!_notifiedItems.contains(notificationKey)) {
-            // Only notify once the repo has been baselined; the first fetch of
-            // a newly-added repo records existing PRs silently.
-            if (isBaselined) {
-              prNotifications.add('New PR #$number by $user: $title');
+            final notificationKey = 'GitHub:$repoKey:PR#$number';
+            if (!_notifiedItems.contains(notificationKey)) {
+              // Only notify once the repo has been baselined; the first fetch of
+              // a newly-added repo records existing PRs silently.
+              if (isBaselined) {
+                prNotifications.add('New PR #$number by $user: $title');
+              }
+              _notifiedItems.add(notificationKey); // Mark as notified
             }
-            _notifiedItems.add(notificationKey); // Mark as notified
-          }
 
-          return 'PR #$number by $user: $title ($comments comments)';
-        }).toList())
-            .then((prList) {
+            return 'PR #$number by $user: $title ($comments comments)';
+          }).toList(),
+        ).then((prList) {
           if (!isBaselined) {
             _baselinedRepos.add(repoKey);
             _saveBaselinedRepos();
@@ -353,11 +376,14 @@ class _MyHomePageState extends State<MyHomePage>
       repoKey,
       'Releases',
       Uri.parse('https://api.github.com/repos/$owner/$repoName/releases'),
-      (data) async => Future.value(data.map((release) {
-        final name = release['name'] as String? ??
-            'Unnamed Release'; // Safely access the name
-        return name;
-      }).toList()),
+      (data) async => Future.value(
+        data.map((release) {
+          final name =
+              release['name'] as String? ??
+              'Unnamed Release'; // Safely access the name
+          return name;
+        }).toList(),
+      ),
       true, // GitHub
       newData,
       token,
@@ -365,41 +391,47 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   Future<void> _fetchAdoData(
-      String organization,
-      String project,
-      String repoName,
-      String repoKey,
-      Map<String, Map<String, List<String>>> newData,
-      String? tokenId) async {
-    final token =
-        await TokenStore.resolveAdoSecret(organization, tokenId: tokenId);
+    String organization,
+    String project,
+    String repoName,
+    String repoKey,
+    Map<String, Map<String, List<String>>> newData,
+    String? tokenId,
+  ) async {
+    final token = await TokenStore.resolveAdoSecret(
+      organization,
+      tokenId: tokenId,
+    );
     await _fetchData(
       repoKey,
       'PRs',
       Uri.parse(
-          'https://dev.azure.com/$organization/$project/_apis/git/repositories/$repoName/pullrequests?api-version=6.0'),
+        'https://dev.azure.com/$organization/$project/_apis/git/repositories/$repoName/pullrequests?api-version=6.0',
+      ),
       (data) async {
         final bool isBaselined = _baselinedRepos.contains(repoKey);
         final List<String> prNotifications = [];
-        return Future.value(data.map((pr) {
-          final title = pr['title'] as String? ?? 'No Title';
-          final id = pr['pullRequestId'] as int? ?? 0;
-          final creator =
-              pr['createdBy']?['displayName'] as String? ?? 'Unknown Creator';
-          final status = pr['status'] as String? ?? 'Unknown Status';
+        return Future.value(
+          data.map((pr) {
+            final title = pr['title'] as String? ?? 'No Title';
+            final id = pr['pullRequestId'] as int? ?? 0;
+            final creator =
+                pr['createdBy']?['displayName'] as String? ?? 'Unknown Creator';
+            final status = pr['status'] as String? ?? 'Unknown Status';
 
-          final notificationKey = 'ADO:$repoKey:PR#$id';
-          if (!_notifiedItems.contains(notificationKey)) {
-            if (isBaselined) {
-              prNotifications
-                  .add('New PR #$id by $creator: $title (Status: $status)');
+            final notificationKey = 'ADO:$repoKey:PR#$id';
+            if (!_notifiedItems.contains(notificationKey)) {
+              if (isBaselined) {
+                prNotifications.add(
+                  'New PR #$id by $creator: $title (Status: $status)',
+                );
+              }
+              _notifiedItems.add(notificationKey); // Mark as notified
             }
-            _notifiedItems.add(notificationKey); // Mark as notified
-          }
 
-          return 'PR #$id by $creator: $title (Status: $status)';
-        }).toList())
-            .then((prList) {
+            return 'PR #$id by $creator: $title (Status: $status)';
+          }).toList(),
+        ).then((prList) {
           if (!isBaselined) {
             _baselinedRepos.add(repoKey);
             _saveBaselinedRepos();
@@ -420,22 +452,30 @@ class _MyHomePageState extends State<MyHomePage>
       repoKey,
       'Builds',
       Uri.parse(
-          'https://dev.azure.com/$organization/$project/_apis/build/builds?api-version=6.0'),
+        'https://dev.azure.com/$organization/$project/_apis/build/builds?api-version=6.0',
+      ),
       (data) async {
-        return await Future.wait(data.map((build) async {
-          final name =
-              build['definition']['name'] as String? ?? 'Unnamed Build';
-          final requestedBy =
-              build['requestedBy']?['displayName'] as String? ?? 'Unknown User';
-          final buildId = build['id'] as int?;
-          if (buildId != null) {
-            final stages =
-                await _fetchBuildStages(organization, project, buildId, token);
-            final stagesText = stages.map((stage) => '- $stage').join('\n');
-            return '$name (Triggered by: $requestedBy)\nStages:\n$stagesText';
-          }
-          return '$name (Triggered by: $requestedBy)';
-        }).toList());
+        return await Future.wait(
+          data.map((build) async {
+            final name =
+                build['definition']['name'] as String? ?? 'Unnamed Build';
+            final requestedBy =
+                build['requestedBy']?['displayName'] as String? ??
+                'Unknown User';
+            final buildId = build['id'] as int?;
+            if (buildId != null) {
+              final stages = await _fetchBuildStages(
+                organization,
+                project,
+                buildId,
+                token,
+              );
+              final stagesText = stages.map((stage) => '- $stage').join('\n');
+              return '$name (Triggered by: $requestedBy)\nStages:\n$stagesText';
+            }
+            return '$name (Triggered by: $requestedBy)';
+          }).toList(),
+        );
       },
       false, // ADO
       newData,
@@ -445,12 +485,16 @@ class _MyHomePageState extends State<MyHomePage>
       repoKey,
       'Pipelines',
       Uri.parse(
-          'https://dev.azure.com/$organization/$project/_apis/pipelines?api-version=6.0'),
-      (data) async => Future.value(data.map((pipeline) {
-        final name = pipeline['name'] as String? ??
-            'Unnamed Pipeline'; // Safely access the pipeline name
-        return name;
-      }).toList()),
+        'https://dev.azure.com/$organization/$project/_apis/pipelines?api-version=6.0',
+      ),
+      (data) async => Future.value(
+        data.map((pipeline) {
+          final name =
+              pipeline['name'] as String? ??
+              'Unnamed Pipeline'; // Safely access the pipeline name
+          return name;
+        }).toList(),
+      ),
       false, // ADO
       newData,
       token,
@@ -458,13 +502,18 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   Future<List<String>> _fetchBuildStages(
-      String organization, String project, int buildId, String? token) async {
+    String organization,
+    String project,
+    int buildId,
+    String? token,
+  ) async {
     if (token == null || token.isEmpty) return ['Token not set.'];
 
     try {
       final response = await http.get(
         Uri.parse(
-            'https://dev.azure.com/$organization/$project/_apis/build/builds/$buildId/timeline?api-version=6.0'),
+          'https://dev.azure.com/$organization/$project/_apis/build/builds/$buildId/timeline?api-version=6.0',
+        ),
         headers: {
           'Authorization': 'Basic ${base64Encode(utf8.encode(':$token'))}',
         },
@@ -475,12 +524,14 @@ class _MyHomePageState extends State<MyHomePage>
         final List<dynamic> records = responseBody['records'] ?? [];
         return records
             .where(
-                (record) => record['type'] == 'Task') // Filter for task records
+              (record) => record['type'] == 'Task',
+            ) // Filter for task records
             .map((record) {
-          final name = record['name'] as String? ?? 'Unnamed Task';
-          final result = record['result'] as String? ?? 'unknown';
-          return '$name: $result';
-        }).toList();
+              final name = record['name'] as String? ?? 'Unnamed Task';
+              final result = record['result'] as String? ?? 'unknown';
+              return '$name: $result';
+            })
+            .toList();
       } else {
         return ['Failed to fetch stages (Status: ${response.statusCode})'];
       }
@@ -494,14 +545,14 @@ class _MyHomePageState extends State<MyHomePage>
     String category,
     Uri url,
     Future<List<String>> Function(List<dynamic>)
-        parseData, // Ensure parseData is consistently async
+    parseData, // Ensure parseData is consistently async
     bool isGithub,
     Map<String, Map<String, List<String>>> newData,
     String? token,
   ) async {
     if (token == null || token.isEmpty) {
       newData[category]![repoKey] = [
-        'Token not set. Add or assign a token via "Manage tokens".'
+        'Token not set. Add or assign a token via "Manage tokens".',
       ];
       return;
     }
@@ -529,11 +580,11 @@ class _MyHomePageState extends State<MyHomePage>
         newData[category]![repoKey] = parsedData;
       } else if (response.statusCode == 203) {
         newData[category]![repoKey] = [
-          'Non-authoritative response received (Status: 203). Please check your permissions or token.'
+          'Non-authoritative response received (Status: 203). Please check your permissions or token.',
         ];
       } else {
         newData[category]![repoKey] = [
-          'Failed to fetch data (Status: ${response.statusCode})'
+          'Failed to fetch data (Status: ${response.statusCode})',
         ];
       }
     } catch (e) {
@@ -541,29 +592,31 @@ class _MyHomePageState extends State<MyHomePage>
     }
   }
 
-  bool _isDataEqual(Map<String, Map<String, List<String>>> oldData,
-      Map<String, Map<String, List<String>>> newData) {
+  bool _isDataEqual(
+    Map<String, Map<String, List<String>>> oldData,
+    Map<String, Map<String, List<String>>> newData,
+  ) {
     return const DeepCollectionEquality().equals(oldData, newData);
   }
 
   Future<void> _showNotification(String title, String body) async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
-      'pr_notifications', // Channel ID
-      'PR Notifications', // Channel name
-      channelDescription: 'Notifications for new PRs and comments',
-      importance: Importance.high,
-      priority: Priority.high,
-      timeoutAfter: 30000, // Notification stays visible for 30 seconds
-    );
+          'pr_notifications', // Channel ID
+          'PR Notifications', // Channel name
+          channelDescription: 'Notifications for new PRs and comments',
+          importance: Importance.high,
+          priority: Priority.high,
+          timeoutAfter: 30000, // Notification stays visible for 30 seconds
+        );
 
     const DarwinNotificationDetails darwinPlatformChannelSpecifics =
         DarwinNotificationDetails(
-      presentAlert: true, // Ensure the alert is presented
-      presentSound: true, // Ensure the sound is presented
-      interruptionLevel:
-          InterruptionLevel.active, // Critical level for visibility
-    );
+          presentAlert: true, // Ensure the alert is presented
+          presentSound: true, // Ensure the sound is presented
+          interruptionLevel:
+              InterruptionLevel.active, // Critical level for visibility
+        );
 
     const NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
@@ -633,7 +686,8 @@ class _MyHomePageState extends State<MyHomePage>
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator()) // Show a loading indicator
+              child: CircularProgressIndicator(),
+            ) // Show a loading indicator
           : TabBarView(
               controller: _tabController,
               children: _data.keys.map((category) {
@@ -686,10 +740,7 @@ class _MyHomePageState extends State<MyHomePage>
   /// added/edited/removed repositories are reflected without waiting for the
   /// next poll cycle.
   Future<void> _openRepoPage(Widget page) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => page),
-    );
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
     if (mounted) {
       _loadRepos(initialLoad: false);
     }
@@ -713,7 +764,8 @@ class _MyHomePageState extends State<MyHomePage>
         final repoKey = data.keys.elementAt(index);
         return ExpansionTile(
           title: Text(repoKey),
-          children: data[repoKey]?.map((item) {
+          children:
+              data[repoKey]?.map((item) {
                 if (repoKey.startsWith('ADO:') && item.contains('Stages:')) {
                   final parts = item.split('\nStages:\n');
                   final buildInfo = parts[0];

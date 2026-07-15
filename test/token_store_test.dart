@@ -38,32 +38,34 @@ void main() {
     expect(await TokenStore.resolveGithubSecret('other'), 'ghp_default');
   });
 
-  test('per-repo override wins, and falls back when the token is gone',
-      () async {
-    await TokenStore.addToken(
-      provider: TokenStore.providerGithub,
-      label: 'Default',
-      scope: '',
-      secret: 'ghp_default',
-    );
-    final override = await TokenStore.addToken(
-      provider: TokenStore.providerGithub,
-      label: 'Special',
-      scope: 'someorg',
-      secret: 'ghp_special',
-    );
+  test(
+    'per-repo override wins, and falls back when the token is gone',
+    () async {
+      await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'Default',
+        scope: '',
+        secret: 'ghp_default',
+      );
+      final override = await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'Special',
+        scope: 'someorg',
+        secret: 'ghp_special',
+      );
 
-    expect(
-      await TokenStore.resolveGithubSecret('acme', tokenId: override.id),
-      'ghp_special',
-    );
+      expect(
+        await TokenStore.resolveGithubSecret('acme', tokenId: override.id),
+        'ghp_special',
+      );
 
-    await TokenStore.deleteToken(override.id);
-    expect(
-      await TokenStore.resolveGithubSecret('acme', tokenId: override.id),
-      'ghp_default',
-    );
-  });
+      await TokenStore.deleteToken(override.id);
+      expect(
+        await TokenStore.resolveGithubSecret('acme', tokenId: override.id),
+        'ghp_default',
+      );
+    },
+  );
 
   test('GitHub and ADO tokens are resolved independently', () async {
     await TokenStore.addToken(
@@ -92,8 +94,9 @@ void main() {
     );
 
     await TokenStore.updateToken(token.copyWith(label: 'B', scope: 'acme'));
-    final tokens =
-        await TokenStore.getTokensForProvider(TokenStore.providerGithub);
+    final tokens = await TokenStore.getTokensForProvider(
+      TokenStore.providerGithub,
+    );
     expect(tokens.single.label, 'B');
     expect(tokens.single.scope, 'acme');
     expect(await TokenStore.getSecret(token.id), 's1'); // unchanged

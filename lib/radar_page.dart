@@ -29,8 +29,9 @@ class _RadarPageState extends State<RadarPage> {
     });
 
     try {
-      final activities =
-          await ActivityService.computeAll(client: AppHttp.client);
+      final activities = await ActivityService.computeAll(
+        client: AppHttp.client,
+      );
       if (!mounted) return;
       setState(() {
         _activities = activities;
@@ -268,17 +269,14 @@ class _RadarPageState extends State<RadarPage> {
       return;
     }
 
-    final launched = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!mounted) return;
     if (!launched) _showLaunchError(activity.displayName);
   }
 
   void _showLaunchError(String displayName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Could not open $displayName')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Could not open $displayName')));
   }
 }

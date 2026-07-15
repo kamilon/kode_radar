@@ -5,8 +5,8 @@ import 'package:http/http.dart' as http;
 
 class CachedHttpClient extends http.BaseClient {
   CachedHttpClient({http.Client? inner, ResponseCache? cache})
-      : _inner = inner ?? http.Client(),
-        _cache = cache ?? ResponseCache();
+    : _inner = inner ?? http.Client(),
+      _cache = cache ?? ResponseCache();
 
   final http.Client _inner;
   final ResponseCache _cache;
@@ -217,8 +217,8 @@ class CachedResponse {
     required this.storedAt,
     DateTime? lastUsed,
     Map<String, String> headers = const <String, String>{},
-  })  : lastUsed = lastUsed ?? storedAt,
-        headers = Map.unmodifiable(headers);
+  }) : lastUsed = lastUsed ?? storedAt,
+       headers = Map.unmodifiable(headers);
 
   final String etag;
   final String body;
@@ -247,11 +247,7 @@ class CachedResponse {
 }
 
 class RateLimitStatus {
-  const RateLimitStatus({
-    this.remaining,
-    this.resetAt,
-    this.retryAfter,
-  });
+  const RateLimitStatus({this.remaining, this.resetAt, this.retryAfter});
 
   final int? remaining;
   final DateTime? resetAt;
@@ -284,19 +280,14 @@ RateLimitStatus parseRateLimit(Map<String, String> headers) {
     remaining: remaining,
     resetAt: resetSeconds == null
         ? null
-        : DateTime.fromMillisecondsSinceEpoch(
-            resetSeconds * 1000,
-            isUtc: true,
-          ),
-    retryAfter:
-        retryAfterSeconds == null ? null : Duration(seconds: retryAfterSeconds),
+        : DateTime.fromMillisecondsSinceEpoch(resetSeconds * 1000, isUtc: true),
+    retryAfter: retryAfterSeconds == null
+        ? null
+        : Duration(seconds: retryAfterSeconds),
   );
 }
 
-bool shouldUseCachedResponseForRateLimit(
-  RateLimitStatus status,
-  DateTime now,
-) {
+bool shouldUseCachedResponseForRateLimit(RateLimitStatus status, DateTime now) {
   final resetAt = status.resetAt;
   return status.remaining == 0 && resetAt != null && resetAt.isAfter(now);
 }
@@ -310,8 +301,10 @@ String cacheKey(http.BaseRequest request) {
 }
 
 http.StreamedResponse _streamedFromCached(
-    CachedResponse cached, http.BaseRequest request,
-    {int? statusCode}) {
+  CachedResponse cached,
+  http.BaseRequest request, {
+  int? statusCode,
+}) {
   final bytes = utf8.encode(cached.body);
   final headers = Map<String, String>.from(cached.headers);
   headers.putIfAbsent('etag', () => cached.etag);

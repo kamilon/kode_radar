@@ -26,9 +26,9 @@ void main() {
       jsonDecode(prefs.getString('self_github_logins')!) as List<dynamic>,
       ['alice', 'bob'],
     );
-    expect(
-      jsonDecode(prefs.getString('self_ado_names')!) as List<dynamic>,
-      ['Ada Lovelace', 'Grace Hopper'],
-    );
+    expect(jsonDecode(prefs.getString('self_ado_names')!) as List<dynamic>, [
+      'Ada Lovelace',
+      'Grace Hopper',
+    ]);
   });
 }

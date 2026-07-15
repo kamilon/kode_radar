@@ -35,8 +35,9 @@ class RepoStore {
   ) {
     return _synchronized(() async {
       final prefs = await SharedPreferences.getInstance();
-      final repos =
-          List<String>.of(prefs.getStringList(storageKey) ?? const []);
+      final repos = List<String>.of(
+        prefs.getStringList(storageKey) ?? const [],
+      );
       final result = mutate(repos);
       await prefs.setStringList(storageKey, repos);
       return result;
@@ -50,8 +51,9 @@ class RepoStore {
   ) {
     return _synchronized(() async {
       final prefs = await SharedPreferences.getInstance();
-      final github =
-          List<String>.of(prefs.getStringList(githubKey) ?? const []);
+      final github = List<String>.of(
+        prefs.getStringList(githubKey) ?? const [],
+      );
       final ado = List<String>.of(prefs.getStringList(adoKey) ?? const []);
       final result = mutate(github, ado);
       await prefs.setStringList(githubKey, github);

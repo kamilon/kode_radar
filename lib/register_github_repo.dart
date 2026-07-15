@@ -69,7 +69,9 @@ class _RegisterGithubRepoPageState extends State<RegisterGithubRepoPage> {
         try {
           final m = Map<String, String>.from(jsonDecode(raw) as Map);
           final key = RepoDiscoveryService.githubKey(
-              m['owner'] ?? '', m['repoName'] ?? '');
+            m['owner'] ?? '',
+            m['repoName'] ?? '',
+          );
           if (key == newKey) return false; // duplicate
         } catch (_) {}
       }
@@ -92,11 +94,13 @@ class _RegisterGithubRepoPageState extends State<RegisterGithubRepoPage> {
         if (!mounted) return; // Ensure the widget is still mounted
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isEditing
-                ? 'Repository updated successfully!'
-                : added
-                    ? 'Repository saved successfully!'
-                    : 'That repository is already tracked.'),
+            content: Text(
+              _isEditing
+                  ? 'Repository updated successfully!'
+                  : added
+                  ? 'Repository saved successfully!'
+                  : 'That repository is already tracked.',
+            ),
           ),
         );
         Navigator.pop(context);
@@ -108,9 +112,9 @@ class _RegisterGithubRepoPageState extends State<RegisterGithubRepoPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing
-            ? 'Edit GitHub Repository'
-            : 'Register GitHub Repository'),
+        title: Text(
+          _isEditing ? 'Edit GitHub Repository' : 'Register GitHub Repository',
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -134,9 +138,7 @@ class _RegisterGithubRepoPageState extends State<RegisterGithubRepoPage> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _repoNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Repository Name',
-                ),
+                decoration: const InputDecoration(labelText: 'Repository Name'),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter the repository name';

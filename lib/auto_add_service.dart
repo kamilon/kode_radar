@@ -16,8 +16,9 @@ class AutoAddService {
   ///
   /// Provide [client] to reuse a connection (and in tests).
   static Future<int> run({http.Client? client}) async {
-    final autoTokens =
-        (await TokenStore.getTokens()).where((t) => t.autoAdd).toList();
+    final autoTokens = (await TokenStore.getTokens())
+        .where((t) => t.autoAdd)
+        .toList();
     if (autoTokens.isEmpty) return 0;
 
     // Process scoped tokens before default (unscoped) ones so a scoped token
@@ -71,10 +72,12 @@ class AutoAddService {
     // repo is never re-added and no UI change is clobbered.
     return RepoStore.runLocked(() async {
       final prefs = await SharedPreferences.getInstance();
-      final github =
-          List<String>.of(prefs.getStringList(RepoStore.githubKey) ?? const []);
-      final ado =
-          List<String>.of(prefs.getStringList(RepoStore.adoKey) ?? const []);
+      final github = List<String>.of(
+        prefs.getStringList(RepoStore.githubKey) ?? const [],
+      );
+      final ado = List<String>.of(
+        prefs.getStringList(RepoStore.adoKey) ?? const [],
+      );
       final ignored = IgnoreStore.readFrom(prefs);
       final existing = _existingKeys(github, ado);
       var added = 0;
@@ -105,15 +108,24 @@ class AutoAddService {
     for (final raw in githubRepos) {
       try {
         final map = Map<String, String>.from(jsonDecode(raw) as Map);
-        keys.add(RepoDiscoveryService.githubKey(
-            map['owner'] ?? '', map['repoName'] ?? ''));
+        keys.add(
+          RepoDiscoveryService.githubKey(
+            map['owner'] ?? '',
+            map['repoName'] ?? '',
+          ),
+        );
       } catch (_) {}
     }
     for (final raw in adoRepos) {
       try {
         final map = Map<String, String>.from(jsonDecode(raw) as Map);
-        keys.add(RepoDiscoveryService.adoKey(map['organization'] ?? '',
-            map['project'] ?? '', map['repoName'] ?? ''));
+        keys.add(
+          RepoDiscoveryService.adoKey(
+            map['organization'] ?? '',
+            map['project'] ?? '',
+            map['repoName'] ?? '',
+          ),
+        );
       } catch (_) {}
     }
     return keys;

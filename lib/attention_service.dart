@@ -97,19 +97,38 @@ class AttentionService {
           if (login != null) reviewerLogins.add(login.trim().toLowerCase());
         }
       }
-      final waitingOnReview = (reviewers is List && reviewers.isNotEmpty) ||
+      final waitingOnReview =
+          (reviewers is List && reviewers.isNotEmpty) ||
           (teams is List && teams.isNotEmpty);
-      final mine = self.isNotEmpty &&
+      final mine =
+          self.isNotEmpty &&
           (self.contains(author.trim().toLowerCase()) ||
               reviewerLogins.any(self.contains));
 
       if (waitingOnReview) {
-        items.add(_reviewRequested(
-            repoDisplay, 'PR #$number', title, author, age, url,
-            isMine: mine));
+        items.add(
+          _reviewRequested(
+            repoDisplay,
+            'PR #$number',
+            title,
+            author,
+            age,
+            url,
+            isMine: mine,
+          ),
+        );
       } else if ((age ?? 0) > oldOpenPrDays) {
-        items.add(_oldOpen(repoDisplay, 'PR #$number', title, author, age, url,
-            isMine: mine));
+        items.add(
+          _oldOpen(
+            repoDisplay,
+            'PR #$number',
+            title,
+            author,
+            age,
+            url,
+            isMine: mine,
+          ),
+        );
       }
     }
     return items;
@@ -137,7 +156,7 @@ class AttentionService {
       final url = id == null
           ? null
           : 'https://dev.azure.com/$organization/$project/_git/$name/'
-              'pullrequest/$id';
+                'pullrequest/$id';
 
       // ADO reviewer votes: 10 approved, 5 approved-with-suggestions,
       // 0 no vote yet, -5 waiting for author, -10 rejected.
@@ -154,29 +173,61 @@ class AttentionService {
       }
       final changesRequested = votes.any((v) => v is int && v < 0);
       final waitingOnReview = votes.any((v) => v == 0);
-      final mine = self.isNotEmpty &&
+      final mine =
+          self.isNotEmpty &&
           (self.contains(author.trim().toLowerCase()) ||
               reviewerNames.any(self.contains));
 
       if (changesRequested) {
-        items.add(_changesRequested(
-            repoDisplay, 'PR #$id', title, author, age, url,
-            isMine: mine));
+        items.add(
+          _changesRequested(
+            repoDisplay,
+            'PR #$id',
+            title,
+            author,
+            age,
+            url,
+            isMine: mine,
+          ),
+        );
       } else if (waitingOnReview) {
-        items.add(_reviewRequested(
-            repoDisplay, 'PR #$id', title, author, age, url,
-            isMine: mine));
+        items.add(
+          _reviewRequested(
+            repoDisplay,
+            'PR #$id',
+            title,
+            author,
+            age,
+            url,
+            isMine: mine,
+          ),
+        );
       } else if ((age ?? 0) > oldOpenPrDays) {
-        items.add(_oldOpen(repoDisplay, 'PR #$id', title, author, age, url,
-            isMine: mine));
+        items.add(
+          _oldOpen(
+            repoDisplay,
+            'PR #$id',
+            title,
+            author,
+            age,
+            url,
+            isMine: mine,
+          ),
+        );
       }
     }
     return items;
   }
 
-  static AttentionItem _reviewRequested(String repoDisplay, String prLabel,
-      String title, String author, int? ageDays, String? url,
-      {bool isMine = false}) {
+  static AttentionItem _reviewRequested(
+    String repoDisplay,
+    String prLabel,
+    String title,
+    String author,
+    int? ageDays,
+    String? url, {
+    bool isMine = false,
+  }) {
     return AttentionItem(
       id: 'reviewRequested:$repoDisplay:$prLabel',
       category: 'reviewRequested',
@@ -191,9 +242,15 @@ class AttentionService {
     );
   }
 
-  static AttentionItem _changesRequested(String repoDisplay, String prLabel,
-      String title, String author, int? ageDays, String? url,
-      {bool isMine = false}) {
+  static AttentionItem _changesRequested(
+    String repoDisplay,
+    String prLabel,
+    String title,
+    String author,
+    int? ageDays,
+    String? url, {
+    bool isMine = false,
+  }) {
     return AttentionItem(
       id: 'changesRequested:$repoDisplay:$prLabel',
       category: 'changesRequested',
@@ -208,9 +265,15 @@ class AttentionService {
     );
   }
 
-  static AttentionItem _oldOpen(String repoDisplay, String prLabel,
-      String title, String author, int? ageDays, String? url,
-      {bool isMine = false}) {
+  static AttentionItem _oldOpen(
+    String repoDisplay,
+    String prLabel,
+    String title,
+    String author,
+    int? ageDays,
+    String? url, {
+    bool isMine = false,
+  }) {
     return AttentionItem(
       id: 'oldOpenPr:$repoDisplay:$prLabel',
       category: 'oldOpenPr',
@@ -286,8 +349,16 @@ class AttentionService {
         final name = _stringValue(map, 'repoName');
         if (owner == null || name == null) continue;
         final tokenId = _stringValue(map, 'tokenId');
-        tasks.add(() => _githubRepoItems(
-            httpClient, owner, name, tokenId, effectiveNow, selfGithubLogins));
+        tasks.add(
+          () => _githubRepoItems(
+            httpClient,
+            owner,
+            name,
+            tokenId,
+            effectiveNow,
+            selfGithubLogins,
+          ),
+        );
       }
 
       for (final raw in adoRepos) {
@@ -298,8 +369,17 @@ class AttentionService {
         final name = _stringValue(map, 'repoName');
         if (organization == null || project == null || name == null) continue;
         final tokenId = _stringValue(map, 'tokenId');
-        tasks.add(() => _adoRepoItems(httpClient, organization, project, name,
-            tokenId, effectiveNow, selfAdoNames));
+        tasks.add(
+          () => _adoRepoItems(
+            httpClient,
+            organization,
+            project,
+            name,
+            tokenId,
+            effectiveNow,
+            selfAdoNames,
+          ),
+        );
       }
 
       final grouped = await _runBounded(tasks, concurrency);
@@ -320,40 +400,47 @@ class AttentionService {
   }
 
   static Future<List<AttentionItem>> _githubRepoItems(
-      http.Client client,
-      String owner,
-      String name,
-      String? tokenId,
-      DateTime now,
-      Set<String> selfGithubLogins) async {
+    http.Client client,
+    String owner,
+    String name,
+    String? tokenId,
+    DateTime now,
+    Set<String> selfGithubLogins,
+  ) async {
     final repoDisplay = '$owner/$name';
     try {
-      final secret =
-          (await TokenStore.resolveGithubSecret(owner, tokenId: tokenId))
-              ?.trim();
+      final secret = (await TokenStore.resolveGithubSecret(
+        owner,
+        tokenId: tokenId,
+      ))?.trim();
       if (secret == null || secret.isEmpty) {
         return [_errorItem(repoDisplay, 'No token set')];
       }
-      final response = await client.get(
-        Uri.https('api.github.com', '/repos/$owner/$name/pulls',
-            {'state': 'open', 'per_page': '100'}),
-        headers: {
-          'Authorization': 'Bearer $secret',
-          'Accept': 'application/vnd.github+json',
-        },
-      ).timeout(_requestTimeout);
+      final response = await client
+          .get(
+            Uri.https('api.github.com', '/repos/$owner/$name/pulls', {
+              'state': 'open',
+              'per_page': '100',
+            }),
+            headers: {
+              'Authorization': 'Bearer $secret',
+              'Accept': 'application/vnd.github+json',
+            },
+          )
+          .timeout(_requestTimeout);
       if (response.statusCode != 200) {
         return [
-          _errorItem(repoDisplay, 'GitHub returned ${response.statusCode}')
+          _errorItem(repoDisplay, 'GitHub returned ${response.statusCode}'),
         ];
       }
       final body = jsonDecode(response.body);
       if (body is! List) return const [];
       return githubItems(
-          repoDisplay: repoDisplay,
-          prs: body,
-          now: now,
-          selfGithubLogins: selfGithubLogins);
+        repoDisplay: repoDisplay,
+        prs: body,
+        now: now,
+        selfGithubLogins: selfGithubLogins,
+      );
     } catch (e) {
       debugPrint('AttentionService GitHub fetch failed for $repoDisplay: $e');
       return [_errorItem(repoDisplay, 'Could not load pull requests')];
@@ -361,35 +448,41 @@ class AttentionService {
   }
 
   static Future<List<AttentionItem>> _adoRepoItems(
-      http.Client client,
-      String organization,
-      String project,
-      String name,
-      String? tokenId,
-      DateTime now,
-      Set<String> selfAdoNames) async {
+    http.Client client,
+    String organization,
+    String project,
+    String name,
+    String? tokenId,
+    DateTime now,
+    Set<String> selfAdoNames,
+  ) async {
     final repoDisplay = '$organization/$project/$name';
     try {
-      final secret =
-          (await TokenStore.resolveAdoSecret(organization, tokenId: tokenId))
-              ?.trim();
+      final secret = (await TokenStore.resolveAdoSecret(
+        organization,
+        tokenId: tokenId,
+      ))?.trim();
       if (secret == null || secret.isEmpty) {
         return [_errorItem(repoDisplay, 'No token set')];
       }
-      final response = await client.get(
-        Uri.https(
-          'dev.azure.com',
-          '/$organization/$project/_apis/git/repositories/$name/pullrequests',
-          {'searchCriteria.status': 'active', 'api-version': '6.0'},
-        ),
-        headers: {
-          'Authorization': 'Basic ${base64Encode(utf8.encode(':$secret'))}',
-        },
-      ).timeout(_requestTimeout);
+      final response = await client
+          .get(
+            Uri.https(
+              'dev.azure.com',
+              '/$organization/$project/_apis/git/repositories/$name/pullrequests',
+              {'searchCriteria.status': 'active', 'api-version': '6.0'},
+            ),
+            headers: {
+              'Authorization': 'Basic ${base64Encode(utf8.encode(':$secret'))}',
+            },
+          )
+          .timeout(_requestTimeout);
       if (response.statusCode != 200) {
         return [
           _errorItem(
-              repoDisplay, 'Azure DevOps returned ${response.statusCode}')
+            repoDisplay,
+            'Azure DevOps returned ${response.statusCode}',
+          ),
         ];
       }
       final body = jsonDecode(response.body);

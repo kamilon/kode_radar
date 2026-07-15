@@ -78,10 +78,12 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         actions: [
           IconButton(
             icon: Icon(_mineOnly ? Icons.person : Icons.groups),
-            tooltip:
-                _mineOnly ? 'Showing yours — tap for all' : 'Show only mine',
-            onPressed:
-                _loading ? null : () => setState(() => _mineOnly = !_mineOnly),
+            tooltip: _mineOnly
+                ? 'Showing yours — tap for all'
+                : 'Show only mine',
+            onPressed: _loading
+                ? null
+                : () => setState(() => _mineOnly = !_mineOnly),
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -103,7 +105,8 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         children: [
           const SizedBox(height: 160),
           Center(
-              child: Text(_error!, style: const TextStyle(color: Colors.red))),
+            child: Text(_error!, style: const TextStyle(color: Colors.red)),
+          ),
         ],
       );
     }
@@ -114,7 +117,7 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
       itemCount: visible.length + 1,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
         if (index == 0) return _buildHeader(visible.length);
         return _buildItemTile(visible[index - 1]);
@@ -136,8 +139,11 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       children: [
         const SizedBox(height: 140),
         Center(
-          child: Icon(Icons.check_circle_outline,
-              size: 56, color: Colors.green[400]),
+          child: Icon(
+            Icons.check_circle_outline,
+            size: 56,
+            color: Colors.green[400],
+          ),
         ),
         const SizedBox(height: 12),
         Center(child: Text(message, textAlign: TextAlign.center)),
@@ -189,8 +195,9 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         leading: Icon(visual.icon, color: visual.color),
         title: Text(item.title),
         subtitle: Text(item.subtitle),
-        trailing:
-            item.url != null ? const Icon(Icons.open_in_new, size: 16) : null,
+        trailing: item.url != null
+            ? const Icon(Icons.open_in_new, size: 16)
+            : null,
         onTap: item.url == null ? null : () => _open(item.url!),
       ),
     );
@@ -288,8 +295,8 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
   }
 
   void _showOpenError(String url) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Could not open $url')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Could not open $url')));
   }
 }
