@@ -28,10 +28,14 @@ class TeamStore {
   }
 
   static Future<Team> add(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(name, 'name', 'Team name cannot be empty');
+    }
     return _runLocked(() async {
       final prefs = await SharedPreferences.getInstance();
       final teams = _readFrom(prefs);
-      final team = Team(id: _newId(), name: name.trim());
+      final team = Team(id: _newId(), name: trimmed);
       teams.add(team);
       await _writeTo(prefs, teams);
       return team;
@@ -39,12 +43,14 @@ class TeamStore {
   }
 
   static Future<void> rename(String id, String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return Future<void>.value();
     return _runLocked(() async {
       final prefs = await SharedPreferences.getInstance();
       final teams = _readFrom(prefs);
       final index = teams.indexWhere((team) => team.id == id);
       if (index == -1) return;
-      teams[index] = teams[index].copyWith(name: name.trim());
+      teams[index] = teams[index].copyWith(name: trimmed);
       await _writeTo(prefs, teams);
     });
   }
@@ -64,7 +70,10 @@ class TeamStore {
       final index = teams.indexWhere((team) => team.id == id);
       if (index == -1) return;
       teams[index] = teams[index].copyWith(
-        repoKeys: repoKeys.where((key) => key.isNotEmpty).toSet(),
+        repoKeys: repoKeys
+            .map((key) => key.trim())
+            .where((key) => key.isNotEmpty)
+            .toSet(),
       );
       await _writeTo(prefs, teams);
     });
@@ -88,7 +97,10 @@ class TeamStore {
       }
       final id = entry['id'];
       final name = entry['name'];
-      if (id is! String || id.isEmpty || name is! String) {
+      if (id is! String ||
+          id.isEmpty ||
+          name is! String ||
+          name.trim().isEmpty) {
         debugPrint('Skipping malformed team entry: missing id or name.');
         continue;
       }
