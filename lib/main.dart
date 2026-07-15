@@ -42,6 +42,12 @@ void main() async {
     macOS: initializationSettingsDarwin,
   );
   await _notificationsPlugin.initialize(settings: initializationSettings);
+  // Android 13+ (API 33+) requires the runtime POST_NOTIFICATIONS grant.
+  await _notificationsPlugin
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >()
+      ?.requestNotificationsPermission();
 
   if (_isDesktopPlatform) {
     await windowManager.ensureInitialized(); // Initialize window manager

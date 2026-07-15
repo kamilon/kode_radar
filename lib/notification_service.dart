@@ -68,6 +68,12 @@ class NotificationService {
         macOS: DarwinInitializationSettings(),
       );
       await _plugin.initialize(settings: settings);
+      // Android 13+ (API 33+) requires the runtime POST_NOTIFICATIONS grant.
+      await _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.requestNotificationsPermission();
       _initialized = true;
     } catch (e) {
       debugPrint('Failed to initialize local notifications: $e');
