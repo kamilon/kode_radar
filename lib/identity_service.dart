@@ -122,7 +122,9 @@ class IdentityService {
       if (response.statusCode != 200) return null;
       return parseGithubLogin(jsonDecode(response.body));
     } catch (e) {
-      debugPrint('IdentityService: GitHub detection failed for $tokenId: $e');
+      if (kDebugMode) {
+        debugPrint('IdentityService: GitHub token detection failed: $e');
+      }
       return null;
     }
   }
@@ -146,7 +148,9 @@ class IdentityService {
       if (response.statusCode != 200) return null;
       return parseAdoName(jsonDecode(response.body));
     } catch (e) {
-      debugPrint('IdentityService: ADO detection failed for $tokenId: $e');
+      if (kDebugMode) {
+        debugPrint('IdentityService: ADO token detection failed: $e');
+      }
       return null;
     }
   }
