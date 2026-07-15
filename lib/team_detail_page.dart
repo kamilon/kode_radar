@@ -45,17 +45,20 @@ class _TeamDetailPageState extends State<TeamDetailPage> {
     });
     try {
       // Fetch repo activity and the feed concurrently, both scoped to the
-      // team's repositories.
-      final activitiesFuture = ActivityService.computeAll(
-        client: AppHttp.client,
-        onlyRepoKeys: _team.repoKeys,
-      );
-      final feedFuture = ActivityFeedService.computeAll(
-        client: AppHttp.client,
-        onlyRepoKeys: _team.repoKeys,
-      );
-      final activities = await activitiesFuture;
-      final feed = await feedFuture;
+      // team's repositories. Future.wait ensures both are awaited even if one
+      // fails (no unhandled async error).
+      final results = await Future.wait([
+        ActivityService.computeAll(
+          client: AppHttp.client,
+          onlyRepoKeys: _team.repoKeys,
+        ),
+        ActivityFeedService.computeAll(
+          client: AppHttp.client,
+          onlyRepoKeys: _team.repoKeys,
+        ),
+      ]);
+      final activities = results[0] as List<RepoActivity>;
+      final feed = results[1] as ActivityFeedResult;
       final repos =
           activities.where((a) => _team.repoKeys.contains(a.repoKey)).toList()
             ..sort((a, b) {
@@ -113,7 +116,7 @@ class _TeamDetailPageState extends State<TeamDetailPage> {
                   _buildHeader(),
                   const Divider(height: 1),
                   if (_error == null)
-                    ?activitySourceNotice(
+                    activitySourceNotice(
                       failedSources: _failedSources,
                       truncated: _truncated,
                     ),

@@ -131,7 +131,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
           _buildFilterBar(),
           const Divider(height: 1),
           if (!_loading && _error == null)
-            ?activitySourceNotice(
+            activitySourceNotice(
               failedSources: _failedSources,
               truncated: _truncated,
             ),

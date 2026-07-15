@@ -13,13 +13,13 @@ String activityRelativeTime(DateTime value) {
 }
 
 /// A compact amber notice shown when some feed sources failed to load or the
-/// page was truncated. Returns null when there is nothing to warn about, so
-/// callers can conditionally include it. Shared by the feed and detail views.
-Widget? activitySourceNotice({
+/// page was truncated. Returns an empty widget when there is nothing to warn
+/// about. Shared by the feed and detail views.
+Widget activitySourceNotice({
   required int failedSources,
   bool truncated = false,
 }) {
-  if (failedSources <= 0 && !truncated) return null;
+  if (failedSources <= 0 && !truncated) return const SizedBox.shrink();
   final parts = <String>[];
   if (failedSources > 0) {
     parts.add(
