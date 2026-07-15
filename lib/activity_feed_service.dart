@@ -465,6 +465,7 @@ class ActivityFeedService {
             name,
             tokenId,
             selfGithubLogins,
+            since,
           ),
         );
       }
@@ -485,6 +486,7 @@ class ActivityFeedService {
             name,
             tokenId,
             selfAdoNames,
+            since,
           ),
         );
       }
@@ -507,6 +509,7 @@ class ActivityFeedService {
     String name,
     String? tokenId,
     Set<String> selfGithubLogins,
+    DateTime since,
   ) async {
     final repoDisplay = '$owner/$name';
     final repoKey = RepoDiscoveryService.githubKey(owner, name);
@@ -543,7 +546,12 @@ class ActivityFeedService {
           events: body,
           selfGithubLogins: selfGithubLogins,
         ),
-        truncated: body.length >= 100,
+        truncated: _truncatedByWindow(
+          body,
+          100,
+          since,
+          (e) => e is Map ? _parseDate(e['created_at']) : null,
+        ),
       );
     });
 
@@ -566,7 +574,14 @@ class ActivityFeedService {
           body: body,
           selfGithubLogins: selfGithubLogins,
         ),
-        truncated: runs is List && runs.length >= 30,
+        truncated: _truncatedByWindow(
+          runs,
+          30,
+          since,
+          (r) => r is Map
+              ? (_parseDate(r['updated_at']) ?? _parseDate(r['run_started_at']))
+              : null,
+        ),
       );
     });
 
@@ -580,6 +595,7 @@ class ActivityFeedService {
     String name,
     String? tokenId,
     Set<String> selfAdoNames,
+    DateTime since,
   ) async {
     final repoDisplay = '$organization/$project/$name';
     final repoKey = RepoDiscoveryService.adoKey(organization, project, name);
@@ -625,7 +641,12 @@ class ActivityFeedService {
           prs: value,
           selfAdoNames: selfAdoNames,
         ),
-        truncated: value.length >= 50,
+        truncated: _truncatedByWindow(
+          value,
+          50,
+          since,
+          (p) => p is Map ? _parseDate(p['creationDate']) : null,
+        ),
       );
     });
 
@@ -653,7 +674,12 @@ class ActivityFeedService {
           body: body,
           selfAdoNames: selfAdoNames,
         ),
-        truncated: value is List && value.length >= 30,
+        truncated: _truncatedByWindow(
+          value,
+          30,
+          since,
+          (p) => p is Map ? _parseDate(p['date']) : null,
+        ),
       );
     });
 
@@ -701,7 +727,12 @@ class ActivityFeedService {
           body: body,
           selfAdoNames: selfAdoNames,
         ),
-        truncated: value is List && value.length >= 30,
+        truncated: _truncatedByWindow(
+          value,
+          30,
+          since,
+          (b) => b is Map ? _parseDate(b['finishTime']) : null,
+        ),
       );
     });
 
@@ -709,6 +740,26 @@ class ActivityFeedService {
   }
 
   // ---- Helpers -------------------------------------------------------------
+
+  /// True when a fetched [page] is full (>= [cap]) AND its oldest item is still
+  /// at/after [since] — i.e. older *in-window* items may lie beyond this page.
+  /// If the oldest item is already older than [since], the page already spans
+  /// the whole window and nothing in-window was omitted.
+  static bool _truncatedByWindow(
+    dynamic page,
+    int cap,
+    DateTime since,
+    DateTime? Function(dynamic item) dateOf,
+  ) {
+    if (page is! List || page.length < cap) return false;
+    DateTime? oldest;
+    for (final item in page) {
+      final date = dateOf(item);
+      if (date == null) continue;
+      if (oldest == null || date.isBefore(oldest)) oldest = date;
+    }
+    return oldest == null || !oldest.isBefore(since);
+  }
 
   static ActivityEvent _adoPrEvent({
     required String id,

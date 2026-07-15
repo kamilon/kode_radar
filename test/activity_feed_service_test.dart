@@ -499,5 +499,83 @@ void main() {
       expect(result.events, isEmpty);
       expect(result.failedSources, greaterThanOrEqualTo(1));
     });
+
+    test('flags truncated when a full page stays within the window', () async {
+      final gh = await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'Acme',
+        scope: 'acme',
+        secret: 'ghp_secret',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('github_repos', [
+        jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': gh.id}),
+      ]);
+      // A full page (100) of in-window events => older ones may be omitted.
+      final fullPage = List.generate(
+        100,
+        (i) => {
+          'id': '$i',
+          'type': 'PushEvent',
+          'actor': {'login': 'alice'},
+          'created_at': '2026-07-14T10:00:00Z',
+          'payload': {'ref': 'refs/heads/main', 'size': 1},
+        },
+      );
+      final client = MockClient((request) async {
+        if (request.url.path == '/repos/acme/api/events') {
+          return http.Response(jsonEncode(fullPage), 200);
+        }
+        return http.Response(jsonEncode({'workflow_runs': []}), 200);
+      });
+
+      final result = await ActivityFeedService.computeAll(
+        client: client,
+        now: DateTime.parse('2026-07-15T12:00:00Z'),
+      );
+      expect(result.truncated, isTrue);
+    });
+
+    test(
+      'no truncation when the full page already predates the window',
+      () async {
+        final gh = await TokenStore.addToken(
+          provider: TokenStore.providerGithub,
+          label: 'Acme',
+          scope: 'acme',
+          secret: 'ghp_secret',
+        );
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList('github_repos', [
+          jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': gh.id}),
+        ]);
+        // A full page whose oldest event predates `since` fully covers the
+        // window, so nothing in-window was omitted.
+        final fullPage = List.generate(
+          100,
+          (i) => {
+            'id': '$i',
+            'type': 'PushEvent',
+            'actor': {'login': 'alice'},
+            'created_at': i == 99
+                ? '2026-06-01T10:00:00Z'
+                : '2026-07-14T10:00:00Z',
+            'payload': {'ref': 'refs/heads/main', 'size': 1},
+          },
+        );
+        final client = MockClient((request) async {
+          if (request.url.path == '/repos/acme/api/events') {
+            return http.Response(jsonEncode(fullPage), 200);
+          }
+          return http.Response(jsonEncode({'workflow_runs': []}), 200);
+        });
+
+        final result = await ActivityFeedService.computeAll(
+          client: client,
+          now: DateTime.parse('2026-07-15T12:00:00Z'),
+        );
+        expect(result.truncated, isFalse);
+      },
+    );
   });
 }
