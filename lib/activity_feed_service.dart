@@ -112,8 +112,8 @@ class ActivityFeedService {
           final number = _stringy(pr['number']);
           final prTitle = _str(pr, 'title') ?? 'Untitled PR';
           final url = _str(pr, 'html_url');
-          String? type;
-          String verb;
+          final String type;
+          final String verb;
           if (action == 'opened' || action == 'reopened') {
             type = ActivityType.prOpened;
             verb = 'opened';
@@ -514,7 +514,9 @@ class ActivityFeedService {
       tokenId: tokenId,
     ))?.trim();
     if (secret == null || secret.isEmpty) {
-      return const _FetchOutcome(<ActivityEvent>[]);
+      // A configured repo with no resolvable token can't be loaded — surface it
+      // as a failed source rather than silent emptiness.
+      return _FetchOutcome.failure;
     }
     final headers = {
       'Authorization': 'Bearer $secret',
@@ -582,7 +584,9 @@ class ActivityFeedService {
       tokenId: tokenId,
     ))?.trim();
     if (secret == null || secret.isEmpty) {
-      return const _FetchOutcome(<ActivityEvent>[]);
+      // A configured repo with no resolvable token can't be loaded — surface it
+      // as a failed source rather than silent emptiness.
+      return _FetchOutcome.failure;
     }
     final headers = {
       'Authorization': 'Basic ${base64Encode(utf8.encode(':$secret'))}',

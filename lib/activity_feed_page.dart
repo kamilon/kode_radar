@@ -153,6 +153,9 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
       );
     }
     if (_truncated) parts.add('older items may be omitted');
+    // Retrying only helps when a source actually failed; truncation won't
+    // change on refresh.
+    final suffix = _failedSources > 0 ? ' Pull to retry.' : '';
     return Container(
       width: double.infinity,
       color: Colors.amber.shade100,
@@ -163,7 +166,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '${parts.join(' · ')}. Pull to retry.',
+              '${parts.join(' · ')}.$suffix',
               style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
             ),
           ),

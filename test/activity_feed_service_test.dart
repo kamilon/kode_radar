@@ -482,5 +482,22 @@ void main() {
       expect(result.events, isEmpty);
       expect(result.failedSources, greaterThanOrEqualTo(1));
     });
+
+    test('counts a repo with no resolvable token as a failed source', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('github_repos', [
+        jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': 'missing'}),
+      ]);
+      // No tokens added, so the secret can't be resolved and no request runs.
+      final client = MockClient((_) async => http.Response('{}', 200));
+
+      final result = await ActivityFeedService.computeAll(
+        client: client,
+        now: DateTime.parse('2026-07-15T12:00:00Z'),
+      );
+
+      expect(result.events, isEmpty);
+      expect(result.failedSources, greaterThanOrEqualTo(1));
+    });
   });
 }
