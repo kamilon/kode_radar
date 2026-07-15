@@ -10,6 +10,7 @@ import 'radar_page.dart';
 import 'attention_inbox_page.dart';
 import 'people_page.dart';
 import 'teams_page.dart';
+import 'theme_controller.dart';
 import 'auto_add_service.dart';
 import 'token_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,6 +28,9 @@ final FlutterLocalNotificationsPlugin _notificationsPlugin =
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load the persisted light/dark/system theme preference.
+  await ThemeController.instance.load();
 
   // Initialize local notifications
   const AndroidInitializationSettings initializationSettingsAndroid =
@@ -127,13 +131,26 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Kode Radar',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Kode Radar Home Page'),
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'Kode Radar',
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+            useMaterial3: true,
+          ),
+          darkTheme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.blue,
+              brightness: Brightness.dark,
+            ),
+            useMaterial3: true,
+          ),
+          themeMode: ThemeController.instance.mode,
+          home: const MyHomePage(title: 'Kode Radar Home Page'),
+        );
+      },
     );
   }
 }
@@ -695,6 +712,11 @@ class _MyHomePageState extends State<MyHomePage>
             tooltip: 'Manage repositories',
             onPressed: _openManageRepos,
           ),
+          IconButton(
+            icon: const Icon(Icons.brightness_6),
+            tooltip: 'Appearance',
+            onPressed: _showAppearancePicker,
+          ),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -765,6 +787,31 @@ class _MyHomePageState extends State<MyHomePage>
 
   Future<void> _openManageRepos() async {
     await _openRepoPage(const ManageReposPage());
+  }
+
+  Future<void> _showAppearancePicker() async {
+    final current = ThemeController.instance.mode;
+    final selected = await showDialog<ThemeMode>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Appearance'),
+        children: [
+          for (final option in const [
+            (ThemeMode.system, 'System'),
+            (ThemeMode.light, 'Light'),
+            (ThemeMode.dark, 'Dark'),
+          ])
+            ListTile(
+              title: Text(option.$2),
+              trailing: current == option.$1 ? const Icon(Icons.check) : null,
+              onTap: () => Navigator.pop(dialogContext, option.$1),
+            ),
+        ],
+      ),
+    );
+    if (selected != null) {
+      await ThemeController.instance.setMode(selected);
+    }
   }
 
   Future<void> _openManageTokens() async {
