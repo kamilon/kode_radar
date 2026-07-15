@@ -304,7 +304,8 @@ class ActivityFeedService {
             repoDisplay: repoDisplay,
             actor: actor,
             title:
-                '${actor.isEmpty ? 'Someone' : actor} ${merged ? 'completed' : 'abandoned'} PR #$id',
+                '${actor.isEmpty ? 'Someone' : actor} '
+                '${merged ? 'merged' : 'closed'} PR #$id',
             subtitle: '$repoDisplay · $title',
             occurredAt: closed,
             url: url,
@@ -556,13 +557,16 @@ class ActivityFeedService {
           )
           .timeout(_requestTimeout);
       if (response.statusCode != 200) return _FetchOutcome.failure;
+      final body = jsonDecode(response.body);
+      final runs = body is Map ? body['workflow_runs'] : null;
       return _FetchOutcome(
         githubRunsToActivity(
           repoDisplay: repoDisplay,
           repoKey: repoKey,
-          body: jsonDecode(response.body),
+          body: body,
           selfGithubLogins: selfGithubLogins,
         ),
+        truncated: runs is List && runs.length >= 30,
       );
     });
 
@@ -637,6 +641,8 @@ class ActivityFeedService {
           )
           .timeout(_requestTimeout);
       if (response.statusCode != 200) return _FetchOutcome.failure;
+      final body = jsonDecode(response.body);
+      final value = body is Map ? body['value'] : null;
       return _FetchOutcome(
         adoPushesToActivity(
           repoDisplay: repoDisplay,
@@ -644,9 +650,10 @@ class ActivityFeedService {
           organization: organization,
           project: project,
           name: name,
-          body: jsonDecode(response.body),
+          body: body,
           selfAdoNames: selfAdoNames,
         ),
+        truncated: value is List && value.length >= 30,
       );
     });
 
@@ -685,13 +692,16 @@ class ActivityFeedService {
           )
           .timeout(_requestTimeout);
       if (response.statusCode != 200) return _FetchOutcome.failure;
+      final body = jsonDecode(response.body);
+      final value = body is Map ? body['value'] : null;
       return _FetchOutcome(
         adoBuildsToActivity(
           repoDisplay: repoDisplay,
           repoKey: repoKey,
-          body: jsonDecode(response.body),
+          body: body,
           selfAdoNames: selfAdoNames,
         ),
+        truncated: value is List && value.length >= 30,
       );
     });
 
