@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_http.dart';
+import 'identity_service.dart';
 import 'identity_store.dart';
 import 'people_service.dart';
 import 'person.dart';
@@ -77,48 +78,100 @@ class _PeoplePageState extends State<PeoplePage> {
     if (!mounted) return;
     final ghController = TextEditingController(text: gh);
     final adoController = TextEditingController(text: ado);
+    var detecting = false;
     try {
       final saved = await showDialog<bool>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Your identity'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Marks "You" here and powers the Attention inbox\'s "Mine" '
-                  'filter. Separate multiple entries with commas.',
-                  style: TextStyle(fontSize: 12),
+        barrierDismissible: false,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => PopScope(
+            canPop: !detecting,
+            child: AlertDialog(
+              title: const Text('Your identity'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Marks "You" here and powers the Attention inbox\'s "Mine" '
+                      'filter. Separate multiple entries with commas.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: ghController,
+                      decoration: const InputDecoration(
+                        labelText: 'GitHub username(s)',
+                        hintText: 'octocat, ...',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: adoController,
+                      decoration: const InputDecoration(
+                        labelText: 'Azure DevOps display name(s)',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        icon: detecting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.person_search),
+                        label: const Text('Detect from my tokens'),
+                        onPressed: detecting
+                            ? null
+                            : () async {
+                                setDialogState(() => detecting = true);
+                                try {
+                                  final result =
+                                      await IdentityService.detectSelf(
+                                        client: AppHttp.client,
+                                        persist: false,
+                                      );
+                                  ghController.text = {
+                                    ..._parseLogins(ghController.text),
+                                    ...result.githubLogins,
+                                  }.join(', ');
+                                  adoController.text = {
+                                    ..._parseNames(adoController.text),
+                                    ...result.adoNames,
+                                  }.join(', ');
+                                } catch (e) {
+                                  debugPrint('Identity detection failed: $e');
+                                } finally {
+                                  setDialogState(() => detecting = false);
+                                }
+                              },
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: ghController,
-                  decoration: const InputDecoration(
-                    labelText: 'GitHub username(s)',
-                    hintText: 'octocat, ...',
-                  ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: detecting
+                      ? null
+                      : () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancel'),
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: adoController,
-                  decoration: const InputDecoration(
-                    labelText: 'Azure DevOps display name(s)',
-                  ),
+                FilledButton(
+                  onPressed: detecting
+                      ? null
+                      : () => Navigator.pop(dialogContext, true),
+                  child: const Text('Save'),
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Save'),
-            ),
-          ],
         ),
       );
       if (saved == true) {
