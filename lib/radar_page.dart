@@ -18,6 +18,7 @@ class _RadarPageState extends State<RadarPage> {
   Map<String, List<num>> _series = const {};
   bool _loading = true;
   String? _error;
+  RadarSort _sort = RadarSort.attention;
 
   @override
   void initState() {
@@ -64,6 +65,21 @@ class _RadarPageState extends State<RadarPage> {
       appBar: AppBar(
         title: const Text('Radar'),
         actions: [
+          PopupMenuButton<RadarSort>(
+            icon: const Icon(Icons.sort),
+            tooltip: 'Sort',
+            enabled: !_loading,
+            initialValue: _sort,
+            onSelected: (value) => setState(() => _sort = value),
+            itemBuilder: (context) => [
+              for (final sort in RadarSort.values)
+                CheckedPopupMenuItem(
+                  value: sort,
+                  checked: _sort == sort,
+                  child: Text(ActivityService.radarSortLabel(sort)),
+                ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
@@ -118,12 +134,13 @@ class _RadarPageState extends State<RadarPage> {
       );
     }
 
+    final sorted = ActivityService.sortActivities(_activities, _sort);
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(12),
-      itemCount: _activities.length,
+      itemCount: sorted.length,
       itemBuilder: (context, index) {
-        final activity = _activities[index];
+        final activity = sorted[index];
         return Card(
           child: ListTile(
             title: Text(activity.displayName),

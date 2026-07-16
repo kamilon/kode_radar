@@ -272,4 +272,136 @@ void main() {
       expect(none, isEmpty);
     });
   });
+
+  group('sortActivities', () {
+    RepoActivity repo(
+      String name, {
+      num score = 0,
+      int openPrs = 0,
+      int? oldestPr,
+      String ci = 'unknown',
+      String? error,
+    }) => RepoActivity(
+      repoKey: 'github:$name',
+      provider: 'github',
+      displayName: name,
+      url: 'https://github.com/$name',
+      openPrCount: openPrs,
+      needsReviewCount: 0,
+      oldestOpenPrAgeDays: oldestPr,
+      lastActivity: null,
+      ciStatus: ci,
+      contributors: const [],
+      activityScore: score,
+      error: error,
+    );
+
+    test('attention: errors first, then score desc, then name', () {
+      final sorted = ActivityService.sortActivities([
+        repo('bravo', score: 5),
+        repo('alpha', score: 5),
+        repo('charlie', score: 9),
+        repo('delta', score: 1, error: 'boom'),
+      ], RadarSort.attention);
+      expect(sorted.map((a) => a.displayName).toList(), [
+        'delta', // error first
+        'charlie', // highest score
+        'alpha', // score tie -> name
+        'bravo',
+      ]);
+    });
+
+    test('ciStatus: failing first, then running, unknown, success', () {
+      final sorted = ActivityService.sortActivities([
+        repo('ok', ci: 'success'),
+        repo('broken', ci: 'failure'),
+        repo('pending', ci: 'running'),
+        repo('mystery', ci: 'unknown'),
+      ], RadarSort.ciStatus);
+      expect(sorted.map((a) => a.displayName).toList(), [
+        'broken',
+        'pending',
+        'mystery',
+        'ok',
+      ]);
+    });
+
+    test('openPrs: most open PRs first', () {
+      final sorted = ActivityService.sortActivities([
+        repo('few', openPrs: 1),
+        repo('many', openPrs: 9),
+        repo('none', openPrs: 0),
+      ], RadarSort.openPrs);
+      expect(sorted.map((a) => a.displayName).toList(), [
+        'many',
+        'few',
+        'none',
+      ]);
+    });
+
+    test('oldestPr: oldest first, repos without an open PR last', () {
+      final sorted = ActivityService.sortActivities([
+        repo('recent', oldestPr: 2),
+        repo('none', oldestPr: null),
+        repo('ancient', oldestPr: 40),
+      ], RadarSort.oldestPr);
+      expect(sorted.map((a) => a.displayName).toList(), [
+        'ancient',
+        'recent',
+        'none',
+      ]);
+    });
+
+    test('name: case-insensitive alphabetical', () {
+      final sorted = ActivityService.sortActivities([
+        repo('Zeta'),
+        repo('alpha'),
+        repo('Mango'),
+      ], RadarSort.name);
+      expect(sorted.map((a) => a.displayName).toList(), [
+        'alpha',
+        'Mango',
+        'Zeta',
+      ]);
+    });
+
+    test('does not mutate the input list', () {
+      final input = [repo('b', score: 1), repo('a', score: 2)];
+      final copy = List.of(input);
+      ActivityService.sortActivities(input, RadarSort.name);
+      expect(
+        input.map((a) => a.displayName).toList(),
+        copy.map((a) => a.displayName).toList(),
+      );
+    });
+
+    test('metric sorts surface errored repos first (not buried as zeros)', () {
+      final sorted = ActivityService.sortActivities([
+        repo('green', ci: 'success', openPrs: 3, oldestPr: 5),
+        repo('broken', ci: 'unknown', error: 'no token'),
+      ], RadarSort.ciStatus);
+      // Despite 'success' outranking 'unknown', the errored repo comes first.
+      expect(sorted.first.displayName, 'broken');
+
+      final byPrs = ActivityService.sortActivities([
+        repo('green', openPrs: 3),
+        repo('broken', openPrs: 0, error: 'no token'),
+      ], RadarSort.openPrs);
+      expect(byPrs.first.displayName, 'broken');
+    });
+
+    test('name sort stays purely alphabetical (errors not hoisted)', () {
+      final sorted = ActivityService.sortActivities([
+        repo('zeta', error: 'boom'),
+        repo('alpha'),
+      ], RadarSort.name);
+      expect(sorted.map((a) => a.displayName).toList(), ['alpha', 'zeta']);
+    });
+
+    test('radarSortLabel gives a label for every option', () {
+      for (final sort in RadarSort.values) {
+        expect(ActivityService.radarSortLabel(sort), isNotEmpty);
+      }
+    });
+  });
 }
