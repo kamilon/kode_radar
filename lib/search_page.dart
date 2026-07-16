@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'activity_service.dart';
+import 'config_revision.dart';
 import 'home_menu.dart';
 import 'monitored_repos.dart';
 import 'repo_detail_page.dart';
@@ -24,22 +25,32 @@ class _SearchPageState extends State<SearchPage> {
   bool _loading = true;
   String _query = '';
 
+  // Guards against a stale in-flight load applying after a newer one.
+  int _loadSeq = 0;
+
   @override
   void initState() {
     super.initState();
+    configRevision.addListener(_onConfigChanged);
     _load();
   }
 
   @override
   void dispose() {
+    configRevision.removeListener(_onConfigChanged);
     _controller.dispose();
     super.dispose();
   }
 
+  void _onConfigChanged() {
+    if (mounted) _load();
+  }
+
   Future<void> _load() async {
+    final seq = ++_loadSeq;
     final repos = await listMonitoredRepos();
     final teams = await TeamStore.list();
-    if (!mounted) return;
+    if (!mounted || seq != _loadSeq) return;
     setState(() {
       _repos = repos;
       _teams = teams;

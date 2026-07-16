@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'app_http.dart';
 import 'attention_service.dart';
+import 'config_revision.dart';
 import 'home_menu.dart';
 import 'identity_store.dart';
 import 'notification_service.dart';
@@ -29,10 +30,24 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
   String? _error;
   DateTime? _lastChecked;
 
+  // Guards against a stale in-flight load applying after a newer one.
+  int _loadSeq = 0;
+
   @override
   void initState() {
     super.initState();
+    configRevision.addListener(_onConfigChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    configRevision.removeListener(_onConfigChanged);
+    super.dispose();
+  }
+
+  void _onConfigChanged() {
+    if (mounted) _load();
   }
 
   /// Items after the "Mine" toggle only — drives the per-category chip counts.
@@ -46,6 +61,7 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
   );
 
   Future<void> _load() async {
+    final seq = ++_loadSeq;
     setState(() {
       _loading = true;
       _error = null;
@@ -60,7 +76,7 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         selfGithubLogins: selfGithub,
         selfAdoNames: selfAdo,
       );
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _items = items;
         _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
@@ -70,7 +86,7 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       unawaited(NotificationService.notifyNewAttention(items));
     } catch (e) {
       debugPrint('AttentionInbox failed to load: $e');
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _error =
             'Something went wrong while loading your inbox. Pull down to try again.';

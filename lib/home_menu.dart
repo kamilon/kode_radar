@@ -9,6 +9,7 @@ import 'people_page.dart';
 import 'teams_page.dart';
 import 'preferences_page.dart';
 import 'theme_controller.dart';
+import 'config_revision.dart';
 
 /// The shared "more" overflow menu shown on every home surface's app bar. It
 /// reaches the secondary destinations — work items, people, teams, repository
@@ -45,26 +46,28 @@ class HomeMenuButton extends StatelessWidget {
           MaterialPageRoute(builder: (_) => const WorkItemsPage()),
         );
       case 'people':
-        navigator.push(MaterialPageRoute(builder: (_) => const PeoplePage()));
+        _pushThenRefresh(navigator, const PeoplePage());
       case 'teams':
-        navigator.push(MaterialPageRoute(builder: (_) => const TeamsPage()));
+        _pushThenRefresh(navigator, const TeamsPage());
       case 'addRepo':
         _showAddRepoSheet(context);
       case 'repos':
-        navigator.push(
-          MaterialPageRoute(builder: (_) => const ManageReposPage()),
-        );
+        _pushThenRefresh(navigator, const ManageReposPage());
       case 'tokens':
-        navigator.push(
-          MaterialPageRoute(builder: (_) => const ManageTokensPage()),
-        );
+        _pushThenRefresh(navigator, const ManageTokensPage());
       case 'appearance':
         _showAppearancePicker(context);
       case 'settings':
-        navigator.push(
-          MaterialPageRoute(builder: (_) => const PreferencesPage()),
-        );
+        _pushThenRefresh(navigator, const PreferencesPage());
     }
+  }
+
+  /// Pushes a destination that can change the monitored configuration
+  /// (repos / tokens / teams / identity / preferences) and, on return, signals
+  /// the surfaces to reload.
+  Future<void> _pushThenRefresh(NavigatorState navigator, Widget page) async {
+    await navigator.push(MaterialPageRoute(builder: (_) => page));
+    bumpConfigRevision();
   }
 
   void _showAddRepoSheet(BuildContext context) {
@@ -78,11 +81,7 @@ class HomeMenuButton extends StatelessWidget {
             title: const Text('Add GitHub Repository'),
             onTap: () {
               Navigator.pop(sheetContext);
-              navigator.push(
-                MaterialPageRoute(
-                  builder: (_) => const RegisterGithubRepoPage(),
-                ),
-              );
+              _pushThenRefresh(navigator, const RegisterGithubRepoPage());
             },
           ),
           ListTile(
@@ -90,9 +89,7 @@ class HomeMenuButton extends StatelessWidget {
             title: const Text('Add ADO Repository'),
             onTap: () {
               Navigator.pop(sheetContext);
-              navigator.push(
-                MaterialPageRoute(builder: (_) => const RegisterAdoRepoPage()),
-              );
+              _pushThenRefresh(navigator, const RegisterAdoRepoPage());
             },
           ),
         ],
