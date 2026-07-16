@@ -14,6 +14,7 @@ import 'identity_store.dart';
 import 'snooze_store.dart';
 import 'notification_service.dart';
 import 'config_revision.dart';
+import 'polling_lifecycle.dart';
 import 'dart:async'; // Import for Timer
 import 'package:tray_manager/tray_manager.dart'; // Import tray_manager package
 import 'package:window_manager/window_manager.dart'; // Import window_manager package
@@ -143,7 +144,7 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   /// The selected primary tab: 0 Attention, 1 Radar, 2 Activity, 3 Search.
   /// Radar is the default landing.
   int _selectedIndex = 1;
@@ -158,25 +159,47 @@ class _MyHomePageState extends State<MyHomePage> {
   Timer? _autoAddInitialTimer; // One-shot startup auto-add pass.
   bool _autoAddRunning = false; // Guards against overlapping auto-add passes.
 
+  late final PollingLifecyclePolicy _lifecyclePolicy = PollingLifecyclePolicy(
+    keepPollingInBackground: _isDesktopPlatform,
+  );
+  bool _backgrounded = false; // True while the app is backgrounded.
+  DateTime? _backgroundedAt; // When we entered the background, for catch-up.
+
   @override
   void initState() {
     super.initState();
-    _pollAttention(); // Seed the notification baseline and do the first poll.
-    _startLiveUpdates(); // Start periodic updates
-    _startAutoAdd(); // Start periodic auto-add of new repositories
+    WidgetsBinding.instance.addObserver(this); // Observe app lifecycle.
+    final initialState = WidgetsBinding.instance.lifecycleState;
+    if (initialState != null && _lifecyclePolicy.isBackground(initialState)) {
+      // Launched directly into the background. Record the state; on desktop keep
+      // polling at the slow cadence, on mobile wait for the first resume.
+      _backgrounded = true;
+      _backgroundedAt = DateTime.now();
+      if (!_lifecyclePolicy.suspendsInBackground) {
+        _pollAttention(); // Seed the notification baseline.
+        _startLiveUpdates(foreground: false);
+        _startAutoAdd();
+      }
+    } else {
+      _pollAttention(); // Seed the notification baseline and do the first poll.
+      _startLiveUpdates(); // Start periodic updates
+      _startAutoAdd(); // Start periodic auto-add of new repositories
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _updateTimer?.cancel(); // Cancel the timer when the widget is disposed
     _autoAddTimer?.cancel();
     _autoAddInitialTimer?.cancel();
     super.dispose();
   }
 
-  void _startLiveUpdates() {
+  void _startLiveUpdates({bool foreground = true}) {
+    _updateTimer?.cancel();
     _updateTimer = Timer.periodic(
-      const Duration(seconds: 15),
+      _lifecyclePolicy.pollInterval(foreground: foreground),
       (_) => _pollAttention(),
     );
   }
@@ -185,10 +208,76 @@ class _MyHomePageState extends State<MyHomePage> {
     // Run shortly after startup (once the initial load has settled), then on a
     // longer interval than the live-data poll.
     _autoAddInitialTimer = Timer(const Duration(seconds: 8), _runAutoAdd);
+    _startAutoAddPeriodic();
+  }
+
+  void _startAutoAddPeriodic() {
+    _autoAddTimer?.cancel();
     _autoAddTimer = Timer.periodic(
-      const Duration(minutes: 10),
+      _lifecyclePolicy.autoAddInterval,
       (_) => _runAutoAdd(),
     );
+  }
+
+  /// Adjusts polling to the app's foreground/background state so we stop (or
+  /// slow) hitting the network — saving battery and API rate limit — while
+  /// backgrounded, then refresh promptly on return. The decisions live in
+  /// [PollingLifecyclePolicy]: mobile suspends entirely (the OS pauses us
+  /// anyway); a desktop tray app keeps polling at a slower cadence so
+  /// notifications still arrive.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (_lifecyclePolicy.isBackground(state)) {
+      _enterBackground();
+    } else if (_lifecyclePolicy.isForeground(state)) {
+      _enterForeground();
+    }
+  }
+
+  void _enterBackground() {
+    if (_backgrounded) return;
+    _backgrounded = true;
+    _backgroundedAt = DateTime.now();
+    if (_lifecyclePolicy.suspendsInBackground) {
+      // Mobile: the OS suspends the process, so stop all polling (including the
+      // one-shot startup discovery). We refresh deliberately on resume instead.
+      _updateTimer?.cancel();
+      _updateTimer = null;
+      _autoAddInitialTimer?.cancel();
+      _autoAddInitialTimer = null;
+      _autoAddTimer?.cancel();
+      _autoAddTimer = null;
+    } else {
+      // Desktop tray app: keep delivering notifications, but slow the attention
+      // poll to the background cadence to spare the API rate limit. Auto-add
+      // (the startup one-shot and the periodic timer) keeps running.
+      _startLiveUpdates(foreground: false);
+    }
+  }
+
+  void _enterForeground() {
+    if (!_backgrounded) return;
+    _backgrounded = false;
+    final backgroundedFor = _backgroundedAt == null
+        ? Duration.zero
+        : DateTime.now().difference(_backgroundedAt!);
+    _backgroundedAt = null;
+
+    // Restore the fast foreground cadence and refresh immediately so the UI is
+    // not left showing stale data while it waits for the next tick.
+    _startLiveUpdates();
+    _pollAttention();
+
+    // If discovery was fully suspended (mobile), the timer was cancelled;
+    // restart it and run a catch-up pass if we were away long enough to have
+    // missed one. On desktop it kept running, so leave it untouched.
+    if (_autoAddTimer == null) {
+      _startAutoAddPeriodic();
+      if (_lifecyclePolicy.shouldRunAutoAddOnResume(backgroundedFor)) {
+        _runAutoAdd();
+      }
+    }
   }
 
   Future<void> _runAutoAdd() async {
