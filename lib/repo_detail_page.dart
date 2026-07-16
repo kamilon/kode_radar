@@ -72,14 +72,19 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
     }
   }
 
-  int get _tabCount => _data.releasesSupported ? 4 : 3;
+  int get _tabCount => _releasesSupported ? 4 : 3;
+
+  /// Releases exist only for GitHub. Derive from the known provider (not the
+  /// async-loaded data) so the tab set is correct immediately and TabBar and
+  /// TabBarView never desync.
+  bool get _releasesSupported => _repo.provider == 'github';
 
   @override
   Widget build(BuildContext context) {
     final tabs = <Tab>[
       const Tab(text: 'Pull requests'),
       const Tab(text: 'CI'),
-      if (_data.releasesSupported) const Tab(text: 'Releases'),
+      if (_releasesSupported) const Tab(text: 'Releases'),
       const Tab(text: 'Activity'),
     ];
     return DefaultTabController(
@@ -117,7 +122,7 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
                       children: [
                         _buildPullsTab(),
                         _buildCiTab(),
-                        if (_data.releasesSupported) _buildReleasesTab(),
+                        if (_releasesSupported) _buildReleasesTab(),
                         _buildActivityTab(),
                       ],
                     ),

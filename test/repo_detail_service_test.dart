@@ -1,5 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kode_radar/repo_detail_service.dart';
+import 'package:kode_radar/token_store.dart';
 
 void main() {
   final now = DateTime.parse('2026-07-15T12:00:00Z');
@@ -136,6 +143,72 @@ void main() {
       expect(releases.single.tag, 'v1.2.0');
       expect(releases.single.name, 'Big release');
       expect(releases.single.author, 'octocat');
+    });
+  });
+
+  group('load', () {
+    setUp(() {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      FlutterSecureStorage.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('resolves the repo record and honors its explicit tokenId', () async {
+      // A same-scope default token and the repo's explicitly assigned token.
+      await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'Default',
+        scope: 'acme',
+        secret: 'ghp_default',
+      );
+      final assigned = await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'Assigned',
+        scope: 'other',
+        secret: 'ghp_assigned',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('github_repos', [
+        jsonEncode({
+          'owner': 'acme',
+          'repoName': 'api',
+          'tokenId': assigned.id,
+        }),
+      ]);
+
+      String? capturedAuth;
+      final client = MockClient((request) async {
+        if (request.url.path == '/repos/acme/api/pulls') {
+          capturedAuth =
+              request.headers['authorization'] ??
+              request.headers['Authorization'];
+          return http.Response('[]', 200);
+        }
+        if (request.url.path == '/repos/acme/api/actions/runs') {
+          return http.Response(jsonEncode({'workflow_runs': []}), 200);
+        }
+        return http.Response('[]', 200);
+      });
+
+      final data = await RepoDetailService.load(
+        repoKey: 'github:acme/api',
+        provider: 'github',
+        client: client,
+        now: now,
+      );
+
+      expect(data.failedSources, 0);
+      // The repo's own token (not the scope-default) must be used.
+      expect(capturedAuth, contains('ghp_assigned'));
+    });
+
+    test('reports failure when the repo record is not found', () async {
+      final data = await RepoDetailService.load(
+        repoKey: 'github:missing/repo',
+        provider: 'github',
+        now: now,
+      );
+      expect(data.failedSources, greaterThan(0));
     });
   });
 }
