@@ -290,35 +290,49 @@ class WorkItemService {
   ) async {
     final repoKey = RepoDiscoveryService.githubKey(owner, name);
     final repoDisplay = '$owner/$name';
+    // "Assigned to you" needs an identity; without one there is nothing to
+    // fetch (parseGithubIssues would filter everything out anyway).
+    if (selfGithubLogins.isEmpty) return const _SourceResult(<WorkItem>[]);
     try {
       final secret = (await TokenStore.resolveGithubSecret(
         owner,
         tokenId: tokenId,
       ))?.trim();
       if (secret == null || secret.isEmpty) return _SourceResult.failure;
-      final response = await client
-          .get(
-            Uri.https('api.github.com', '/repos/$owner/$name/issues', {
-              'state': 'open',
-              'per_page': '100',
-            }),
-            headers: {
-              'Authorization': 'Bearer $secret',
-              'Accept': 'application/vnd.github+json',
-            },
-          )
-          .timeout(_requestTimeout);
-      if (response.statusCode != 200) return _SourceResult.failure;
-      final body = jsonDecode(response.body);
-      if (body is! List) return const _SourceResult(<WorkItem>[]);
-      return _SourceResult(
-        parseGithubIssues(
+      final items = <WorkItem>[];
+      final seen = <String>{};
+      // Filter server-side by assignee so a repo with more than one page of
+      // open issues can't push the assigned ones off the first page. GitHub's
+      // `assignee` accepts a single login, so query once per known identity.
+      for (final login in selfGithubLogins) {
+        final response = await client
+            .get(
+              Uri.https('api.github.com', '/repos/$owner/$name/issues', {
+                'state': 'open',
+                'assignee': login,
+                'per_page': '100',
+              }),
+              headers: {
+                'Authorization': 'Bearer $secret',
+                'Accept': 'application/vnd.github+json',
+              },
+            )
+            .timeout(_requestTimeout);
+        if (response.statusCode != 200) return _SourceResult.failure;
+        final body = jsonDecode(response.body);
+        if (body is! List) continue;
+        // parseGithubIssues still skips pull requests (the /issues endpoint
+        // returns them too) and de-dupes across identities by work-item id.
+        for (final item in parseGithubIssues(
           body,
           repoKey: repoKey,
           repoDisplay: repoDisplay,
           selfGithubLogins: selfGithubLogins,
-        ),
-      );
+        )) {
+          if (seen.add(item.id)) items.add(item);
+        }
+      }
+      return _SourceResult(items);
     } catch (e) {
       if (kDebugMode) {
         debugPrint(

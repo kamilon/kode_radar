@@ -40,25 +40,22 @@ class HomeMenuButton extends StatelessWidget {
 
   void _onSelected(BuildContext context, String value) {
     final navigator = Navigator.of(context);
-    switch (value) {
-      case 'work':
-        navigator.push(
-          MaterialPageRoute(builder: (_) => const WorkItemsPage()),
-        );
-      case 'people':
-        _pushThenRefresh(navigator, const PeoplePage());
-      case 'teams':
-        _pushThenRefresh(navigator, const TeamsPage());
-      case 'addRepo':
-        _showAddRepoSheet(context);
-      case 'repos':
-        _pushThenRefresh(navigator, const ManageReposPage());
-      case 'tokens':
-        _pushThenRefresh(navigator, const ManageTokensPage());
-      case 'appearance':
-        _showAppearancePicker(context);
-      case 'settings':
-        _pushThenRefresh(navigator, const PreferencesPage());
+    if (value == 'work') {
+      navigator.push(MaterialPageRoute(builder: (_) => const WorkItemsPage()));
+    } else if (value == 'people') {
+      _pushThenRefresh(navigator, const PeoplePage());
+    } else if (value == 'teams') {
+      _pushThenRefresh(navigator, const TeamsPage());
+    } else if (value == 'addRepo') {
+      _showAddRepoSheet(context);
+    } else if (value == 'repos') {
+      _pushThenRefresh(navigator, const ManageReposPage());
+    } else if (value == 'tokens') {
+      _pushThenRefresh(navigator, const ManageTokensPage());
+    } else if (value == 'appearance') {
+      _showAppearancePicker(context);
+    } else if (value == 'settings') {
+      _pushThenRefresh(navigator, const PreferencesPage());
     }
   }
 
