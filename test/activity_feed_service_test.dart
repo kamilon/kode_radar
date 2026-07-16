@@ -602,7 +602,7 @@ void main() {
     });
 
     test(
-      'no truncation when the full page already predates the window',
+      'stops (not truncated) at a page whose newest event predates the window',
       () async {
         final gh = await TokenStore.addToken(
           provider: TokenStore.providerGithub,
@@ -614,23 +614,14 @@ void main() {
         await prefs.setStringList('github_repos', [
           jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': gh.id}),
         ]);
-        // A full page whose oldest event predates `since` fully covers the
-        // window, so nothing in-window was omitted.
-        final fullPage = List.generate(
-          100,
-          (i) => {
-            'id': '$i',
-            'type': 'PushEvent',
-            'actor': {'login': 'alice'},
-            'created_at': i == 99
-                ? '2026-06-01T10:00:00Z'
-                : '2026-07-14T10:00:00Z',
-            'payload': {'ref': 'refs/heads/main', 'size': 1},
-          },
-        );
+        // A full page whose NEWEST event already predates `since`: the whole
+        // page is out of window, so pagination stops and nothing is truncated.
         final client = MockClient((request) async {
           if (request.url.path == '/repos/acme/api/events') {
-            return http.Response(jsonEncode(fullPage), 200);
+            return http.Response(
+              jsonEncode(_pushPage('old', 100, '2026-06-01T10:00:00Z')),
+              200,
+            );
           }
           return http.Response(jsonEncode({'workflow_runs': []}), 200);
         });
@@ -639,6 +630,7 @@ void main() {
           client: client,
           now: DateTime.parse('2026-07-15T12:00:00Z'),
         );
+        expect(result.events, isEmpty);
         expect(result.truncated, isFalse);
       },
     );
@@ -745,5 +737,214 @@ void main() {
         isTrue,
       );
     });
+
+    test('paginates GitHub events until a short page', () async {
+      final gh = await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'Acme',
+        scope: 'acme',
+        secret: 'ghp_secret',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('github_repos', [
+        jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': gh.id}),
+      ]);
+      final client = MockClient((request) async {
+        if (request.url.path == '/repos/acme/api/events') {
+          final page = request.url.queryParameters['page'] ?? '1';
+          if (page == '1') {
+            return http.Response(
+              jsonEncode(_pushPage('p1', 100, '2026-07-14T10:00:00Z')),
+              200,
+            );
+          }
+          if (page == '2') {
+            return http.Response(
+              jsonEncode(_pushPage('p2', 50, '2026-07-13T10:00:00Z')),
+              200,
+            );
+          }
+          return http.Response('[]', 200);
+        }
+        return http.Response(jsonEncode({'workflow_runs': []}), 200);
+      });
+
+      final result = await ActivityFeedService.computeAll(
+        client: client,
+        now: DateTime.parse('2026-07-15T12:00:00Z'),
+      );
+      expect(result.events, hasLength(150));
+      expect(result.truncated, isFalse);
+    });
+
+    test(
+      'flags truncation when the page cap is hit within the window',
+      () async {
+        final gh = await TokenStore.addToken(
+          provider: TokenStore.providerGithub,
+          label: 'Acme',
+          scope: 'acme',
+          secret: 'ghp_secret',
+        );
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList('github_repos', [
+          jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': gh.id}),
+        ]);
+        final client = MockClient((request) async {
+          if (request.url.path == '/repos/acme/api/events') {
+            final page = request.url.queryParameters['page'] ?? '1';
+            // Every page is full and in-window, so the cap (3 pages) is reached.
+            return http.Response(
+              jsonEncode(_pushPage('p$page', 100, '2026-07-14T10:00:00Z')),
+              200,
+            );
+          }
+          return http.Response(jsonEncode({'workflow_runs': []}), 200);
+        });
+
+        final result = await ActivityFeedService.computeAll(
+          client: client,
+          now: DateTime.parse('2026-07-15T12:00:00Z'),
+        );
+        expect(result.events, hasLength(300));
+        expect(result.truncated, isTrue);
+      },
+    );
+
+    test(
+      'does not stop early when a page has an out-of-order old event',
+      () async {
+        final gh = await TokenStore.addToken(
+          provider: TokenStore.providerGithub,
+          label: 'Acme',
+          scope: 'acme',
+          secret: 'ghp_secret',
+        );
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList('github_repos', [
+          jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': gh.id}),
+        ]);
+        final client = MockClient((request) async {
+          if (request.url.path == '/repos/acme/api/events') {
+            final page = request.url.queryParameters['page'] ?? '1';
+            if (page == '1') {
+              final events = [
+                ..._pushPage('p1', 99, '2026-07-14T10:00:00Z'),
+                {
+                  'id': 'p1-old',
+                  'type': 'PushEvent',
+                  'actor': {'login': 'alice'},
+                  'created_at': '2026-06-01T10:00:00Z',
+                  'payload': {'ref': 'refs/heads/main', 'size': 1},
+                },
+              ];
+              return http.Response(jsonEncode(events), 200);
+            }
+            if (page == '2') {
+              return http.Response(
+                jsonEncode(_pushPage('p2', 50, '2026-07-13T10:00:00Z')),
+                200,
+              );
+            }
+            return http.Response('[]', 200);
+          }
+          return http.Response(jsonEncode({'workflow_runs': []}), 200);
+        });
+
+        final result = await ActivityFeedService.computeAll(
+          client: client,
+          now: DateTime.parse('2026-07-15T12:00:00Z'),
+        );
+        // 99 in-window from page 1 (the old one is windowed out) + 50 from page 2.
+        expect(result.events, hasLength(149));
+        expect(result.truncated, isFalse);
+      },
+    );
+
+    test(
+      'a later-page failure keeps earlier pages and marks it partial',
+      () async {
+        final gh = await TokenStore.addToken(
+          provider: TokenStore.providerGithub,
+          label: 'Acme',
+          scope: 'acme',
+          secret: 'ghp_secret',
+        );
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList('github_repos', [
+          jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': gh.id}),
+        ]);
+        final client = MockClient((request) async {
+          if (request.url.path == '/repos/acme/api/events') {
+            final page = request.url.queryParameters['page'] ?? '1';
+            if (page == '1') {
+              return http.Response(
+                jsonEncode(_pushPage('p1', 100, '2026-07-14T10:00:00Z')),
+                200,
+              );
+            }
+            return http.Response('forbidden', 403); // page 2 fails
+          }
+          return http.Response(jsonEncode({'workflow_runs': []}), 200);
+        });
+
+        final result = await ActivityFeedService.computeAll(
+          client: client,
+          now: DateTime.parse('2026-07-15T12:00:00Z'),
+        );
+        expect(result.events, hasLength(100));
+        expect(result.failedSources, greaterThanOrEqualTo(1));
+        expect(result.truncated, isTrue);
+      },
+    );
+
+    test(
+      'a later page with an unexpected shape is marked partial, not dropped',
+      () async {
+        final gh = await TokenStore.addToken(
+          provider: TokenStore.providerGithub,
+          label: 'Acme',
+          scope: 'acme',
+          secret: 'ghp_secret',
+        );
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList('github_repos', [
+          jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': gh.id}),
+        ]);
+        final client = MockClient((request) async {
+          if (request.url.path == '/repos/acme/api/events') {
+            final page = request.url.queryParameters['page'] ?? '1';
+            if (page == '1') {
+              return http.Response(
+                jsonEncode(_pushPage('p1', 100, '2026-07-14T10:00:00Z')),
+                200,
+              );
+            }
+            // Page 2 returns valid JSON that isn't a List (e.g. an error body).
+            return http.Response(jsonEncode({'message': 'oops'}), 200);
+          }
+          return http.Response(jsonEncode({'workflow_runs': []}), 200);
+        });
+
+        final result = await ActivityFeedService.computeAll(
+          client: client,
+          now: DateTime.parse('2026-07-15T12:00:00Z'),
+        );
+        expect(result.events, hasLength(100));
+        expect(result.failedSources, greaterThanOrEqualTo(1));
+        expect(result.truncated, isTrue);
+      },
+    );
   });
 }
+
+List<Map<String, dynamic>> _pushPage(String tag, int count, String date) => [
+  for (var i = 0; i < count; i++)
+    {
+      'id': '$tag-$i',
+      'type': 'PushEvent',
+      'actor': {'login': 'alice'},
+      'created_at': date,
+      'payload': {'ref': 'refs/heads/main', 'size': 1},
+    },
+];

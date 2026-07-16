@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kode_radar/attention_service.dart';
 import 'package:kode_radar/notification_service.dart';
 
 void main() {
@@ -14,5 +15,124 @@ void main() {
       NotificationService.diffNew(<String>{'a', 'b'}, <String>['a', 'b']),
       isEmpty,
     );
+  });
+
+  group('shouldAdvanceBaseline', () {
+    test('quiet hours defer (hold the baseline)', () {
+      expect(
+        NotificationService.shouldAdvanceBaseline(
+          firstRun: false,
+          inQuietHours: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('first run always seeds even during quiet hours', () {
+      expect(
+        NotificationService.shouldAdvanceBaseline(
+          firstRun: true,
+          inQuietHours: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('non-quiet advances (disabled toggle drops, no replay)', () {
+      expect(
+        NotificationService.shouldAdvanceBaseline(
+          firstRun: false,
+          inQuietHours: false,
+        ),
+        isTrue,
+      );
+    });
+  });
+
+  AttentionItem item(String id, String repo) => AttentionItem(
+    id: id,
+    category: 'reviewRequested',
+    severity: 3000,
+    title: id,
+    subtitle: '',
+    repoDisplay: repo,
+  );
+
+  group('monitoredRepoDisplays', () {
+    test('derives owner/name and org/project/name displays', () {
+      final displays = NotificationService.monitoredRepoDisplays(
+        ['{"owner":"acme","repoName":"api"}', 'not-json'],
+        ['{"organization":"org","project":"proj","repoName":"repo"}'],
+      );
+      expect(displays, {'acme/api', 'org/proj/repo'});
+    });
+
+    test('skips malformed / incomplete entries', () {
+      final displays = NotificationService.monitoredRepoDisplays([
+        '{"owner":"acme"}',
+        '42',
+      ], const []);
+      expect(displays, isEmpty);
+    });
+  });
+
+  group('pendingIds', () {
+    test('first run notifies nothing (silent seed)', () {
+      expect(
+        NotificationService.pendingIds(
+          seen: const {},
+          knownRepos: const {},
+          items: [item('a', 'r1'), item('b', 'r1')],
+          firstRun: true,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('notifies ids new since the baseline', () {
+      expect(
+        NotificationService.pendingIds(
+          seen: const {'a'},
+          knownRepos: const {'r1'},
+          items: [item('a', 'r1'), item('b', 'r1')],
+          firstRun: false,
+        ),
+        {'b'},
+      );
+    });
+
+    test('suppresses items from a repo appearing for the first time', () {
+      // r2 is not yet known, so its items are seeded silently, not notified.
+      final pending = NotificationService.pendingIds(
+        seen: const {'a'},
+        knownRepos: const {'r1'},
+        items: [item('b', 'r1'), item('c', 'r2'), item('d', 'r2')],
+        firstRun: false,
+      );
+      expect(pending, {'b'});
+    });
+  });
+
+  group('mergeSeen', () {
+    test('unions so a transiently-absent id is retained (no re-notify)', () {
+      // The repo behind 'b' failed this cycle so 'b' is missing from current,
+      // but it must stay in the baseline so recovery does not re-notify it.
+      expect(NotificationService.mergeSeen(const {'a', 'b'}, const {'a'}), {
+        'a',
+        'b',
+      });
+    });
+
+    test('adds newly seen ids', () {
+      expect(NotificationService.mergeSeen(const {'a'}, const {'a', 'b'}), {
+        'a',
+        'b',
+      });
+    });
+
+    test('resets to the current snapshot beyond the growth cap', () {
+      final huge = {for (var i = 0; i < 6000; i++) 'id$i'};
+      expect(NotificationService.mergeSeen(huge, const {'a', 'b'}), {'a', 'b'});
+    });
   });
 }

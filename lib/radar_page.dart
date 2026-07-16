@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'activity_service.dart';
 import 'app_http.dart';
+import 'config_revision.dart';
+import 'home_menu.dart';
 import 'metric_store.dart';
 import 'repo_detail_page.dart';
 import 'sparkline.dart';
@@ -18,14 +20,31 @@ class _RadarPageState extends State<RadarPage> {
   Map<String, List<num>> _series = const {};
   bool _loading = true;
   String? _error;
+  RadarSort _sort = RadarSort.attention;
+
+  // Guards against a stale in-flight load applying after a newer one (e.g. a
+  // config-triggered reload).
+  int _loadSeq = 0;
 
   @override
   void initState() {
     super.initState();
+    configRevision.addListener(_onConfigChanged);
     _loadActivities();
   }
 
+  @override
+  void dispose() {
+    configRevision.removeListener(_onConfigChanged);
+    super.dispose();
+  }
+
+  void _onConfigChanged() {
+    if (mounted) _loadActivities();
+  }
+
   Future<void> _loadActivities() async {
+    final seq = ++_loadSeq;
     setState(() {
       _loading = true;
       _error = null;
@@ -35,10 +54,11 @@ class _RadarPageState extends State<RadarPage> {
       final activities = await ActivityService.computeAll(
         client: AppHttp.client,
       );
+      if (!mounted || seq != _loadSeq) return;
       // Record a trend snapshot (deduped ~1/day), then load per-repo series.
       await MetricStore.capture(activities);
       final history = await MetricStore.all();
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _activities = activities;
         _series = {
@@ -50,7 +70,7 @@ class _RadarPageState extends State<RadarPage> {
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
         _error = 'Failed to load radar: $e';
         _loading = false;
@@ -64,11 +84,27 @@ class _RadarPageState extends State<RadarPage> {
       appBar: AppBar(
         title: const Text('Radar'),
         actions: [
+          PopupMenuButton<RadarSort>(
+            icon: const Icon(Icons.sort),
+            tooltip: 'Sort',
+            enabled: !_loading,
+            initialValue: _sort,
+            onSelected: (value) => setState(() => _sort = value),
+            itemBuilder: (context) => [
+              for (final sort in RadarSort.values)
+                CheckedPopupMenuItem(
+                  value: sort,
+                  checked: _sort == sort,
+                  child: Text(ActivityService.radarSortLabel(sort)),
+                ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
             onPressed: _loading ? null : _loadActivities,
           ),
+          const HomeMenuButton(),
         ],
       ),
       body: _loading
@@ -118,12 +154,13 @@ class _RadarPageState extends State<RadarPage> {
       );
     }
 
+    final sorted = ActivityService.sortActivities(_activities, _sort);
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(12),
-      itemCount: _activities.length,
+      itemCount: sorted.length,
       itemBuilder: (context, index) {
-        final activity = _activities[index];
+        final activity = sorted[index];
         return Card(
           child: ListTile(
             title: Text(activity.displayName),

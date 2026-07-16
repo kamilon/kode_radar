@@ -23,6 +23,27 @@ class RepoActivity {
     this.error,
   });
 
+  /// A lightweight reference used purely for navigation (e.g. from search).
+  /// The detail screen re-fetches everything via `repoKey`/`provider`.
+  factory RepoActivity.reference({
+    required String repoKey,
+    required String provider,
+    required String displayName,
+    required String url,
+  }) => RepoActivity(
+    repoKey: repoKey,
+    provider: provider,
+    displayName: displayName,
+    url: url,
+    openPrCount: 0,
+    needsReviewCount: 0,
+    oldestOpenPrAgeDays: null,
+    lastActivity: null,
+    ciStatus: 'unknown',
+    contributors: const [],
+    activityScore: 0,
+  );
+
   final String repoKey;
   final String provider;
   final String displayName;
@@ -37,10 +58,100 @@ class RepoActivity {
   final String? error;
 }
 
+/// How the Radar orders repositories.
+enum RadarSort { attention, ciStatus, openPrs, oldestPr, name }
+
 class ActivityService {
   ActivityService._();
 
   static const Duration _requestTimeout = Duration(seconds: 20);
+
+  /// A short label for a [RadarSort] option.
+  static String radarSortLabel(RadarSort sort) => switch (sort) {
+    RadarSort.attention => 'Attention',
+    RadarSort.ciStatus => 'CI — failing first',
+    RadarSort.openPrs => 'Most open PRs',
+    RadarSort.oldestPr => 'Oldest PR first',
+    RadarSort.name => 'Name (A–Z)',
+  };
+
+  /// Sorts errored/misconfigured repos ahead of healthy ones. Used as the
+  /// primary key for the metric sorts so a repo whose data failed to load (and
+  /// therefore reads as 0 PRs / unknown CI / no PR) is never buried among
+  /// genuinely healthy repos and mistaken for one.
+  static int _errorFirst(RepoActivity a, RepoActivity b) =>
+      (a.error != null ? 0 : 1) - (b.error != null ? 0 : 1);
+
+  /// Orders repositories for the Radar. A stable secondary sort by name keeps
+  /// the order deterministic within ties.
+  static List<RepoActivity> sortActivities(
+    List<RepoActivity> activities,
+    RadarSort sort,
+  ) {
+    int byName(RepoActivity a, RepoActivity b) =>
+        a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
+    final list = List<RepoActivity>.of(activities);
+    switch (sort) {
+      case RadarSort.attention:
+        list.sort((a, b) {
+          // Repos with errors / missing tokens surface first (they need
+          // attention or configuration), then by activity score, then name.
+          final byErr = _errorFirst(a, b);
+          if (byErr != 0) return byErr;
+          final byScore = b.activityScore.compareTo(a.activityScore);
+          if (byScore != 0) return byScore;
+          return byName(a, b);
+        });
+      case RadarSort.ciStatus:
+        list.sort((a, b) {
+          final byErr = _errorFirst(a, b);
+          if (byErr != 0) return byErr;
+          final byCi = _ciRank(a.ciStatus).compareTo(_ciRank(b.ciStatus));
+          if (byCi != 0) return byCi;
+          final byScore = b.activityScore.compareTo(a.activityScore);
+          if (byScore != 0) return byScore;
+          return byName(a, b);
+        });
+      case RadarSort.openPrs:
+        list.sort((a, b) {
+          final byErr = _errorFirst(a, b);
+          if (byErr != 0) return byErr;
+          final byPrs = b.openPrCount.compareTo(a.openPrCount);
+          if (byPrs != 0) return byPrs;
+          return byName(a, b);
+        });
+      case RadarSort.oldestPr:
+        list.sort((a, b) {
+          final byErr = _errorFirst(a, b);
+          if (byErr != 0) return byErr;
+          // Oldest (largest age) first; repos with no open PR sort last.
+          final ax = a.oldestOpenPrAgeDays ?? -1;
+          final bx = b.oldestOpenPrAgeDays ?? -1;
+          final byAge = bx.compareTo(ax);
+          if (byAge != 0) return byAge;
+          return byName(a, b);
+        });
+      case RadarSort.name:
+        // Name is an explicit alphabetical ordering — errors are not hoisted.
+        list.sort(byName);
+    }
+    return list;
+  }
+
+  /// Ranks CI status so failing repos surface first, then running, then
+  /// unknown, then success.
+  static int _ciRank(String status) {
+    switch (status) {
+      case 'failure':
+        return 0;
+      case 'running':
+        return 1;
+      case 'success':
+        return 3;
+      default:
+        return 2;
+    }
+  }
 
   static List<String> extractPrAuthorsGithub(List data) {
     final authors = <String>[];
@@ -561,20 +672,7 @@ class ActivityService {
       }
 
       final activities = await _runBounded(tasks, concurrency);
-
-      activities.sort((a, b) {
-        // Repos with errors / missing tokens surface first (they need
-        // attention or configuration), then by activity score, then name.
-        final aErr = a.error != null ? 0 : 1;
-        final bErr = b.error != null ? 0 : 1;
-        if (aErr != bErr) return aErr - bErr;
-        final byScore = b.activityScore.compareTo(a.activityScore);
-        if (byScore != 0) return byScore;
-        return a.displayName.toLowerCase().compareTo(
-          b.displayName.toLowerCase(),
-        );
-      });
-      return activities;
+      return sortActivities(activities, RadarSort.attention);
     } finally {
       if (client == null) httpClient.close();
     }

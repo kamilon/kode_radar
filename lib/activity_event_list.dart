@@ -60,10 +60,14 @@ class ActivityEventList extends StatelessWidget {
     super.key,
     required this.events,
     this.padding = EdgeInsets.zero,
+    this.newSince,
   });
 
   final List<ActivityEvent> events;
   final EdgeInsetsGeometry padding;
+
+  /// When set, events occurring after this time get a "New" badge.
+  final DateTime? newSince;
 
   @override
   Widget build(BuildContext context) {
@@ -112,9 +116,15 @@ class ActivityEventList extends StatelessWidget {
 
   Widget _eventTile(BuildContext context, ActivityEvent event) {
     final visual = _visualFor(event.type);
+    final isNew = newSince != null && event.occurredAt.isAfter(newSince!);
     return ListTile(
       leading: Icon(visual.icon, color: visual.color),
-      title: Text(event.title),
+      title: Row(
+        children: [
+          Flexible(child: Text(event.title)),
+          if (isNew) ...[const SizedBox(width: 6), const NewBadge()],
+        ],
+      ),
       subtitle: Text(
         '${event.subtitle} · ${activityRelativeTime(event.occurredAt.toLocal())}',
       ),
@@ -197,6 +207,53 @@ class ActivityEventList extends StatelessWidget {
       context,
     ).showSnackBar(SnackBar(content: Text('Could not open $url')));
   }
+}
+
+/// A small green "New" badge for items that arrived since you last looked.
+class NewBadge extends StatelessWidget {
+  const NewBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: Colors.green.shade600,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Text(
+        'New',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+/// A compact banner announcing how many items are new since the last visit.
+/// Returns an empty widget when [count] is zero.
+Widget sinceLastLookedBanner(int count, {String unit = 'new'}) {
+  if (count <= 0) return const SizedBox.shrink();
+  return Container(
+    width: double.infinity,
+    color: Colors.green.shade50,
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    child: Row(
+      children: [
+        Icon(Icons.fiber_new, size: 18, color: Colors.green.shade800),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            '$count $unit since you last looked',
+            style: TextStyle(fontSize: 12, color: Colors.green.shade900),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 /// A row in the flattened list: either a day header or an event.
