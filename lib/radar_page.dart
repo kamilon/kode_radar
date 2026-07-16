@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'activity_service.dart';
 import 'app_http.dart';
+import 'home_menu.dart';
 import 'metric_store.dart';
 import 'repo_detail_page.dart';
 import 'sparkline.dart';
@@ -85,6 +86,7 @@ class _RadarPageState extends State<RadarPage> {
             tooltip: 'Refresh',
             onPressed: _loading ? null : _loadActivities,
           ),
+          const HomeMenuButton(),
         ],
       ),
       body: _loading

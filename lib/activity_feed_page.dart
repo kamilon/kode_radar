@@ -4,6 +4,7 @@ import 'activity_event.dart';
 import 'activity_event_list.dart';
 import 'activity_feed_service.dart';
 import 'app_http.dart';
+import 'home_menu.dart';
 import 'identity_store.dart';
 import 'preferences_store.dart';
 import 'saved_view_store.dart';
@@ -289,6 +290,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
             tooltip: 'Refresh',
             onPressed: _loading ? null : _load,
           ),
+          const HomeMenuButton(),
         ],
       ),
       body: Column(

@@ -2,18 +2,10 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'register_github_repo.dart';
-import 'register_ado_repo.dart';
-import 'manage_repos_page.dart';
-import 'manage_tokens_page.dart';
 import 'radar_page.dart';
 import 'attention_inbox_page.dart';
 import 'activity_feed_page.dart';
-import 'work_items_page.dart';
 import 'search_page.dart';
-import 'preferences_page.dart';
-import 'people_page.dart';
-import 'teams_page.dart';
 import 'theme_controller.dart';
 import 'auto_add_service.dart';
 import 'token_store.dart';
@@ -22,7 +14,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http; // Import for HTTP requests
 import 'dart:async'; // Import for Timer
 import 'package:collection/collection.dart'; // Import for DeepCollectionEquality
-import 'package:url_launcher/url_launcher.dart'; // Import for launching URLs
 import 'package:tray_manager/tray_manager.dart'; // Import tray_manager package
 import 'package:window_manager/window_manager.dart'; // Import window_manager package
 import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // Import for local notifications
@@ -173,16 +164,24 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _MyHomePageState extends State<MyHomePage> {
+  /// The selected primary tab: 0 Attention, 1 Radar, 2 Activity, 3 Search.
+  /// Radar is the default landing.
+  int _selectedIndex = 1;
+
+  /// Tabs the user has opened at least once. Each surface is built lazily the
+  /// first time its tab is selected, then kept alive to preserve its state.
+  final Set<int> _visited = {1};
+
+  // Legacy per-repo PR/build/release/pipeline data, retained only to drive the
+  // background new-PR notifications (compared against the previous snapshot);
+  // it is no longer rendered.
   final Map<String, Map<String, List<String>>> _data = {
     'PRs': {},
     'Builds': {},
     'Releases': {},
     'Pipelines': {},
   };
-  bool _isLoading = true; // Add a loading state
   bool _isFetching = false; // Guards against overlapping data-load cycles
   Timer? _updateTimer; // Add a timer for periodic updates
   Timer? _autoAddTimer; // Timer for the auto-add discovery pass
@@ -199,7 +198,6 @@ class _MyHomePageState extends State<MyHomePage>
   void initState() {
     super.initState();
     _loadNotifiedItems(); // Load notified items from storage
-    _tabController = TabController(length: _data.keys.length, vsync: this);
     _loadRepos(initialLoad: true); // Perform the initial load
     _startLiveUpdates(); // Start periodic updates
     _startAutoAdd(); // Start periodic auto-add of new repositories
@@ -207,7 +205,6 @@ class _MyHomePageState extends State<MyHomePage>
 
   @override
   void dispose() {
-    _tabController.dispose();
     _updateTimer?.cancel(); // Cancel the timer when the widget is disposed
     _autoAddTimer?.cancel();
     _autoAddInitialTimer?.cancel();
@@ -269,12 +266,6 @@ class _MyHomePageState extends State<MyHomePage>
     if (_isFetching) return;
     _isFetching = true;
     try {
-      if (initialLoad) {
-        setState(() {
-          _isLoading = true; // Show loading indicator only for the initial load
-        });
-      }
-
       final prefs = await SharedPreferences.getInstance();
       final List<String> githubRepos =
           prefs.getStringList('github_repos') ?? [];
@@ -334,20 +325,14 @@ class _MyHomePageState extends State<MyHomePage>
       }
 
       if (mounted) {
-        setState(() {
-          if (initialLoad || !_isDataEqual(_data, newData)) {
-            _previousData.clear();
-            _previousData.addAll(
-              _data,
-            ); // Save the current data as previous data
-            _data.clear();
-            _data.addAll(newData); // only if it has changed
-          }
-
-          if (initialLoad) {
-            _isLoading = false; // Hide loading indicator after the initial load
-          }
-        });
+        // _data feeds the background new-PR notifications only; it is no longer
+        // rendered, so update it directly rather than via setState.
+        if (initialLoad || !_isDataEqual(_data, newData)) {
+          _previousData.clear();
+          _previousData.addAll(_data); // Save the current data as previous data
+          _data.clear();
+          _data.addAll(newData); // only if it has changed
+        }
       }
     } finally {
       _isFetching = false;
@@ -666,337 +651,93 @@ class _MyHomePageState extends State<MyHomePage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.inbox),
-            tooltip: 'Attention',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AttentionInboxPage()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.dynamic_feed),
-            tooltip: 'Activity',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ActivityFeedPage()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.radar),
-            tooltip: 'Radar',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const RadarPage()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.search),
-            tooltip: 'Search',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SearchPage()),
-              );
-            },
-          ),
-          PopupMenuButton<String>(
-            tooltip: 'More',
-            onSelected: _onMenuSelected,
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'work', child: Text('Assigned to you')),
-              PopupMenuItem(value: 'people', child: Text('People')),
-              PopupMenuItem(value: 'teams', child: Text('Teams')),
-              PopupMenuDivider(),
-              PopupMenuItem(value: 'tokens', child: Text('Manage tokens')),
-              PopupMenuItem(value: 'repos', child: Text('Manage repositories')),
-              PopupMenuItem(value: 'appearance', child: Text('Appearance')),
-              PopupMenuItem(value: 'settings', child: Text('Settings')),
-            ],
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: _data.keys.map((category) => Tab(text: category)).toList(),
-        ),
-      ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(),
-            ) // Show a loading indicator
-          : TabBarView(
-              controller: _tabController,
-              children: _data.keys.map((category) {
-                final categoryData = _data[category];
-                if (categoryData == null || categoryData.isEmpty) {
-                  return const Center(child: Text('No data available.'));
-                }
-                return _buildListView(categoryData);
-              }).toList(),
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showAddRepoDialog();
-        },
-        child: const Icon(Icons.add),
-      ),
+    // Build each surface lazily the first time its tab is opened, then keep it
+    // alive (via IndexedStack) so scroll position and loaded data persist. The
+    // GlobalKey keeps the surfaces' state when the layout switches between the
+    // rail and the bottom bar across the width breakpoint (e.g. desktop
+    // resize), which moves the IndexedStack to a different tree position.
+    final pages = <Widget>[
+      for (var i = 0; i < _navItems.length; i++)
+        _visited.contains(i) ? _surfaceFor(i) : const SizedBox.shrink(),
+    ];
+    final body = IndexedStack(
+      key: _shellBodyKey,
+      index: _selectedIndex,
+      children: pages,
     );
-  }
 
-  void _showAddRepoDialog() {
-    if (!mounted) return; // Ensure the widget is still mounted
-    showModalBottomSheet(
-      context: context,
-      builder: (sheetContext) {
-        return Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.add),
-              title: const Text('Add GitHub Repository'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _openRepoPage(const RegisterGithubRepoPage());
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.add),
-              title: const Text('Add ADO Repository'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _openRepoPage(const RegisterAdoRepoPage());
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  /// Opens a repo-related page and refreshes the dashboard on return so that
-  /// added/edited/removed repositories are reflected without waiting for the
-  /// next poll cycle.
-  Future<void> _openRepoPage(Widget page) async {
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
-    if (mounted) {
-      _loadRepos(initialLoad: false);
-    }
-  }
-
-  Future<void> _openManageRepos() async {
-    await _openRepoPage(const ManageReposPage());
-  }
-
-  Future<void> _onMenuSelected(String value) async {
-    switch (value) {
-      case 'work':
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const WorkItemsPage()),
-        );
-        break;
-      case 'people':
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const PeoplePage()),
-        );
-        break;
-      case 'teams':
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const TeamsPage()),
-        );
-        break;
-      case 'tokens':
-        await _openManageTokens();
-        break;
-      case 'repos':
-        await _openManageRepos();
-        break;
-      case 'appearance':
-        await _showAppearancePicker();
-        break;
-      case 'settings':
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const PreferencesPage()),
-        );
-        break;
-    }
-  }
-
-  Future<void> _showAppearancePicker() async {
-    final current = ThemeController.instance.mode;
-    final selected = await showDialog<ThemeMode>(
-      context: context,
-      builder: (dialogContext) => SimpleDialog(
-        title: const Text('Appearance'),
-        children: [
-          for (final option in const [
-            (ThemeMode.system, 'System'),
-            (ThemeMode.light, 'Light'),
-            (ThemeMode.dark, 'Dark'),
-          ])
-            ListTile(
-              title: Text(option.$2),
-              trailing: current == option.$1 ? const Icon(Icons.check) : null,
-              onTap: () => Navigator.pop(dialogContext, option.$1),
-            ),
-        ],
-      ),
-    );
-    if (selected != null) {
-      try {
-        await ThemeController.instance.setMode(selected);
-      } catch (e) {
-        debugPrint('Failed to save theme preference: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not save appearance preference.'),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // A navigation rail on wide layouts (tablet / desktop), a bottom
+        // navigation bar on narrow ones (phone).
+        if (constraints.maxWidth >= 640) {
+          return Scaffold(
+            body: Row(
+              children: [
+                NavigationRail(
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: _onSelectTab,
+                  labelType: NavigationRailLabelType.all,
+                  destinations: [
+                    for (final item in _navItems)
+                      NavigationRailDestination(
+                        icon: Icon(item.icon),
+                        label: Text(item.label),
+                      ),
+                  ],
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(child: body),
+              ],
             ),
           );
         }
-      }
-    }
-  }
-
-  Future<void> _openManageTokens() async {
-    await _openRepoPage(const ManageTokensPage());
-  }
-
-  Widget _buildListView(Map<String, List<String>> data) {
-    if (data.isEmpty) {
-      return const Center(child: Text('No data available.'));
-    }
-    return ListView.builder(
-      itemCount: data.keys.length,
-      itemBuilder: (context, index) {
-        final repoKey = data.keys.elementAt(index);
-        return ExpansionTile(
-          title: Text(repoKey),
-          children:
-              data[repoKey]?.map((item) {
-                if (repoKey.startsWith('ADO:') && item.contains('Stages:')) {
-                  final parts = item.split('\nStages:\n');
-                  final buildInfo = parts[0];
-                  final stages = parts.length > 1 ? parts[1].split('\n') : [];
-                  return ExpansionTile(
-                    title: Row(
-                      children: [
-                        if (repoKey.startsWith('ADO:') &&
-                            item.contains('Stages:')) ...[
-                          Icon(
-                            item.contains('succeeded')
-                                ? Icons.check_circle
-                                : Icons.cancel,
-                            color: item.contains('succeeded')
-                                ? Colors.green
-                                : Colors.red,
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        Text(buildInfo),
-                      ],
-                    ),
-                    children: stages.map((stage) {
-                      final stageParts = stage.split(': ');
-                      final stageName = stageParts[0];
-                      final String stageResult = stageParts.length > 1
-                          ? stageParts[1].toLowerCase()
-                          : 'unknown';
-
-                      IconData icon;
-                      Color iconColor;
-
-                      switch (stageResult) {
-                        case 'succeeded':
-                          icon = Icons.check_circle;
-                          iconColor = Colors.green;
-                          break;
-                        case 'failed':
-                          icon = Icons.cancel;
-                          iconColor = Colors.red;
-                          break;
-                        case 'pending':
-                          icon = Icons.hourglass_empty;
-                          iconColor = Colors.orange;
-                          break;
-                        default:
-                          icon = Icons.help_outline;
-                          iconColor = Colors.grey;
-                      }
-
-                      return ListTile(
-                        leading: Icon(icon, color: iconColor),
-                        title: Text(stageName),
-                      );
-                    }).toList(),
-                  );
-                }
-                final url = _getUrlForItem(repoKey, item);
-                return GestureDetector(
-                  onDoubleTap: () async {
-                    if (url != null && await canLaunch(url)) {
-                      await launch(url); // Open the URL in the default browser
-                    }
-                  },
-                  child: ListTile(title: Text(item)),
-                );
-              }).toList() ??
-              [const ListTile(title: Text('Loading...'))],
+        return Scaffold(
+          body: body,
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: _onSelectTab,
+            destinations: [
+              for (final item in _navItems)
+                NavigationDestination(icon: Icon(item.icon), label: item.label),
+            ],
+          ),
         );
       },
     );
   }
 
-  String? _getUrlForItem(String repoKey, String item) {
-    // Logic to generate or retrieve the URL for the given item
-    if (repoKey.startsWith('GitHub:')) {
-      final parts = repoKey.split(': ')[1].split('/');
-      final owner = parts[0];
-      final repoName = parts[1];
-      if (item.startsWith('PR #')) {
-        final prNumber = item.split(' ')[1].substring(1);
-        return 'https://github.com/$owner/$repoName/pull/$prNumber';
-      } else if (item.startsWith('Release:')) {
-        return 'https://github.com/$owner/$repoName/releases';
-      }
-    } else if (repoKey.startsWith('ADO:')) {
-      final parts = repoKey.split(': ')[1].split('/');
-      final organization = parts[0];
-      final project = parts[1];
-      final repoName = parts[2];
-      if (item.startsWith('PR #')) {
-        final prId = item.split(' ')[1].substring(1);
-        return 'https://dev.azure.com/$organization/$project/_git/$repoName/pullrequest/$prId';
-      } else if (item.startsWith('Build:')) {
-        return 'https://dev.azure.com/$organization/$project/_build';
-      }
+  static const List<({IconData icon, String label})> _navItems = [
+    (icon: Icons.inbox, label: 'Attention'),
+    (icon: Icons.radar, label: 'Radar'),
+    (icon: Icons.dynamic_feed, label: 'Activity'),
+    (icon: Icons.search, label: 'Search'),
+  ];
+
+  // Preserves the surfaces' state when the rail/bottom-bar layout swaps the
+  // IndexedStack to a different position in the tree.
+  final GlobalKey _shellBodyKey = GlobalKey();
+
+  Widget _surfaceFor(int index) {
+    switch (index) {
+      case 0:
+        return const AttentionInboxPage();
+      case 1:
+        return const RadarPage();
+      case 2:
+        return const ActivityFeedPage();
+      default:
+        return const SearchPage();
     }
-    return null;
   }
-}
 
-Future<bool> canLaunch(String url) async {
-  return await canLaunchUrl(Uri.parse(url));
-}
-
-Future<void> launch(String url) async {
-  final uri = Uri.parse(url);
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  } else {
-    throw 'Could not launch $url';
+  void _onSelectTab(int index) {
+    // The Search surface stays mounted (it's in the IndexedStack) and autofocus
+    // leaves its keyboard up, so dismiss focus when moving between tabs.
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _selectedIndex = index;
+      _visited.add(index);
+    });
   }
 }

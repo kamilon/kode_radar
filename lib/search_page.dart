@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'activity_service.dart';
+import 'home_menu.dart';
 import 'monitored_repos.dart';
 import 'repo_detail_page.dart';
 import 'team.dart';
@@ -83,6 +84,7 @@ class _SearchPageState extends State<SearchPage> {
                 setState(() => _query = '');
               },
             ),
+          const HomeMenuButton(),
         ],
       ),
       body: _loading

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'app_http.dart';
 import 'attention_service.dart';
+import 'home_menu.dart';
 import 'identity_store.dart';
 import 'notification_service.dart';
 import 'snooze_store.dart';
@@ -96,6 +97,7 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
             tooltip: 'Refresh',
             onPressed: _loading ? null : _load,
           ),
+          const HomeMenuButton(),
         ],
       ),
       body: _loading
