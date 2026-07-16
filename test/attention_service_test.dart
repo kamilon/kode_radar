@@ -516,6 +516,77 @@ void main() {
     expect(items.single.isMine, isTrue);
   });
 
+  group('applyFilters / categoryCounts', () {
+    final items = [
+      const AttentionItem(
+        id: 'a',
+        category: 'reviewRequested',
+        severity: 3000,
+        title: 'a',
+        subtitle: '',
+        repoDisplay: 'r',
+        isMine: true,
+      ),
+      const AttentionItem(
+        id: 'b',
+        category: 'changesRequested',
+        severity: 2000,
+        title: 'b',
+        subtitle: '',
+        repoDisplay: 'r',
+      ),
+      const AttentionItem(
+        id: 'c',
+        category: 'reviewRequested',
+        severity: 3000,
+        title: 'c',
+        subtitle: '',
+        repoDisplay: 'r',
+      ),
+    ];
+
+    test('mineOnly keeps only the user\'s items', () {
+      final mine = AttentionService.applyFilters(items, mineOnly: true);
+      expect(mine.map((i) => i.id), ['a']);
+    });
+
+    test('category keeps only the matching category', () {
+      final changes = AttentionService.applyFilters(
+        items,
+        category: 'changesRequested',
+      );
+      expect(changes.map((i) => i.id), ['b']);
+    });
+
+    test('mineOnly and category combine (AND)', () {
+      final both = AttentionService.applyFilters(
+        items,
+        mineOnly: true,
+        category: 'changesRequested',
+      );
+      expect(both, isEmpty);
+    });
+
+    test('no filters returns everything', () {
+      expect(AttentionService.applyFilters(items).length, 3);
+    });
+
+    test('categoryCounts tallies per category', () {
+      expect(AttentionService.categoryCounts(items), {
+        'reviewRequested': 2,
+        'changesRequested': 1,
+      });
+    });
+
+    test('categoryLabel maps known categories to friendly labels', () {
+      expect(
+        AttentionService.categoryLabel('changesRequested'),
+        'Changes requested',
+      );
+      expect(AttentionService.categoryLabel('oldOpenPr'), 'Old open');
+    });
+  });
+
   group('computeAll', () {
     setUp(() {
       TestWidgetsFlutterBinding.ensureInitialized();

@@ -80,6 +80,47 @@ class AttentionService {
   static int _severity(int tier, int? ageDays) =>
       tier * 1000 + (ageDays ?? 0).clamp(0, 999);
 
+  // ---- Filtering (pure, testable) ------------------------------------------
+
+  /// The attention categories in priority (tier) order, for building filters.
+  static const List<String> categories = [
+    'reviewRequested',
+    'changesRequested',
+    'oldOpenPr',
+    'error',
+  ];
+
+  /// A short, human-readable label for an attention [category].
+  static String categoryLabel(String category) => switch (category) {
+    'reviewRequested' => 'Review requested',
+    'changesRequested' => 'Changes requested',
+    'oldOpenPr' => 'Old open',
+    'error' => 'Errors',
+    _ => category,
+  };
+
+  /// Filters items by whether they are the user's and/or by [category].
+  static List<AttentionItem> applyFilters(
+    List<AttentionItem> items, {
+    bool mineOnly = false,
+    String? category,
+  }) {
+    return items.where((item) {
+      if (mineOnly && !item.isMine) return false;
+      if (category != null && item.category != category) return false;
+      return true;
+    }).toList();
+  }
+
+  /// Counts items per category (used to label and hide empty filter chips).
+  static Map<String, int> categoryCounts(List<AttentionItem> items) {
+    final counts = <String, int>{};
+    for (final item in items) {
+      counts[item.category] = (counts[item.category] ?? 0) + 1;
+    }
+    return counts;
+  }
+
   // ---- Pure, testable rule helpers -----------------------------------------
 
   /// Builds attention items for a GitHub repo from its GraphQL open-PR nodes.

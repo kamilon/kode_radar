@@ -23,6 +23,7 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
   List<AttentionItem> _items = const [];
   bool _loading = true;
   bool _mineOnly = false;
+  String? _categoryFilter;
   bool _identitySet = false;
   String? _error;
   DateTime? _lastChecked;
@@ -33,8 +34,15 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
     _load();
   }
 
-  List<AttentionItem> get _visibleItems =>
-      _mineOnly ? _items.where((i) => i.isMine).toList() : _items;
+  /// Items after the "Mine" toggle only — drives the per-category chip counts.
+  List<AttentionItem> get _mineFiltered =>
+      AttentionService.applyFilters(_items, mineOnly: _mineOnly);
+
+  List<AttentionItem> get _visibleItems => AttentionService.applyFilters(
+    _items,
+    mineOnly: _mineOnly,
+    category: _categoryFilter,
+  );
 
   Future<void> _load() async {
     setState(() {
@@ -81,9 +89,7 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
             tooltip: _mineOnly
                 ? 'Showing yours — tap for all'
                 : 'Show only mine',
-            onPressed: _loading
-                ? null
-                : () => setState(() => _mineOnly = !_mineOnly),
+            onPressed: _loading ? null : _toggleMine,
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -96,6 +102,10 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(onRefresh: _load, child: _buildContent()),
     );
+  }
+
+  void _toggleMine() {
+    setState(() => _mineOnly = !_mineOnly);
   }
 
   Widget _buildContent() {
@@ -112,16 +122,78 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
     }
 
     final visible = _visibleItems;
-    if (visible.isEmpty) return _buildEmptyState();
+    final Widget list = visible.isEmpty
+        ? _buildEmptyState()
+        : ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
+            itemCount: visible.length + 1,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              if (index == 0) return _buildHeader(visible.length);
+              return _buildItemTile(visible[index - 1]);
+            },
+          );
 
-    return ListView.separated(
-      physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: visible.length + 1,
-      separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        if (index == 0) return _buildHeader(visible.length);
-        return _buildItemTile(visible[index - 1]);
-      },
+    final filterBar = _buildFilterBar();
+    if (filterBar == null) return list;
+    return Column(
+      children: [
+        filterBar,
+        Expanded(child: list),
+      ],
+    );
+  }
+
+  /// A horizontal row of category chips (with counts). The active filter is
+  /// always shown (even at zero) so a selection is never stranded. Returns null
+  /// when nothing passes the "Mine" filter, or when there is only one category
+  /// and no active selection to clear.
+  Widget? _buildFilterBar() {
+    if (_mineFiltered.isEmpty) return null;
+    final counts = AttentionService.categoryCounts(_mineFiltered);
+    final present = AttentionService.categories
+        .where((c) => (counts[c] ?? 0) > 0 || c == _categoryFilter)
+        .toList();
+    if (present.length < 2 && _categoryFilter == null) return null;
+    final total = _mineFiltered.length;
+    return SizedBox(
+      height: 52,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            _filterChip(
+              'All ($total)',
+              selected: _categoryFilter == null,
+              onSelected: () => setState(() => _categoryFilter = null),
+            ),
+            for (final c in present)
+              _filterChip(
+                '${AttentionService.categoryLabel(c)} (${counts[c] ?? 0})',
+                selected: _categoryFilter == c,
+                onSelected: () => setState(
+                  () => _categoryFilter = _categoryFilter == c ? null : c,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _filterChip(
+    String label, {
+    required bool selected,
+    required VoidCallback onSelected,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onSelected(),
+      ),
     );
   }
 
@@ -131,6 +203,11 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       message = 'Nothing needs your attention right now.';
     } else if (_mineOnly && !_identitySet) {
       message = 'Set your identity in People to use the "Mine" filter.';
+    } else if (_categoryFilter != null) {
+      final label = AttentionService.categoryLabel(_categoryFilter!);
+      message = _mineOnly
+          ? 'None of your "$label" items are here right now.'
+          : 'No "$label" items right now.';
     } else {
       message = 'None of the current items are yours.';
     }
@@ -228,7 +305,9 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
     final dismissForever = direction == DismissDirection.endToStart;
     // Remove synchronously so the dismissed widget is gone before the next
     // build, then persist the snooze in the background.
-    setState(() => _items = _items.where((i) => i.id != item.id).toList());
+    setState(() {
+      _items = _items.where((i) => i.id != item.id).toList();
+    });
     final pending = dismissForever
         ? SnoozeStore.snooze(item.id)
         : SnoozeStore.snooze(item.id, forDuration: const Duration(days: 1));
