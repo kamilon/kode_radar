@@ -5,6 +5,7 @@ import 'activity_event_list.dart';
 import 'activity_feed_service.dart';
 import 'app_http.dart';
 import 'identity_store.dart';
+import 'seen_store.dart';
 import 'team.dart';
 import 'team_store.dart';
 
@@ -30,6 +31,10 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
   String? _error;
   DateTime? _lastChecked;
 
+  /// The previous "last seen" time, captured once, used to flag new events.
+  DateTime? _newSince;
+  bool _seenCaptured = false;
+
   /// Selected type groups; empty means "all kinds".
   final Set<String> _groups = <String>{};
 
@@ -50,6 +55,13 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
       _error = null;
     });
     try {
+      // Capture the previous last-seen once (so "new" highlights stay stable
+      // across in-session refreshes). The persisted watermark is advanced only
+      // after a successful load, below.
+      if (!_seenCaptured) {
+        _seenCaptured = true;
+        _newSince = await SeenStore.lastSeen(SeenStore.feedKey);
+      }
       final teams = await TeamStore.list();
       final selfGithub = await IdentityStore.selfGithubLogins();
       final selfAdo = await IdentityStore.selfAdoNames();
@@ -59,6 +71,17 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
         selfAdoNames: selfAdo,
       );
       if (!mounted) return;
+      // Advance the watermark to the newest event we actually loaded — a
+      // provider timestamp, so device-clock skew can't poison it, and only on
+      // a successful load so a failure/quick pop never consumes unseen items.
+      // markSeen never moves the marker backwards.
+      if (result.events.isNotEmpty) {
+        await SeenStore.markSeen(
+          SeenStore.feedKey,
+          result.events.first.occurredAt,
+        );
+        if (!mounted) return;
+      }
       setState(() {
         _events = result.events;
         _failedSources = result.failedSources;
@@ -104,6 +127,13 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
     }).toList();
   }
 
+  /// How many currently-visible events are new since the last visit.
+  int get _newCount {
+    final since = _newSince;
+    if (since == null) return 0;
+    return _visibleEvents.where((e) => e.occurredAt.isAfter(since)).length;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -130,6 +160,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
         children: [
           _buildFilterBar(),
           const Divider(height: 1),
+          if (!_loading && _error == null) sinceLastLookedBanner(_newCount),
           if (!_loading && _error == null)
             activitySourceNotice(
               failedSources: _failedSources,
@@ -227,7 +258,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
     final visible = _visibleEvents;
     if (visible.isEmpty) return _buildEmptyState();
 
-    return ActivityEventList(events: visible);
+    return ActivityEventList(events: visible, newSince: _newSince);
   }
 
   Widget _buildEmptyState() {
