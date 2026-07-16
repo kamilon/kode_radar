@@ -482,7 +482,9 @@ class RepoDetailService {
           if (repoResp.statusCode != 200) return null;
           final decoded = jsonDecode(repoResp.body);
           final repositoryId = decoded is Map ? _str(decoded, 'id') : null;
-          if (repositoryId == null) return const <RepoRun>[];
+          // A repo we can't resolve to a GUID means CI couldn't be scoped —
+          // treat it as a failure, not "no runs".
+          if (repositoryId == null) return null;
           final response = await httpClient
               .get(
                 Uri.https(
