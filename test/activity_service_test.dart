@@ -1,9 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kode_radar/activity_service.dart';
+import 'package:kode_radar/token_store.dart';
 
 void main() {
   test('extractPrAuthorsGithub dedupes authors', () {
@@ -228,5 +231,45 @@ void main() {
     expect(activity.contributors, ['alice']);
     expect(activity.ciStatus, 'success');
     expect(activity.error, isNull);
+  });
+
+  group('computeAll onlyRepoKeys', () {
+    setUp(() {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      FlutterSecureStorage.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('fetches only the requested repositories', () async {
+      final gh = await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'Acme',
+        scope: 'acme',
+        secret: 'ghp_secret',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('github_repos', [
+        jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': gh.id}),
+        jsonEncode({'owner': 'acme', 'repoName': 'web', 'tokenId': gh.id}),
+      ]);
+      final client = MockClient((request) async {
+        if (request.url.path.endsWith('/actions/runs')) {
+          return http.Response(jsonEncode({'workflow_runs': []}), 200);
+        }
+        return http.Response('[]', 200);
+      });
+
+      final scoped = await ActivityService.computeAll(
+        client: client,
+        onlyRepoKeys: {'github:acme/api'},
+      );
+      expect(scoped.map((a) => a.repoKey).toList(), ['github:acme/api']);
+
+      final none = await ActivityService.computeAll(
+        client: client,
+        onlyRepoKeys: {},
+      );
+      expect(none, isEmpty);
+    });
   });
 }

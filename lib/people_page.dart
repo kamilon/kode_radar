@@ -5,6 +5,7 @@ import 'identity_service.dart';
 import 'identity_store.dart';
 import 'people_service.dart';
 import 'person.dart';
+import 'person_detail_page.dart';
 
 class PeoplePage extends StatefulWidget {
   const PeoplePage({super.key});
@@ -245,6 +246,14 @@ class _PeoplePageState extends State<PeoplePage> {
         final person = _people[index];
         return ListTile(
           leading: CircleAvatar(child: Text(_initials(person.displayName))),
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PersonDetailPage(person: person),
+              ),
+            );
+          },
           title: Row(
             children: [
               Expanded(child: Text(person.displayName)),
