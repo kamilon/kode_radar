@@ -174,7 +174,8 @@ class _WorkItemsPageState extends State<WorkItemsPage> {
 
   List<_Row> _buildRows(List<WorkItem> items) {
     // Group by groupKey (github:owner/name vs ado:org/project) so identically
-    // named GitHub repos and ADO projects never merge; keep newest first.
+    // named GitHub repos and ADO projects never merge; within each group, keep
+    // the most recently updated items first.
     final sorted = [...items]
       ..sort((a, b) {
         final byGroup = a.groupKey.compareTo(b.groupKey);

@@ -897,6 +897,44 @@ void main() {
         expect(result.truncated, isTrue);
       },
     );
+
+    test(
+      'a later page with an unexpected shape is marked partial, not dropped',
+      () async {
+        final gh = await TokenStore.addToken(
+          provider: TokenStore.providerGithub,
+          label: 'Acme',
+          scope: 'acme',
+          secret: 'ghp_secret',
+        );
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList('github_repos', [
+          jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': gh.id}),
+        ]);
+        final client = MockClient((request) async {
+          if (request.url.path == '/repos/acme/api/events') {
+            final page = request.url.queryParameters['page'] ?? '1';
+            if (page == '1') {
+              return http.Response(
+                jsonEncode(_pushPage('p1', 100, '2026-07-14T10:00:00Z')),
+                200,
+              );
+            }
+            // Page 2 returns valid JSON that isn't a List (e.g. an error body).
+            return http.Response(jsonEncode({'message': 'oops'}), 200);
+          }
+          return http.Response(jsonEncode({'workflow_runs': []}), 200);
+        });
+
+        final result = await ActivityFeedService.computeAll(
+          client: client,
+          now: DateTime.parse('2026-07-15T12:00:00Z'),
+        );
+        expect(result.events, hasLength(100));
+        expect(result.failedSources, greaterThanOrEqualTo(1));
+        expect(result.truncated, isTrue);
+      },
+    );
   });
 }
 

@@ -624,7 +624,11 @@ class ActivityFeedService {
           pageFailed = true;
           break;
         }
-        if (body is! List) break;
+        if (body is! List) {
+          if (collected.isEmpty) return _FetchOutcome.failure;
+          pageFailed = true;
+          break;
+        }
         collected.addAll(body);
         if (body.length < 100) break; // last page reached
         // Only stop when the whole page is already out of window (its NEWEST
