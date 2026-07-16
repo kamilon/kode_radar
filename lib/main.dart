@@ -9,6 +9,7 @@ import 'manage_tokens_page.dart';
 import 'radar_page.dart';
 import 'attention_inbox_page.dart';
 import 'activity_feed_page.dart';
+import 'work_items_page.dart';
 import 'preferences_page.dart';
 import 'people_page.dart';
 import 'teams_page.dart';
@@ -686,6 +687,16 @@ class _MyHomePageState extends State<MyHomePage>
               await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const ActivityFeedPage()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.assignment_turned_in),
+            tooltip: 'Assigned to you',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const WorkItemsPage()),
               );
             },
           ),
