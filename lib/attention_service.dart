@@ -41,12 +41,11 @@ class AttentionItem {
 }
 
 /// Computes a ranked, team-wide list of pull requests that need action across
-/// all monitored repos: waiting on review, changes requested (Azure DevOps
-/// only for now — GitHub changes-requested detection needs the reviews API and
-/// is a later milestone), or open a long time. Items are optionally tagged as
-/// the current user's (`AttentionItem.isMine`) when GitHub logins / ADO names
-/// are supplied, and snoozed items are filtered out. CI-failing repos are
-/// surfaced on the Radar, not here.
+/// all monitored repos: waiting on review, changes requested, or open a long
+/// time. Items are optionally tagged as the current user's
+/// (`AttentionItem.isMine`) when GitHub logins / ADO names are supplied, and
+/// snoozed items are filtered out. CI-failing repos are surfaced on the Radar,
+/// not here.
 class AttentionService {
   AttentionService._();
 
@@ -54,6 +53,22 @@ class AttentionService {
   /// surfaced as an "old open PR".
   static const int oldOpenPrDays = 7;
   static const Duration _requestTimeout = Duration(seconds: 20);
+
+  /// GraphQL query for a repo's open PRs. `reviewDecision` is only populated
+  /// when branch protection requires reviews, so `latestOpinionatedReviews`
+  /// (each author's latest approve/changes-requested stance) is also queried to
+  /// detect changes-requested on unprotected repos. The pending review requests
+  /// drive "waiting on review" and self-assignment.
+  static const String _openPullsQuery =
+      r'query($owner:String!,$name:String!){'
+      r'repository(owner:$owner,name:$name){'
+      r'pullRequests(states:OPEN,first:100,orderBy:{field:UPDATED_AT,direction:DESC}){'
+      r'nodes{number title url isDraft createdAt '
+      r'author{login} reviewDecision '
+      r'latestOpinionatedReviews(first:100){nodes{state}} '
+      r'reviewRequests(first:20){totalCount '
+      r'nodes{requestedReviewer{__typename ... on User{login}}}}}'
+      r'}}}';
 
   // Category tiers; severity = tier * 1000 + age, so category always dominates
   // age in ranking while older items still sort first within a category.
@@ -67,7 +82,10 @@ class AttentionService {
 
   // ---- Pure, testable rule helpers -----------------------------------------
 
-  /// Builds attention items for a GitHub repo from its open PR list.
+  /// Builds attention items for a GitHub repo from its GraphQL open-PR nodes.
+  /// The exact `reviewDecision` lets us surface changes-requested PRs (matching
+  /// Azure DevOps), not just review-requested and old-open ones. A PR is
+  /// "mine" when the current user authored it or is a requested reviewer.
   static List<AttentionItem> githubItems({
     required String repoDisplay,
     required List<dynamic> prs,
@@ -78,38 +96,52 @@ class AttentionService {
     final items = <AttentionItem>[];
     for (final pr in prs) {
       if (pr is! Map) continue;
-      if (pr['draft'] == true) continue;
+      if (pr['isDraft'] == true) continue;
       final number = pr['number'];
+      if (number is! int) continue;
       final title = _stringValue(pr, 'title') ?? 'Untitled PR';
-      final author = _nestedString(pr['user'], 'login') ?? 'unknown';
-      final url = _stringValue(pr, 'html_url');
-      final age = _ageDays(pr['created_at'], now);
+      final author = _nestedString(pr['author'], 'login') ?? 'unknown';
+      final url = _stringValue(pr, 'url');
+      final age = _ageDays(pr['createdAt'], now);
+      final decision = _stringValue(pr, 'reviewDecision');
+      // reviewDecision is null on repos without required reviews, so also
+      // inspect each author's latest opinionated review. Supersession is
+      // handled by GitHub: a later approval replaces an earlier change request.
+      final changesRequested =
+          decision == 'CHANGES_REQUESTED' ||
+          _hasChangesRequestedReview(pr['latestOpinionatedReviews']);
 
-      // Waiting on review = individual reviewers still requested, or a team
-      // review requested. (GitHub drops a reviewer from this list once they
-      // submit a review, so a non-empty list means "still waiting".)
-      final reviewers = pr['requested_reviewers'];
-      final teams = pr['requested_teams'];
-      final reviewerLogins = <String>{};
-      if (reviewers is List) {
-        for (final r in reviewers) {
-          final login = _nestedString(r, 'login');
-          if (login != null) reviewerLogins.add(login.trim().toLowerCase());
-        }
-      }
-      final waitingOnReview =
-          (reviewers is List && reviewers.isNotEmpty) ||
-          (teams is List && teams.isNotEmpty);
+      final reviewRequests = pr['reviewRequests'];
+      final pendingCount =
+          reviewRequests is Map && reviewRequests['totalCount'] is int
+          ? reviewRequests['totalCount'] as int
+          : 0;
+      final reviewerLogins = _requestedReviewerLogins(reviewRequests);
       final mine =
           self.isNotEmpty &&
           (self.contains(author.trim().toLowerCase()) ||
               reviewerLogins.any(self.contains));
 
-      if (waitingOnReview) {
+      final label = 'PR #$number';
+      if (changesRequested) {
+        items.add(
+          _changesRequested(
+            repoDisplay,
+            label,
+            title,
+            author,
+            age,
+            url,
+            isMine: mine,
+          ),
+        );
+      } else if (decision == 'REVIEW_REQUIRED' || pendingCount > 0) {
+        // A required review, or any pending review request (individual or
+        // team), means the PR is still waiting on review.
         items.add(
           _reviewRequested(
             repoDisplay,
-            'PR #$number',
+            label,
             title,
             author,
             age,
@@ -119,19 +151,41 @@ class AttentionService {
         );
       } else if ((age ?? 0) > oldOpenPrDays) {
         items.add(
-          _oldOpen(
-            repoDisplay,
-            'PR #$number',
-            title,
-            author,
-            age,
-            url,
-            isMine: mine,
-          ),
+          _oldOpen(repoDisplay, label, title, author, age, url, isMine: mine),
         );
       }
     }
     return items;
+  }
+
+  /// Collects the lower-cased logins of individually requested reviewers from a
+  /// GraphQL `reviewRequests` connection. Team review requests have no login
+  /// and are ignored here (they still count toward the pending total).
+  static Set<String> _requestedReviewerLogins(dynamic reviewRequests) {
+    final logins = <String>{};
+    final nodes = reviewRequests is Map ? reviewRequests['nodes'] : null;
+    if (nodes is List) {
+      for (final n in nodes) {
+        if (n is! Map) continue;
+        final login = _nestedString(n['requestedReviewer'], 'login');
+        if (login != null) logins.add(login.trim().toLowerCase());
+      }
+    }
+    return logins;
+  }
+
+  /// True when any author's latest opinionated review is CHANGES_REQUESTED.
+  /// GitHub's `latestOpinionatedReviews` already collapses to each author's
+  /// most recent approve/changes stance, so a later approval supersedes it.
+  static bool _hasChangesRequestedReview(dynamic latestOpinionatedReviews) {
+    final nodes = latestOpinionatedReviews is Map
+        ? latestOpinionatedReviews['nodes']
+        : null;
+    if (nodes is! List) return false;
+    for (final n in nodes) {
+      if (n is Map && n['state'] == 'CHANGES_REQUESTED') return true;
+    }
+    return false;
   }
 
   /// Builds attention items for an Azure DevOps repo from its active PR list.
@@ -321,6 +375,17 @@ class AttentionService {
     return value is String ? value : null;
   }
 
+  /// Extracts `data.repository.pullRequests.nodes` from a GraphQL response, or
+  /// null when the shape is invalid (distinguishing "no open PRs" from a failed
+  /// or malformed response).
+  static List<dynamic>? _graphqlPullNodes(dynamic body) {
+    final data = body is Map ? body['data'] : null;
+    final repository = data is Map ? data['repository'] : null;
+    final pullRequests = repository is Map ? repository['pullRequests'] : null;
+    final nodes = pullRequests is Map ? pullRequests['nodes'] : null;
+    return nodes is List ? nodes : null;
+  }
+
   // ---- Fetching ------------------------------------------------------------
 
   static Future<List<AttentionItem>> computeAll({
@@ -417,15 +482,16 @@ class AttentionService {
         return [_errorItem(repoDisplay, 'No token set')];
       }
       final response = await client
-          .get(
-            Uri.https('api.github.com', '/repos/$owner/$name/pulls', {
-              'state': 'open',
-              'per_page': '100',
-            }),
+          .post(
+            Uri.https('api.github.com', '/graphql'),
             headers: {
               'Authorization': 'Bearer $secret',
-              'Accept': 'application/vnd.github+json',
+              'Content-Type': 'application/json',
             },
+            body: jsonEncode({
+              'query': _openPullsQuery,
+              'variables': {'owner': owner, 'name': name},
+            }),
           )
           .timeout(_requestTimeout);
       if (response.statusCode != 200) {
@@ -434,10 +500,16 @@ class AttentionService {
         ];
       }
       final body = jsonDecode(response.body);
-      if (body is! List) return const [];
+      if (body is Map && body['errors'] != null) {
+        return [_errorItem(repoDisplay, 'Could not load pull requests')];
+      }
+      final nodes = _graphqlPullNodes(body);
+      if (nodes == null) {
+        return [_errorItem(repoDisplay, 'Could not load pull requests')];
+      }
       return githubItems(
         repoDisplay: repoDisplay,
-        prs: body,
+        prs: nodes,
         now: now,
         selfGithubLogins: selfGithubLogins,
       );

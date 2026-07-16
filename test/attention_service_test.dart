@@ -20,12 +20,18 @@ void main() {
         {
           'number': 12,
           'title': 'Add feature',
-          'user': {'login': 'alice'},
-          'created_at': daysAgo(3).toIso8601String(),
-          'html_url': 'https://github.com/acme/api/pull/12',
-          'requested_reviewers': [
-            {'login': 'bob'},
-          ],
+          'author': {'login': 'alice'},
+          'createdAt': daysAgo(3).toIso8601String(),
+          'url': 'https://github.com/acme/api/pull/12',
+          'reviewDecision': null,
+          'reviewRequests': {
+            'totalCount': 1,
+            'nodes': [
+              {
+                'requestedReviewer': {'login': 'bob'},
+              },
+            ],
+          },
         },
       ],
     );
@@ -43,16 +49,188 @@ void main() {
         {
           'number': 20,
           'title': 'Team review',
-          'user': {'login': 'alice'},
-          'created_at': daysAgo(1).toIso8601String(),
-          'requested_reviewers': [],
-          'requested_teams': [
-            {'slug': 'platform'},
-          ],
+          'author': {'login': 'alice'},
+          'createdAt': daysAgo(1).toIso8601String(),
+          'reviewDecision': null,
+          // A team review request has no reviewer login but still counts.
+          'reviewRequests': {
+            'totalCount': 1,
+            'nodes': [
+              {
+                'requestedReviewer': {'__typename': 'Team', 'slug': 'platform'},
+              },
+            ],
+          },
         },
       ],
     );
     expect(items.single.category, 'reviewRequested');
+  });
+
+  test('GitHub: CHANGES_REQUESTED -> changesRequested', () {
+    final items = AttentionService.githubItems(
+      repoDisplay: 'acme/api',
+      now: now,
+      prs: [
+        {
+          'number': 33,
+          'title': 'Needs work',
+          'author': {'login': 'alice'},
+          'createdAt': daysAgo(2).toIso8601String(),
+          'url': 'https://github.com/acme/api/pull/33',
+          'reviewDecision': 'CHANGES_REQUESTED',
+          'reviewRequests': {'totalCount': 0, 'nodes': []},
+        },
+      ],
+    );
+    expect(items.single.category, 'changesRequested');
+    expect(items.single.title, 'PR #33 has changes requested');
+  });
+
+  test('GitHub: APPROVED -> nothing unless old (then oldOpenPr)', () {
+    List<AttentionItem> approvedAged(int days) => AttentionService.githubItems(
+      repoDisplay: 'acme/api',
+      now: now,
+      prs: [
+        {
+          'number': 44,
+          'title': 'Ready',
+          'author': {'login': 'alice'},
+          'createdAt': daysAgo(days).toIso8601String(),
+          'reviewDecision': 'APPROVED',
+          'reviewRequests': {'totalCount': 0, 'nodes': []},
+        },
+      ],
+    );
+    expect(approvedAged(2), isEmpty);
+    expect(approvedAged(40).single.category, 'oldOpenPr');
+  });
+
+  test('GitHub: REVIEW_REQUIRED decision -> reviewRequested', () {
+    final items = AttentionService.githubItems(
+      repoDisplay: 'acme/api',
+      now: now,
+      prs: [
+        {
+          'number': 55,
+          'title': 'Required',
+          'author': {'login': 'alice'},
+          'createdAt': daysAgo(1).toIso8601String(),
+          'reviewDecision': 'REVIEW_REQUIRED',
+          'reviewRequests': {'totalCount': 0, 'nodes': []},
+        },
+      ],
+    );
+    expect(items.single.category, 'reviewRequested');
+  });
+
+  test(
+    'GitHub: unprotected repo (null decision) with a changes-requested review '
+    '-> changesRequested',
+    () {
+      final items = AttentionService.githubItems(
+        repoDisplay: 'acme/api',
+        now: now,
+        prs: [
+          {
+            'number': 66,
+            'title': 'No branch protection',
+            'author': {'login': 'alice'},
+            'createdAt': daysAgo(2).toIso8601String(),
+            // reviewDecision is null when the repo has no required reviews.
+            'reviewDecision': null,
+            'latestOpinionatedReviews': {
+              'nodes': [
+                {'state': 'CHANGES_REQUESTED'},
+              ],
+            },
+            'reviewRequests': {'totalCount': 0, 'nodes': []},
+          },
+        ],
+      );
+      expect(items.single.category, 'changesRequested');
+    },
+  );
+
+  test(
+    'GitHub: changes-requested outranks a pending review on the same PR',
+    () {
+      final items = AttentionService.githubItems(
+        repoDisplay: 'acme/api',
+        now: now,
+        prs: [
+          {
+            'number': 77,
+            'title': 'Both',
+            'author': {'login': 'alice'},
+            'createdAt': daysAgo(2).toIso8601String(),
+            'reviewDecision': 'CHANGES_REQUESTED',
+            'latestOpinionatedReviews': {
+              'nodes': [
+                {'state': 'CHANGES_REQUESTED'},
+              ],
+            },
+            'reviewRequests': {
+              'totalCount': 1,
+              'nodes': [
+                {
+                  'requestedReviewer': {'login': 'bob'},
+                },
+              ],
+            },
+          },
+        ],
+      );
+      expect(items.single.category, 'changesRequested');
+    },
+  );
+
+  test('GitHub: a DISMISSED review is not treated as changes requested', () {
+    final items = AttentionService.githubItems(
+      repoDisplay: 'acme/api',
+      now: now,
+      prs: [
+        {
+          'number': 99,
+          'title': 'Dismissed',
+          'author': {'login': 'alice'},
+          'createdAt': daysAgo(2).toIso8601String(),
+          'reviewDecision': null,
+          'latestOpinionatedReviews': {
+            'nodes': [
+              {'state': 'DISMISSED'},
+            ],
+          },
+          'reviewRequests': {'totalCount': 0, 'nodes': []},
+        },
+      ],
+    );
+    expect(items, isEmpty);
+  });
+
+  test('GitHub: an approval superseding a change request -> not changes', () {
+    // latestOpinionatedReviews already collapses to the author's latest stance,
+    // so a later approval means no CHANGES_REQUESTED node remains.
+    final items = AttentionService.githubItems(
+      repoDisplay: 'acme/api',
+      now: now,
+      prs: [
+        {
+          'number': 88,
+          'title': 'Approved after changes',
+          'author': {'login': 'alice'},
+          'createdAt': daysAgo(2).toIso8601String(),
+          'reviewDecision': null,
+          'latestOpinionatedReviews': {
+            'nodes': [
+              {'state': 'APPROVED'},
+            ],
+          },
+          'reviewRequests': {'totalCount': 0, 'nodes': []},
+        },
+      ],
+    );
+    expect(items, isEmpty);
   });
 
   test(
@@ -65,16 +243,18 @@ void main() {
           {
             'number': 1,
             'title': 'Old',
-            'user': {'login': 'alice'},
-            'created_at': daysAgo(40).toIso8601String(),
-            'requested_reviewers': [],
+            'author': {'login': 'alice'},
+            'createdAt': daysAgo(40).toIso8601String(),
+            'reviewDecision': null,
+            'reviewRequests': {'totalCount': 0, 'nodes': []},
           },
           {
             'number': 2,
             'title': 'Fresh',
-            'user': {'login': 'alice'},
-            'created_at': daysAgo(1).toIso8601String(),
-            'requested_reviewers': [],
+            'author': {'login': 'alice'},
+            'createdAt': daysAgo(1).toIso8601String(),
+            'reviewDecision': null,
+            'reviewRequests': {'totalCount': 0, 'nodes': []},
           },
         ],
       );
@@ -92,12 +272,18 @@ void main() {
         {
           'number': 3,
           'title': 'WIP',
-          'draft': true,
-          'user': {'login': 'alice'},
-          'created_at': daysAgo(30).toIso8601String(),
-          'requested_reviewers': [
-            {'login': 'bob'},
-          ],
+          'isDraft': true,
+          'author': {'login': 'alice'},
+          'createdAt': daysAgo(30).toIso8601String(),
+          'reviewDecision': null,
+          'reviewRequests': {
+            'totalCount': 1,
+            'nodes': [
+              {
+                'requestedReviewer': {'login': 'bob'},
+              },
+            ],
+          },
         },
       ],
     );
@@ -114,11 +300,17 @@ void main() {
           {
             'number': 1,
             'title': 't',
-            'user': {'login': 'a'},
-            'created_at': daysAgo(0).toIso8601String(),
-            'requested_reviewers': [
-              {'login': 'b'},
-            ],
+            'author': {'login': 'a'},
+            'createdAt': daysAgo(0).toIso8601String(),
+            'reviewDecision': null,
+            'reviewRequests': {
+              'totalCount': 1,
+              'nodes': [
+                {
+                  'requestedReviewer': {'login': 'b'},
+                },
+              ],
+            },
           },
         ],
       ).single;
@@ -129,9 +321,10 @@ void main() {
           {
             'number': 2,
             'title': 't',
-            'user': {'login': 'a'},
-            'created_at': daysAgo(300).toIso8601String(),
-            'requested_reviewers': [],
+            'author': {'login': 'a'},
+            'createdAt': daysAgo(300).toIso8601String(),
+            'reviewDecision': null,
+            'reviewRequests': {'totalCount': 0, 'nodes': []},
           },
         ],
       ).single;
@@ -228,12 +421,18 @@ void main() {
         {
           'number': 9,
           'title': 123,
-          'user': {'login': 42},
-          'created_at': daysAgo(2).toIso8601String(),
-          'requested_reviewers': [
-            {'login': 'bob'},
-          ],
-          'html_url': 99,
+          'author': {'login': 42},
+          'createdAt': daysAgo(2).toIso8601String(),
+          'reviewDecision': null,
+          'reviewRequests': {
+            'totalCount': 1,
+            'nodes': [
+              {
+                'requestedReviewer': {'login': 'bob'},
+              },
+            ],
+          },
+          'url': 99,
         },
       ],
     );
@@ -251,27 +450,40 @@ void main() {
         {
           'number': 1,
           'title': 't',
-          'user': {'login': 'alice'},
-          'created_at': daysAgo(1).toIso8601String(),
-          'requested_reviewers': [
-            {'login': 'me'},
-          ],
+          'author': {'login': 'alice'},
+          'createdAt': daysAgo(1).toIso8601String(),
+          'reviewDecision': null,
+          'reviewRequests': {
+            'totalCount': 1,
+            'nodes': [
+              {
+                'requestedReviewer': {'login': 'me'},
+              },
+            ],
+          },
         },
         {
           'number': 2,
           'title': 't',
-          'user': {'login': 'me'},
-          'created_at': daysAgo(40).toIso8601String(),
-          'requested_reviewers': [],
+          'author': {'login': 'me'},
+          'createdAt': daysAgo(40).toIso8601String(),
+          'reviewDecision': null,
+          'reviewRequests': {'totalCount': 0, 'nodes': []},
         },
         {
           'number': 3,
           'title': 't',
-          'user': {'login': 'bob'},
-          'created_at': daysAgo(1).toIso8601String(),
-          'requested_reviewers': [
-            {'login': 'carol'},
-          ],
+          'author': {'login': 'bob'},
+          'createdAt': daysAgo(1).toIso8601String(),
+          'reviewDecision': null,
+          'reviewRequests': {
+            'totalCount': 1,
+            'nodes': [
+              {
+                'requestedReviewer': {'login': 'carol'},
+              },
+            ],
+          },
         },
       ],
     );
@@ -326,22 +538,37 @@ void main() {
         ]);
 
         final client = MockClient((request) async {
-          if (request.url.path == '/repos/acme/api/pulls') {
+          if (request.url.path == '/graphql') {
             return http.Response(
-              jsonEncode([
-                {
-                  'number': 7,
-                  'title': 'Waiting',
-                  'user': {'login': 'alice'},
-                  // Created a decade before the injected clock; if the code used
-                  // the wall clock this age would be far larger than 10 days.
-                  'created_at': '2020-01-01T00:00:00Z',
-                  'requested_reviewers': [
-                    {'login': 'bob'},
-                  ],
-                  'html_url': 'https://github.com/acme/api/pull/7',
+              jsonEncode({
+                'data': {
+                  'repository': {
+                    'pullRequests': {
+                      'nodes': [
+                        {
+                          'number': 7,
+                          'title': 'Waiting',
+                          'author': {'login': 'alice'},
+                          // Created a decade before the injected clock; if the
+                          // code used the wall clock this age would be far
+                          // larger than 10 days.
+                          'createdAt': '2020-01-01T00:00:00Z',
+                          'reviewDecision': null,
+                          'reviewRequests': {
+                            'totalCount': 1,
+                            'nodes': [
+                              {
+                                'requestedReviewer': {'login': 'bob'},
+                              },
+                            ],
+                          },
+                          'url': 'https://github.com/acme/api/pull/7',
+                        },
+                      ],
+                    },
+                  },
                 },
-              ]),
+              }),
               200,
             );
           }
@@ -371,20 +598,34 @@ void main() {
         jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': token.id}),
       ]);
       final client = MockClient((request) async {
-        if (request.url.path == '/repos/acme/api/pulls') {
+        if (request.url.path == '/graphql') {
           return http.Response(
-            jsonEncode([
-              {
-                'number': 7,
-                'title': 't',
-                'user': {'login': 'a'},
-                'created_at': '2020-01-01T00:00:00Z',
-                'requested_reviewers': [
-                  {'login': 'b'},
-                ],
-                'html_url': 'https://github.com/acme/api/pull/7',
+            jsonEncode({
+              'data': {
+                'repository': {
+                  'pullRequests': {
+                    'nodes': [
+                      {
+                        'number': 7,
+                        'title': 't',
+                        'author': {'login': 'a'},
+                        'createdAt': '2020-01-01T00:00:00Z',
+                        'reviewDecision': null,
+                        'reviewRequests': {
+                          'totalCount': 1,
+                          'nodes': [
+                            {
+                              'requestedReviewer': {'login': 'b'},
+                            },
+                          ],
+                        },
+                        'url': 'https://github.com/acme/api/pull/7',
+                      },
+                    ],
+                  },
+                },
               },
-            ]),
+            }),
             200,
           );
         }
@@ -402,5 +643,93 @@ void main() {
       );
       expect(filtered, isEmpty);
     });
+
+    test('POSTs a GraphQL query with the owner/name variables', () async {
+      final token = await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'Acme',
+        scope: 'acme',
+        secret: 'ghp_secret',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('github_repos', [
+        jsonEncode({'owner': 'acme', 'repoName': 'api', 'tokenId': token.id}),
+      ]);
+
+      String? method;
+      Map<String, dynamic>? gqlBody;
+      final client = MockClient((request) async {
+        if (request.url.path == '/graphql') {
+          method = request.method;
+          gqlBody = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(
+            jsonEncode({
+              'data': {
+                'repository': {
+                  'pullRequests': {'nodes': []},
+                },
+              },
+            }),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      });
+
+      final items = await AttentionService.computeAll(client: client, now: now);
+      expect(items, isEmpty);
+      expect(method, 'POST');
+      expect(gqlBody?['variables'], {'owner': 'acme', 'name': 'api'});
+      final query = gqlBody?['query'] as String? ?? '';
+      expect(query, contains('reviewDecision'));
+      expect(query, contains('latestOpinionatedReviews'));
+    });
+
+    test(
+      'surfaces an error item on non-200, GraphQL errors, or bad shape',
+      () async {
+        Future<void> check(http.Response graphqlResponse) async {
+          SharedPreferences.setMockInitialValues({});
+          FlutterSecureStorage.setMockInitialValues({});
+          final token = await TokenStore.addToken(
+            provider: TokenStore.providerGithub,
+            label: 'Acme',
+            scope: 'acme',
+            secret: 'ghp_secret',
+          );
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setStringList('github_repos', [
+            jsonEncode({
+              'owner': 'acme',
+              'repoName': 'api',
+              'tokenId': token.id,
+            }),
+          ]);
+          final client = MockClient((request) async {
+            if (request.url.path == '/graphql') return graphqlResponse;
+            return http.Response('[]', 200);
+          });
+          final items = await AttentionService.computeAll(
+            client: client,
+            now: now,
+          );
+          expect(items, hasLength(1));
+          expect(items.single.category, 'error');
+        }
+
+        await check(http.Response('nope', 502));
+        await check(
+          http.Response(
+            jsonEncode({
+              'errors': [
+                {'message': 'boom'},
+              ],
+            }),
+            200,
+          ),
+        );
+        await check(http.Response(jsonEncode({'data': {}}), 200));
+      },
+    );
   });
 }
