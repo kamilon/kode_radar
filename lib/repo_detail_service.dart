@@ -127,6 +127,7 @@ class RepoDetailService {
     for (final pr in data) {
       if (pr is! Map) continue;
       final number = pr['number'];
+      if (number is! int) continue; // skip malformed entries (no "PR #null")
       final title = _str(pr, 'title') ?? 'Untitled PR';
       final author = _nested(pr['user'], 'login') ?? 'unknown';
       final url = _str(pr, 'html_url');
@@ -164,13 +165,13 @@ class RepoDetailService {
     for (final pr in data) {
       if (pr is! Map) continue;
       final id = pr['pullRequestId'];
+      if (id is! int) continue; // skip malformed entries (no "PR #null")
       final title = _str(pr, 'title') ?? 'Untitled PR';
       final author = _nested(pr['createdBy'], 'displayName') ?? 'unknown';
       final draft = pr['isDraft'] == true;
-      final url = id == null
-          ? null
-          : 'https://dev.azure.com/$organization/$project/_git/$name/'
-                'pullrequest/$id';
+      final url =
+          'https://dev.azure.com/$organization/$project/_git/$name/'
+          'pullrequest/$id';
       final reviewers = pr['reviewers'];
       final votes = <int>[];
       if (reviewers is List) {
@@ -300,29 +301,38 @@ class RepoDetailService {
         releasesFailed: true,
       );
     }
-    for (final raw in prefs.getStringList(RepoStore.adoKey) ?? const []) {
-      final map = _decode(raw);
-      if (map == null) continue;
-      final organization = _str(map, 'organization');
-      final project = _str(map, 'project');
-      final name = _str(map, 'repoName');
-      if (organization == null || project == null || name == null) continue;
-      if (RepoDiscoveryService.adoKey(organization, project, name) != repoKey) {
-        continue;
+    if (provider == 'ado') {
+      for (final raw in prefs.getStringList(RepoStore.adoKey) ?? const []) {
+        final map = _decode(raw);
+        if (map == null) continue;
+        final organization = _str(map, 'organization');
+        final project = _str(map, 'project');
+        final name = _str(map, 'repoName');
+        if (organization == null || project == null || name == null) continue;
+        if (RepoDiscoveryService.adoKey(organization, project, name) !=
+            repoKey) {
+          continue;
+        }
+        return loadAdo(
+          organization: organization,
+          project: project,
+          name: name,
+          tokenId: _str(map, 'tokenId'),
+          client: client,
+          now: now,
+        );
       }
-      return loadAdo(
-        organization: organization,
-        project: project,
-        name: name,
-        tokenId: _str(map, 'tokenId'),
-        client: client,
-        now: now,
+      return const RepoDetailData(
+        releasesSupported: false,
+        pullsFailed: true,
+        ciFailed: true,
       );
     }
+    // Unknown provider — surface as a failure rather than guessing.
     return const RepoDetailData(
-      releasesSupported: false,
       pullsFailed: true,
       ciFailed: true,
+      releasesFailed: true,
     );
   }
 
