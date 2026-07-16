@@ -11,40 +11,63 @@ import 'package:kode_radar/token_store.dart';
 void main() {
   final now = DateTime.parse('2026-07-15T12:00:00Z');
 
-  group('parseGithubPulls', () {
-    test(
-      'maps requested reviewers to waiting, else none; parses age/draft',
-      () {
-        final pulls = RepoDetailService.parseGithubPulls([
-          {
-            'number': 7,
-            'title': 'Add feature',
-            'user': {'login': 'alice'},
-            'created_at': '2026-07-13T12:00:00Z',
-            'html_url': 'https://github.com/acme/api/pull/7',
-            'requested_reviewers': [
-              {'login': 'bob'},
-            ],
-          },
-          {
-            'number': 8,
-            'title': 'WIP',
-            'user': {'login': 'carol'},
-            'created_at': '2026-07-15T00:00:00Z',
-            'draft': true,
-            'requested_reviewers': [],
-          },
-        ], now);
+  group('parseGithubGraphqlPulls', () {
+    test('maps reviewDecision to review state; parses age/draft', () {
+      Map<String, dynamic> node(
+        int number,
+        String? decision,
+        int pending, {
+        bool draft = false,
+        String created = '2026-07-13T12:00:00Z',
+      }) => {
+        'number': number,
+        'title': 'PR $number',
+        'url': 'https://github.com/acme/api/pull/$number',
+        'isDraft': draft,
+        'createdAt': created,
+        'author': {'login': 'alice'},
+        'reviewDecision': decision,
+        'reviewRequests': {'totalCount': pending},
+      };
 
-        expect(pulls, hasLength(2));
-        expect(pulls[0].label, 'PR #7');
-        expect(pulls[0].reviewState, PrReviewState.waiting);
-        expect(pulls[0].ageDays, 2);
-        expect(pulls[0].draft, isFalse);
-        expect(pulls[1].reviewState, PrReviewState.none);
-        expect(pulls[1].draft, isTrue);
-      },
-    );
+      final pulls = RepoDetailService.parseGithubGraphqlPulls({
+        'data': {
+          'repository': {
+            'pullRequests': {
+              'nodes': [
+                node(7, 'APPROVED', 0),
+                node(8, 'CHANGES_REQUESTED', 1),
+                node(9, 'REVIEW_REQUIRED', 2, draft: true),
+                node(
+                  10,
+                  null,
+                  1,
+                ), // no decision but a pending request => waiting
+                node(11, null, 0), // no decision, no request => none
+              ],
+            },
+          },
+        },
+      }, now);
+
+      expect(pulls, hasLength(5));
+      expect(pulls[0].reviewState, PrReviewState.approved);
+      expect(pulls[0].ageDays, 2);
+      expect(pulls[0].draft, isFalse);
+      expect(pulls[1].reviewState, PrReviewState.changesRequested);
+      expect(pulls[2].reviewState, PrReviewState.waiting);
+      expect(pulls[2].draft, isTrue);
+      expect(pulls[3].reviewState, PrReviewState.waiting);
+      expect(pulls[4].reviewState, PrReviewState.none);
+    });
+
+    test('returns empty on a missing/error response shape', () {
+      expect(
+        RepoDetailService.parseGithubGraphqlPulls({'errors': []}, now),
+        isEmpty,
+      );
+      expect(RepoDetailService.parseGithubGraphqlPulls('nope', now), isEmpty);
+    });
   });
 
   group('parseAdoPulls', () {
@@ -177,12 +200,30 @@ void main() {
       ]);
 
       String? capturedAuth;
+      String? capturedMethod;
+      String? capturedContentType;
+      Map<String, dynamic>? capturedGraphqlBody;
       final client = MockClient((request) async {
-        if (request.url.path == '/repos/acme/api/pulls') {
+        if (request.url.path == '/graphql') {
           capturedAuth =
               request.headers['authorization'] ??
               request.headers['Authorization'];
-          return http.Response('[]', 200);
+          capturedMethod = request.method;
+          capturedContentType =
+              request.headers['content-type'] ??
+              request.headers['Content-Type'];
+          capturedGraphqlBody =
+              jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(
+            jsonEncode({
+              'data': {
+                'repository': {
+                  'pullRequests': {'nodes': []},
+                },
+              },
+            }),
+            200,
+          );
         }
         if (request.url.path == '/repos/acme/api/actions/runs') {
           return http.Response(jsonEncode({'workflow_runs': []}), 200);
@@ -200,6 +241,49 @@ void main() {
       expect(data.failedSources, 0);
       // The repo's own token (not the scope-default) must be used.
       expect(capturedAuth, contains('ghp_assigned'));
+      // The GraphQL contract: a POST of JSON carrying owner/name variables and
+      // the reviewDecision-bearing query.
+      expect(capturedMethod, 'POST');
+      expect(capturedContentType, contains('application/json'));
+      expect(capturedGraphqlBody?['variables'], {
+        'owner': 'acme',
+        'name': 'api',
+      });
+      expect(capturedGraphqlBody?['query'], contains('reviewDecision'));
+    });
+
+    test('reports pulls failure on a malformed GraphQL response', () async {
+      await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'Default',
+        scope: 'acme',
+        secret: 'ghp_default',
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('github_repos', [
+        jsonEncode({'owner': 'acme', 'repoName': 'api'}),
+      ]);
+
+      final client = MockClient((request) async {
+        if (request.url.path == '/graphql') {
+          // 200 but no repository (e.g. an unexpected/partial body) must be a
+          // failure, not an empty "no open PRs" list.
+          return http.Response(jsonEncode({'data': {}}), 200);
+        }
+        if (request.url.path == '/repos/acme/api/actions/runs') {
+          return http.Response(jsonEncode({'workflow_runs': []}), 200);
+        }
+        return http.Response('[]', 200);
+      });
+
+      final data = await RepoDetailService.load(
+        repoKey: 'github:acme/api',
+        provider: 'github',
+        client: client,
+        now: now,
+      );
+
+      expect(data.pullsFailed, isTrue);
     });
 
     test('reports failure when the repo record is not found', () async {

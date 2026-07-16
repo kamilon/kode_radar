@@ -119,37 +119,79 @@ class RepoDetailService {
 
   // ---- Pure, testable normalizers ------------------------------------------
 
-  /// Normalizes a GitHub open-PR list. GitHub approved/changes-requested state
-  /// needs the per-PR reviews API (a later milestone), so review state here is
-  /// `waiting` (reviewers still requested) or `none`.
-  static List<RepoPr> parseGithubPulls(List<dynamic> data, DateTime now) {
+  /// The GraphQL query for a repo's open pull requests, including the exact
+  /// [reviewDecision] (approved / changes requested / review required).
+  static const String _openPullsQuery =
+      r'query($owner:String!,$name:String!){'
+      r'repository(owner:$owner,name:$name){'
+      r'pullRequests(states:OPEN,first:50,orderBy:{field:UPDATED_AT,direction:DESC}){'
+      r'nodes{number title url isDraft createdAt '
+      r'author{login} reviewDecision reviewRequests(first:1){totalCount}}'
+      r'}}}';
+
+  /// Normalizes a GitHub GraphQL open-PR response into work items with a full
+  /// review state derived from `reviewDecision`.
+  static List<RepoPr> parseGithubGraphqlPulls(dynamic body, DateTime now) {
+    final nodes = _graphqlPullNodes(body);
+    if (nodes == null) return const [];
     final result = <RepoPr>[];
-    for (final pr in data) {
+    for (final pr in nodes) {
       if (pr is! Map) continue;
       final number = pr['number'];
-      if (number is! int) continue; // skip malformed entries (no "PR #null")
-      final title = _str(pr, 'title') ?? 'Untitled PR';
-      final author = _nested(pr['user'], 'login') ?? 'unknown';
-      final url = _str(pr, 'html_url');
-      final draft = pr['draft'] == true;
-      final reviewers = pr['requested_reviewers'];
-      final teams = pr['requested_teams'];
-      final waiting =
-          (reviewers is List && reviewers.isNotEmpty) ||
-          (teams is List && teams.isNotEmpty);
+      if (number is! int) continue;
+      final reviewRequests = pr['reviewRequests'];
+      final pending =
+          reviewRequests is Map && reviewRequests['totalCount'] is int
+          ? reviewRequests['totalCount'] as int
+          : 0;
       result.add(
         RepoPr(
           label: 'PR #$number',
-          title: title,
-          author: author,
-          reviewState: waiting ? PrReviewState.waiting : PrReviewState.none,
-          ageDays: _ageDays(pr['created_at'], now),
-          draft: draft,
-          url: url,
+          title: _str(pr, 'title') ?? 'Untitled PR',
+          author: _nested(pr['author'], 'login') ?? 'unknown',
+          reviewState: _reviewStateFromDecision(
+            _str(pr, 'reviewDecision'),
+            pending,
+          ),
+          ageDays: _ageDays(pr['createdAt'], now),
+          draft: pr['isDraft'] == true,
+          url: _str(pr, 'url'),
         ),
       );
     }
     return result;
+  }
+
+  /// Extracts `data.repository.pullRequests.nodes` from a GraphQL response, or
+  /// null when the response shape is invalid (missing repository/pull requests).
+  /// A valid-but-empty repo returns an empty list, letting callers distinguish
+  /// "no open PRs" (success) from a malformed/failed response.
+  static List<dynamic>? _graphqlPullNodes(dynamic body) {
+    final data = body is Map ? body['data'] : null;
+    final repository = data is Map ? data['repository'] : null;
+    final pullRequests = repository is Map ? repository['pullRequests'] : null;
+    final nodes = pullRequests is Map ? pullRequests['nodes'] : null;
+    return nodes is List ? nodes : null;
+  }
+
+  /// Maps a GitHub `reviewDecision` (+ pending review-request count) to the
+  /// provider-normalized [PrReviewState].
+  static String _reviewStateFromDecision(
+    String? decision,
+    int pendingReviewRequests,
+  ) {
+    switch (decision) {
+      case 'APPROVED':
+        return PrReviewState.approved;
+      case 'CHANGES_REQUESTED':
+        return PrReviewState.changesRequested;
+      case 'REVIEW_REQUIRED':
+        return PrReviewState.waiting;
+      default:
+        return pendingReviewRequests > 0
+            ? PrReviewState.waiting
+            : PrReviewState.none;
+    }
   }
 
   /// Normalizes an Azure DevOps active-PR list; reviewer votes map to review
@@ -364,18 +406,29 @@ class RepoDetailService {
 
       final results = await Future.wait([
         _guard('GitHub pulls', () async {
+          // GraphQL gives the exact reviewDecision (approved / changes
+          // requested / review required) in a single request, avoiding a
+          // per-PR reviews-API fan-out.
           final response = await httpClient
-              .get(
-                Uri.https('api.github.com', '/repos/$owner/$name/pulls', {
-                  'state': 'open',
-                  'per_page': '50',
+              .post(
+                Uri.https('api.github.com', '/graphql'),
+                headers: {
+                  'Authorization': 'Bearer $secret',
+                  'Content-Type': 'application/json',
+                },
+                body: jsonEncode({
+                  'query': _openPullsQuery,
+                  'variables': {'owner': owner, 'name': name},
                 }),
-                headers: headers,
               )
               .timeout(_requestTimeout);
           if (response.statusCode != 200) return null;
           final body = jsonDecode(response.body);
-          return body is List ? parseGithubPulls(body, effectiveNow) : null;
+          if (body is Map && body['errors'] != null) return null;
+          // A malformed/null-repository 200 response is a failure, not an
+          // empty PR list — surface it via pullsFailed instead of "no PRs".
+          if (_graphqlPullNodes(body) == null) return null;
+          return parseGithubGraphqlPulls(body, effectiveNow);
         }),
         _guard('GitHub runs', () async {
           final response = await httpClient
