@@ -9,6 +9,7 @@ import 'manage_tokens_page.dart';
 import 'radar_page.dart';
 import 'attention_inbox_page.dart';
 import 'activity_feed_page.dart';
+import 'preferences_page.dart';
 import 'people_page.dart';
 import 'teams_page.dart';
 import 'theme_controller.dart';
@@ -732,6 +733,14 @@ class _MyHomePageState extends State<MyHomePage>
             icon: const Icon(Icons.brightness_6),
             tooltip: 'Appearance',
             onPressed: _showAppearancePicker,
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PreferencesPage()),
+            ),
           ),
         ],
         bottom: TabBar(

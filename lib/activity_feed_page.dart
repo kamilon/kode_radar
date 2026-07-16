@@ -5,6 +5,7 @@ import 'activity_event_list.dart';
 import 'activity_feed_service.dart';
 import 'app_http.dart';
 import 'identity_store.dart';
+import 'preferences_store.dart';
 import 'seen_store.dart';
 import 'team.dart';
 import 'team_store.dart';
@@ -28,6 +29,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
   bool _identitySet = false;
   int _failedSources = 0;
   bool _truncated = false;
+  int _lookbackDays = ActivityFeedService.defaultLookback.inDays;
   String? _error;
   DateTime? _lastChecked;
 
@@ -65,10 +67,12 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
       final teams = await TeamStore.list();
       final selfGithub = await IdentityStore.selfGithubLogins();
       final selfAdo = await IdentityStore.selfAdoNames();
+      final appPrefs = await PreferencesStore.load();
       final result = await ActivityFeedService.computeAll(
         client: AppHttp.client,
         selfGithubLogins: selfGithub,
         selfAdoNames: selfAdo,
+        lookback: Duration(days: appPrefs.feedLookbackDays),
       );
       if (!mounted) return;
       // Advance the watermark to the newest event we actually loaded — a
@@ -86,6 +90,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
         _events = result.events;
         _failedSources = result.failedSources;
         _truncated = result.truncated;
+        _lookbackDays = appPrefs.feedLookbackDays;
         _teams = teams;
         // Drop a stale team filter if the team was deleted.
         if (_teamId != null && !teams.any((t) => t.id == _teamId)) {
@@ -266,7 +271,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
     if (_events.isEmpty && _failedSources > 0) {
       message = 'Couldn\'t load activity right now. Pull down to retry.';
     } else if (_events.isEmpty) {
-      final days = ActivityFeedService.defaultLookback.inDays;
+      final days = _lookbackDays;
       message = 'No recent activity in the last $days days.';
     } else if (_mineOnly && !_identitySet) {
       message = 'Set your identity in People to use the "Mine" filter.';

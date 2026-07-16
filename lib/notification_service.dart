@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'attention_service.dart';
+import 'preferences_store.dart';
 
 class NotificationService {
   NotificationService._();
@@ -43,15 +44,37 @@ class NotificationService {
       final firstRun = !prefs.containsKey(_seenKey);
       final seen = (prefs.getStringList(_seenKey) ?? const <String>[]).toSet();
       final newIds = firstRun ? <String>{} : diffNew(seen, currentIds);
+      final now = DateTime.now();
+      final appPrefs = await PreferencesStore.load();
+      // Quiet hours *defer*: we hold the notification and, crucially, do NOT
+      // advance the baseline, so these items surface on the next refresh after
+      // quiet hours end. A disabled toggle instead *drops* (baseline advances
+      // below) so re-enabling never replays a backlog.
+      final inQuietHours =
+          appPrefs.notificationsEnabled &&
+          appPrefs.quietHoursEnabled &&
+          PreferencesStore.isWithinQuietHours(
+            now,
+            appPrefs.quietStartHour,
+            appPrefs.quietEndHour,
+          );
 
-      if (newIds.isNotEmpty) {
+      if (newIds.isNotEmpty &&
+          PreferencesStore.notificationsAllowed(appPrefs, now)) {
         final newItems = items
             .where((item) => newIds.contains(item.id))
             .toList(growable: false);
         await _showSummaryNotification(newItems);
       }
 
-      await prefs.setStringList(_seenKey, currentIds.toList()..sort());
+      // Seed on first run always; otherwise hold the baseline while deferring
+      // for quiet hours.
+      if (shouldAdvanceBaseline(
+        firstRun: firstRun,
+        inQuietHours: inQuietHours,
+      )) {
+        await prefs.setStringList(_seenKey, currentIds.toList()..sort());
+      }
     } catch (e) {
       debugPrint('Failed to process attention notifications: $e');
     }
@@ -59,6 +82,16 @@ class NotificationService {
 
   static Set<String> diffNew(Set<String> seen, Iterable<String> current) =>
       current.toSet().difference(seen);
+
+  /// Whether to advance the seen baseline. Quiet hours defer (hold the baseline
+  /// so items notify on the next refresh after quiet hours end); the first run
+  /// and every non-quiet case advance (a disabled toggle therefore drops rather
+  /// than replays a backlog).
+  @visibleForTesting
+  static bool shouldAdvanceBaseline({
+    required bool firstRun,
+    required bool inQuietHours,
+  }) => firstRun || !inQuietHours;
 
   static Future<void> _initPlugin() async {
     try {

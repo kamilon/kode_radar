@@ -15,4 +15,36 @@ void main() {
       isEmpty,
     );
   });
+
+  group('shouldAdvanceBaseline', () {
+    test('quiet hours defer (hold the baseline)', () {
+      expect(
+        NotificationService.shouldAdvanceBaseline(
+          firstRun: false,
+          inQuietHours: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('first run always seeds even during quiet hours', () {
+      expect(
+        NotificationService.shouldAdvanceBaseline(
+          firstRun: true,
+          inQuietHours: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('non-quiet advances (disabled toggle drops, no replay)', () {
+      expect(
+        NotificationService.shouldAdvanceBaseline(
+          firstRun: false,
+          inQuietHours: false,
+        ),
+        isTrue,
+      );
+    });
+  });
 }
