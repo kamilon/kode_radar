@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'token_store.dart';
 import 'token_health_service.dart';
+import 'token_health_store.dart';
 import 'add_edit_token_page.dart';
 
 /// Lists the stored access tokens grouped by provider and lets the user add,
@@ -17,9 +20,21 @@ class _ManageTokensPageState extends State<ManageTokensPage> {
   List<TokenInfo> _tokens = [];
   bool _isLoading = true;
 
-  /// The latest verification result per token id, and which are in flight.
-  final Map<String, TokenCheck> _checks = {};
+  /// The last known verification result per token id (persisted across
+  /// sessions), and which tokens are being verified right now.
+  final Map<String, StoredTokenCheck> _checks = {};
   final Set<String> _checking = {};
+
+  /// A per-token generation counter. Each verify captures the current value and
+  /// only applies/persists its result if the value still matches — so a check
+  /// that was superseded by a new verify, an edit, or a delete is discarded,
+  /// even across the async windows those actions span.
+  final Map<String, int> _verifyGen = {};
+
+  /// Invalidates any in-flight check for [tokenId] (bumps its generation).
+  void _invalidateCheck(String tokenId) {
+    _verifyGen[tokenId] = (_verifyGen[tokenId] ?? 0) + 1;
+  }
 
   @override
   void initState() {
@@ -29,9 +44,13 @@ class _ManageTokensPageState extends State<ManageTokensPage> {
 
   Future<void> _load() async {
     final tokens = await TokenStore.getTokens();
+    final stored = await TokenHealthStore.all();
     if (!mounted) return;
     setState(() {
       _tokens = tokens;
+      _checks
+        ..clear()
+        ..addAll(stored);
       _isLoading = false;
     });
   }
@@ -52,9 +71,12 @@ class _ManageTokensPageState extends State<ManageTokensPage> {
       MaterialPageRoute(builder: (_) => AddEditTokenPage(existing: token)),
     );
     if (saved == true) {
-      // The secret may have changed, so drop the stale verification result.
+      // The secret may have changed, so invalidate any in-flight check and
+      // drop the stale verification result.
+      _invalidateCheck(token.id);
       _checks.remove(token.id);
       _checking.remove(token.id);
+      await TokenHealthStore.remove(token.id);
       await _load();
     }
   }
@@ -86,7 +108,11 @@ class _ManageTokensPageState extends State<ManageTokensPage> {
     );
     if (confirmed != true) return;
 
+    // Invalidate any in-flight check now, before the async delete window, so a
+    // check completing during it can't re-create the removed entry.
+    _invalidateCheck(token.id);
     await TokenStore.deleteToken(token.id);
+    await TokenHealthStore.remove(token.id);
     await _load();
     if (!mounted) return;
     setState(() {
@@ -99,17 +125,37 @@ class _ManageTokensPageState extends State<ManageTokensPage> {
   }
 
   Future<void> _verify(TokenInfo token) async {
+    // Take this check's generation; a later verify/edit/delete bumps it and
+    // supersedes us.
+    final gen = (_verifyGen[token.id] ?? 0) + 1;
+    _verifyGen[token.id] = gen;
     setState(() {
       _checking.add(token.id);
       _checks.remove(token.id);
     });
     final result = await TokenHealthService.check(token);
-    // Discard a superseded check: _edit (secret changed) and _delete both drop
-    // the id from _checking, so a stale in-flight result must not be applied.
-    if (!mounted || !_checking.contains(token.id)) return;
+    // Only the most recent request for this token may apply/persist its result
+    // — a superseded check must not be applied or persisted (else it would
+    // resurface on the next open).
+    if (!mounted || _verifyGen[token.id] != gen) return;
+    final now = DateTime.now();
+    // Fire-and-forget the persist, but swallow a storage failure so it can't
+    // surface as an unhandled async error.
+    unawaited(
+      TokenHealthStore.record(
+        token.id,
+        result,
+        now: now,
+      ).catchError((Object _) {}),
+    );
     setState(() {
       _checking.remove(token.id);
-      _checks[token.id] = result;
+      _checks[token.id] = StoredTokenCheck(
+        health: result.health,
+        checkedAt: now,
+        account: result.account,
+        message: result.message,
+      );
     });
   }
 
@@ -253,11 +299,17 @@ class _ManageTokensPageState extends State<ManageTokensPage> {
     );
   }
 
-  Widget _buildCheckStatus(TokenCheck check) {
+  Widget _buildCheckStatus(StoredTokenCheck check) {
+    // A stored "authenticated" result only reflects the moment it was checked;
+    // after a while the token may have been revoked, so de-emphasize old
+    // successes rather than implying current validity.
+    final stale =
+        check.health == TokenHealth.valid &&
+        DateTime.now().difference(check.checkedAt) > const Duration(hours: 24);
     final (IconData icon, Color color, String text) = switch (check.health) {
       TokenHealth.valid => (
-        Icons.check_circle,
-        Colors.green,
+        stale ? Icons.help_outline : Icons.check_circle,
+        stale ? Colors.grey : Colors.green,
         check.account == null || check.account!.isEmpty
             ? 'Authenticated'
             : 'Authenticated as ${check.account}',
@@ -273,15 +325,33 @@ class _ManageTokensPageState extends State<ManageTokensPage> {
         check.message ?? 'The check could not be completed.',
       ),
     };
+    final suffix = stale
+        ? ' · checked ${_relativeTime(check.checkedAt)} (may be out of date)'
+        : ' · checked ${_relativeTime(check.checkedAt)}';
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 16, color: color),
         const SizedBox(width: 6),
         Expanded(
-          child: Text(text, style: TextStyle(color: color)),
+          child: Text('$text$suffix', style: TextStyle(color: color)),
         ),
       ],
     );
+  }
+
+  static String _relativeTime(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) {
+      final m = diff.inMinutes;
+      return '$m minute${m == 1 ? '' : 's'} ago';
+    }
+    if (diff.inHours < 24) {
+      final h = diff.inHours;
+      return '$h hour${h == 1 ? '' : 's'} ago';
+    }
+    final d = diff.inDays;
+    return '$d day${d == 1 ? '' : 's'} ago';
   }
 }
