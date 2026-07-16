@@ -586,31 +586,70 @@ class ActivityFeedService {
       'Accept': 'application/vnd.github+json',
     };
 
+    const maxEventPages = 3;
     final events = await _guard('GitHub events', repoDisplay, () async {
-      final response = await client
-          .get(
-            Uri.https('api.github.com', '/repos/$owner/$name/events', {
-              'per_page': '100',
-            }),
-            headers: headers,
-          )
-          .timeout(_requestTimeout);
-      if (response.statusCode != 200) return _FetchOutcome.failure;
-      final body = jsonDecode(response.body);
-      if (body is! List) return const _FetchOutcome(<ActivityEvent>[]);
+      final collected = <dynamic>[];
+      var page = 1;
+      var truncated = false;
+      var pageFailed = false;
+      while (true) {
+        final http.Response response;
+        try {
+          response = await client
+              .get(
+                Uri.https('api.github.com', '/repos/$owner/$name/events', {
+                  'per_page': '100',
+                  'page': '$page',
+                }),
+                headers: headers,
+              )
+              .timeout(_requestTimeout);
+        } catch (e) {
+          // Page 1 total failure → let _guard record it; a later page keeps
+          // what we already have and marks the source partial.
+          if (collected.isEmpty) rethrow;
+          pageFailed = true;
+          break;
+        }
+        if (response.statusCode != 200) {
+          if (collected.isEmpty) return _FetchOutcome.failure;
+          pageFailed = true;
+          break;
+        }
+        final dynamic body;
+        try {
+          body = jsonDecode(response.body);
+        } catch (e) {
+          if (collected.isEmpty) rethrow;
+          pageFailed = true;
+          break;
+        }
+        if (body is! List) break;
+        collected.addAll(body);
+        if (body.length < 100) break; // last page reached
+        // Only stop when the whole page is already out of window (its NEWEST
+        // event predates `since`). This doesn't rely on strict cross-page
+        // ordering, so timestamp inversions can't drop in-window events.
+        final newest = _newestDate(
+          body,
+          (e) => e is Map ? _parseDate(e['created_at']) : null,
+        );
+        if (newest != null && newest.isBefore(since)) break;
+        if (page >= maxEventPages) {
+          truncated = true; // in-window events may remain beyond the page cap
+          break;
+        }
+        page++;
+      }
       return _FetchOutcome(
         githubEventsToActivity(
           repoDisplay: repoDisplay,
           repoKey: repoKey,
-          events: body,
+          events: collected,
           selfGithubLogins: selfGithubLogins,
         ),
-        truncated: _truncatedByWindow(
-          body,
-          100,
-          since,
-          (e) => e is Map ? _parseDate(e['created_at']) : null,
-        ),
+        failedCount: pageFailed ? 1 : 0,
+        truncated: truncated || pageFailed,
       );
     });
 
@@ -811,16 +850,39 @@ class ActivityFeedService {
     DateTime? Function(dynamic item) dateOf,
   ) {
     if (page is! List || page.length < cap) return false;
-    DateTime? oldest;
-    for (final item in page) {
-      final date = dateOf(item);
-      if (date == null) continue;
-      if (oldest == null || date.isBefore(oldest)) oldest = date;
-    }
+    final oldest = _oldestDate(page, dateOf);
     // Only assert truncation when provable: an unknown oldest date (all items
     // unparseable) is treated as not truncated.
     if (oldest == null) return false;
     return !oldest.isBefore(since);
+  }
+
+  /// The oldest parseable date among [items], or null if none parse.
+  static DateTime? _oldestDate(
+    List<dynamic> items,
+    DateTime? Function(dynamic item) dateOf,
+  ) {
+    DateTime? oldest;
+    for (final item in items) {
+      final date = dateOf(item);
+      if (date == null) continue;
+      if (oldest == null || date.isBefore(oldest)) oldest = date;
+    }
+    return oldest;
+  }
+
+  /// The newest parseable date among [items], or null if none parse.
+  static DateTime? _newestDate(
+    List<dynamic> items,
+    DateTime? Function(dynamic item) dateOf,
+  ) {
+    DateTime? newest;
+    for (final item in items) {
+      final date = dateOf(item);
+      if (date == null) continue;
+      if (newest == null || date.isAfter(newest)) newest = date;
+    }
+    return newest;
   }
 
   static ActivityEvent _adoPrEvent({
