@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'activity_service.dart';
 import 'app_http.dart';
 import 'metric_store.dart';
+import 'repo_detail_page.dart';
 import 'sparkline.dart';
 
 class RadarPage extends StatefulWidget {
@@ -179,8 +179,11 @@ class _RadarPageState extends State<RadarPage> {
                 ],
               ),
             ),
-            trailing: const Icon(Icons.open_in_new),
-            onTap: () => _openRepo(activity),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => RepoDetailPage(repo: activity)),
+            ),
           ),
         );
       },
@@ -272,27 +275,5 @@ class _RadarPageState extends State<RadarPage> {
     final text = shown.join(', ');
     if (extra <= 0) return text;
     return '$text, +$extra';
-  }
-
-  Future<void> _openRepo(RepoActivity activity) async {
-    final uri = Uri.tryParse(activity.url);
-    if (uri == null) return;
-
-    final canLaunch = await canLaunchUrl(uri);
-    if (!mounted) return;
-    if (!canLaunch) {
-      _showLaunchError(activity.displayName);
-      return;
-    }
-
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!mounted) return;
-    if (!launched) _showLaunchError(activity.displayName);
-  }
-
-  void _showLaunchError(String displayName) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Could not open $displayName')));
   }
 }

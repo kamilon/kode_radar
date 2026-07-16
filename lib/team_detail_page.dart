@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'activity_event.dart';
 import 'activity_event_list.dart';
 import 'activity_feed_service.dart';
 import 'activity_service.dart';
 import 'app_http.dart';
+import 'repo_detail_page.dart';
 import 'team.dart';
 import 'team_service.dart';
 
@@ -209,8 +209,11 @@ class _TeamDetailPageState extends State<TeamDetailPage> {
           fontSize: 12,
         ),
       ),
-      trailing: const Icon(Icons.open_in_new, size: 16),
-      onTap: () => _open(repo.url),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => RepoDetailPage(repo: repo)),
+      ),
     );
   }
 
@@ -274,28 +277,5 @@ class _TeamDetailPageState extends State<TeamDetailPage> {
   String _relativeTime(DateTime? value) {
     if (value == null) return 'no activity';
     return activityRelativeTime(value);
-  }
-
-  Future<void> _open(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null) {
-      _showOpenError(url);
-      return;
-    }
-    final canLaunch = await canLaunchUrl(uri);
-    if (!mounted) return;
-    if (!canLaunch) {
-      _showOpenError(url);
-      return;
-    }
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!mounted) return;
-    if (!launched) _showOpenError(url);
-  }
-
-  void _showOpenError(String url) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Could not open $url')));
   }
 }
