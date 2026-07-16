@@ -26,27 +26,27 @@ void main() {
     // Verify that the app title is displayed
     expect(find.text('Kode Radar Home Page'), findsOneWidget);
 
-    // Verify that the manage tokens and manage repositories actions are present
-    expect(find.byIcon(Icons.vpn_key), findsOneWidget);
-    expect(find.byIcon(Icons.folder_open), findsOneWidget);
-
-    // Verify that the attention inbox action is present
+    // Primary actions are shown as icons.
     expect(find.byIcon(Icons.inbox), findsOneWidget);
+    expect(find.byIcon(Icons.dynamic_feed), findsOneWidget);
+    expect(find.byIcon(Icons.radar), findsOneWidget);
+    expect(find.byIcon(Icons.search), findsOneWidget);
 
-    // Verify that the Teams action is present
-    expect(find.byIcon(Icons.groups), findsOneWidget);
-
-    // Verify that the appearance (theme) action is present
-    expect(find.byIcon(Icons.brightness_6), findsOneWidget);
+    // Secondary actions live in the overflow menu.
+    expect(find.byIcon(Icons.more_vert), findsOneWidget);
 
     // Verify that the add button is present
     expect(find.byIcon(Icons.add), findsOneWidget);
   });
 
-  testWidgets('Teams page can be opened', (WidgetTester tester) async {
+  testWidgets('Teams page can be opened from the overflow menu', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const MyApp());
 
-    await tester.tap(find.byIcon(Icons.groups));
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Teams'));
     await tester.pumpAndSettle();
 
     // Navigated to the Teams page; empty state since no teams are configured.
@@ -70,12 +70,16 @@ void main() {
     );
   });
 
-  testWidgets('Manage Tokens page can be opened', (WidgetTester tester) async {
+  testWidgets('Manage Tokens page can be opened from the overflow menu', (
+    WidgetTester tester,
+  ) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const MyApp());
 
-    // Tap the manage tokens icon
-    await tester.tap(find.byIcon(Icons.vpn_key));
+    // Open the overflow menu, then the manage tokens item.
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Manage tokens'));
     await tester.pumpAndSettle();
 
     // Verify that we navigated to the manage tokens page

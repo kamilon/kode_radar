@@ -10,6 +10,7 @@ import 'radar_page.dart';
 import 'attention_inbox_page.dart';
 import 'activity_feed_page.dart';
 import 'work_items_page.dart';
+import 'search_page.dart';
 import 'preferences_page.dart';
 import 'people_page.dart';
 import 'teams_page.dart';
@@ -691,16 +692,6 @@ class _MyHomePageState extends State<MyHomePage>
             },
           ),
           IconButton(
-            icon: const Icon(Icons.assignment_turned_in),
-            tooltip: 'Assigned to you',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const WorkItemsPage()),
-              );
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.radar),
             tooltip: 'Radar',
             onPressed: () async {
@@ -711,47 +702,28 @@ class _MyHomePageState extends State<MyHomePage>
             },
           ),
           IconButton(
-            icon: const Icon(Icons.people),
-            tooltip: 'People',
+            icon: const Icon(Icons.search),
+            tooltip: 'Search',
             onPressed: () async {
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const PeoplePage()),
+                MaterialPageRoute(builder: (_) => const SearchPage()),
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.groups),
-            tooltip: 'Teams',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TeamsPage()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.vpn_key),
-            tooltip: 'Manage tokens',
-            onPressed: _openManageTokens,
-          ),
-          IconButton(
-            icon: const Icon(Icons.folder_open),
-            tooltip: 'Manage repositories',
-            onPressed: _openManageRepos,
-          ),
-          IconButton(
-            icon: const Icon(Icons.brightness_6),
-            tooltip: 'Appearance',
-            onPressed: _showAppearancePicker,
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: 'Settings',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const PreferencesPage()),
-            ),
+          PopupMenuButton<String>(
+            tooltip: 'More',
+            onSelected: _onMenuSelected,
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'work', child: Text('Assigned to you')),
+              PopupMenuItem(value: 'people', child: Text('People')),
+              PopupMenuItem(value: 'teams', child: Text('Teams')),
+              PopupMenuDivider(),
+              PopupMenuItem(value: 'tokens', child: Text('Manage tokens')),
+              PopupMenuItem(value: 'repos', child: Text('Manage repositories')),
+              PopupMenuItem(value: 'appearance', child: Text('Appearance')),
+              PopupMenuItem(value: 'settings', child: Text('Settings')),
+            ],
           ),
         ],
         bottom: TabBar(
@@ -823,6 +795,44 @@ class _MyHomePageState extends State<MyHomePage>
 
   Future<void> _openManageRepos() async {
     await _openRepoPage(const ManageReposPage());
+  }
+
+  Future<void> _onMenuSelected(String value) async {
+    switch (value) {
+      case 'work':
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const WorkItemsPage()),
+        );
+        break;
+      case 'people':
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const PeoplePage()),
+        );
+        break;
+      case 'teams':
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TeamsPage()),
+        );
+        break;
+      case 'tokens':
+        await _openManageTokens();
+        break;
+      case 'repos':
+        await _openManageRepos();
+        break;
+      case 'appearance':
+        await _showAppearancePicker();
+        break;
+      case 'settings':
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const PreferencesPage()),
+        );
+        break;
+    }
   }
 
   Future<void> _showAppearancePicker() async {

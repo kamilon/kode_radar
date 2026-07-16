@@ -146,9 +146,7 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              _repo.contributors.isEmpty
-                  ? 'No recent contributors'
-                  : _repo.contributors.take(6).join(', '),
+              _contributorsText(),
               style: const TextStyle(fontSize: 12),
               overflow: TextOverflow.ellipsis,
             ),
@@ -156,6 +154,22 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
         ],
       ),
     );
+  }
+
+  /// Contributors derived from the loaded open PRs (their authors), so the
+  /// header is correct regardless of how this screen was reached (e.g. from
+  /// search, where the passed reference carries no contributors). Falls back to
+  /// the reference's contributors before the first load completes.
+  String _contributorsText() {
+    final fromPulls = <String>{
+      for (final pr in _data.pulls)
+        if (pr.author.isNotEmpty) pr.author,
+    };
+    final contributors = fromPulls.isNotEmpty
+        ? fromPulls.toList()
+        : _repo.contributors;
+    if (contributors.isEmpty) return 'No recent contributors';
+    return contributors.take(6).join(', ');
   }
 
   Widget _buildPullsTab() {

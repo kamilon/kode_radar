@@ -23,6 +23,27 @@ class RepoActivity {
     this.error,
   });
 
+  /// A lightweight reference used purely for navigation (e.g. from search).
+  /// The detail screen re-fetches everything via `repoKey`/`provider`.
+  factory RepoActivity.reference({
+    required String repoKey,
+    required String provider,
+    required String displayName,
+    required String url,
+  }) => RepoActivity(
+    repoKey: repoKey,
+    provider: provider,
+    displayName: displayName,
+    url: url,
+    openPrCount: 0,
+    needsReviewCount: 0,
+    oldestOpenPrAgeDays: null,
+    lastActivity: null,
+    ciStatus: 'unknown',
+    contributors: const [],
+    activityScore: 0,
+  );
+
   final String repoKey;
   final String provider;
   final String displayName;
