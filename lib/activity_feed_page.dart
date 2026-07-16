@@ -6,6 +6,7 @@ import 'activity_feed_service.dart';
 import 'app_http.dart';
 import 'identity_store.dart';
 import 'preferences_store.dart';
+import 'saved_view_store.dart';
 import 'seen_store.dart';
 import 'team.dart';
 import 'team_store.dart';
@@ -139,6 +140,130 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
     return _visibleEvents.where((e) => e.occurredAt.isAfter(since)).length;
   }
 
+  void _applyView(SavedView view) {
+    setState(() {
+      // Keep only groups that still exist (tolerate a renamed/removed group).
+      _groups
+        ..clear()
+        ..addAll(view.groups.where(ActivityType.groups.contains));
+      final teamId = view.teamId;
+      if (teamId != null &&
+          _teams.isNotEmpty &&
+          !_teams.any((t) => t.id == teamId)) {
+        _teamId = null; // the team was deleted
+      } else {
+        _teamId = teamId; // keep as-is (also when teams haven't loaded yet)
+      }
+      _mineOnly = view.mineOnly;
+    });
+  }
+
+  Future<void> _openSavedViews() async {
+    final views = await SavedViewStore.list();
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.add),
+              title: const Text('Save current filters as a view…'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _saveCurrentView();
+              },
+            ),
+            if (views.isNotEmpty) const Divider(height: 1),
+            for (final view in views)
+              ListTile(
+                leading: const Icon(Icons.bookmark_outline),
+                title: Text(view.name),
+                subtitle: Text(_viewSummary(view)),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: 'Delete',
+                  onPressed: () async {
+                    await SavedViewStore.delete(view.id);
+                    if (sheetContext.mounted) Navigator.pop(sheetContext);
+                  },
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _applyView(view);
+                },
+              ),
+            if (views.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('No saved views yet.'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveCurrentView() async {
+    final controller = TextEditingController();
+    try {
+      final name = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Save view'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Name'),
+            onSubmitted: (value) => Navigator.pop(dialogContext, value),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, controller.text),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      );
+      if (name == null || name.trim().isEmpty) return;
+      await SavedViewStore.add(
+        name: name,
+        groups: {..._groups},
+        teamId: _teamId,
+        mineOnly: _mineOnly,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Saved view "${name.trim()}"')));
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  String _viewSummary(SavedView view) {
+    final parts = <String>[];
+    if (view.groups.isEmpty) {
+      parts.add('All kinds');
+    } else {
+      parts.add(view.groups.map(ActivityType.groupLabel).join(', '));
+    }
+    if (view.teamId != null) {
+      final team = _teams.firstWhere(
+        (t) => t.id == view.teamId,
+        orElse: () => const Team(id: '', name: 'a team'),
+      );
+      parts.add('team: ${team.name}');
+    }
+    if (view.mineOnly) parts.add('mine');
+    return parts.join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -153,6 +278,11 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
             onPressed: _loading
                 ? null
                 : () => setState(() => _mineOnly = !_mineOnly),
+          ),
+          IconButton(
+            icon: const Icon(Icons.bookmarks_outlined),
+            tooltip: 'Saved views',
+            onPressed: _loading ? null : _openSavedViews,
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
