@@ -328,6 +328,16 @@ class MetricStore {
         }
         if (snapshots.isNotEmpty) histories[key] = snapshots;
       }
+      // A non-empty payload that yields zero usable snapshots is treated as
+      // malformed (wrong shape/field types) so it's retained for later recovery
+      // rather than marked imported and deleted. A genuinely empty `{}` map is
+      // valid (nothing to import).
+      if (histories.isEmpty && decoded.isNotEmpty) {
+        return (
+          _LegacyDecodeStatus.invalid,
+          const <String, List<MetricSnapshot>>{},
+        );
+      }
       return (_LegacyDecodeStatus.valid, histories);
     } catch (e) {
       debugPrint('MetricStore failed to decode legacy $storageKey: $e');

@@ -284,6 +284,26 @@ void main() {
       await badDb.close();
     },
   );
+
+  test(
+    'legacy history with only unparseable entries is retained, not deleted',
+    () async {
+      // Valid JSON map, but every snapshot has the wrong shape (int `at`), so
+      // nothing decodes — the blob must be kept rather than marked imported.
+      const raw =
+          '{"github:owner/legacy":[{"at":0,"openPrs":1,'
+          '"needsReview":0,"activityScore":1}]}';
+      SharedPreferences.setMockInitialValues({'metric_history': raw});
+      final badDb = AppDatabase.forExecutor(NativeDatabase.memory());
+      MetricStore.debugUseDatabase(badDb);
+
+      expect(await MetricStore.all(), isEmpty);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('metric_history'), raw);
+
+      await badDb.close();
+    },
+  );
 }
 
 RepoActivity _activity(
