@@ -38,7 +38,7 @@ class MetricStore {
   // make the "monitored" read in `capture` atomic with its insert relative to
   // `removeRepo` — i.e. a delete can't interleave between a capture reading the
   // monitored set and writing its snapshot.
-  static Future<void> _lock = Future<void>.value();
+  static Future<void> _lock = SynchronousFuture<void>(null);
 
   static Future<T> _runLocked<T>(Future<T> Function() action) {
     final result = _lock.then((_) => action());
@@ -49,11 +49,14 @@ class MetricStore {
   static AppDatabase get _database => _db ??= AppDatabase();
 
   /// Test hook: back the store with an injected (e.g. in-memory) database and
-  /// reset the one-time migration guard.
+  /// reset the one-time migration guard and the mutation lock, so each injected
+  /// database starts from a clean serialization state (a pending/errored lock
+  /// chain left by a prior test can't stall the next one).
   @visibleForTesting
   static void debugUseDatabase(AppDatabase db) {
     _db = db;
     _migration = null;
+    _lock = SynchronousFuture<void>(null);
   }
 
   static bool shouldCapture(DateTime? lastAt, DateTime now) =>
