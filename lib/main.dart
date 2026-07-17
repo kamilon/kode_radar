@@ -193,10 +193,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _updateTimer?.cancel(); // Cancel the timer when the widget is disposed
-    _autoAddTimer?.cancel();
-    _autoAddInitialTimer?.cancel();
+    _cancelPollingTimers(); // Stop all polling when the widget is disposed.
     super.dispose();
+  }
+
+  void _cancelPollingTimers() {
+    _updateTimer?.cancel();
+    _updateTimer = null;
+    _autoAddInitialTimer?.cancel();
+    _autoAddInitialTimer = null;
+    _autoAddTimer?.cancel();
+    _autoAddTimer = null;
   }
 
   void _startLiveUpdates({bool foreground = true}) {
@@ -236,11 +243,22 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (_lifecyclePolicy.isBackground(state)) {
+    if (state == AppLifecycleState.detached) {
+      _enterDetached();
+    } else if (_lifecyclePolicy.isBackground(state)) {
       _enterBackground();
     } else if (_lifecyclePolicy.isForeground(state)) {
       _enterForeground();
     }
+  }
+
+  void _enterDetached() {
+    // The engine detached the view (app terminating, or before the first frame
+    // at launch). Stop all network activity regardless of platform, and mark
+    // the app backgrounded so a later resume restarts polling.
+    _backgrounded = true;
+    _backgroundedAt ??= DateTime.now();
+    _cancelPollingTimers();
   }
 
   void _enterBackground() {
@@ -250,12 +268,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (_lifecyclePolicy.suspendsInBackground) {
       // Mobile: the OS suspends the process, so stop all polling (including the
       // one-shot startup discovery). We refresh deliberately on resume instead.
-      _updateTimer?.cancel();
-      _updateTimer = null;
-      _autoAddInitialTimer?.cancel();
-      _autoAddInitialTimer = null;
-      _autoAddTimer?.cancel();
-      _autoAddTimer = null;
+      _cancelPollingTimers();
     } else {
       // Desktop tray app: keep delivering notifications, but slow the attention
       // poll to the background cadence to spare the API rate limit. Auto-add
@@ -296,9 +309,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Future<void> _runAutoAdd() async {
     if (_autoAddRunning) return; // Skip if a pass is already in flight.
     _autoAddRunning = true;
-    _didInitialAutoAdd = true;
     try {
       final added = await AutoAddService.run();
+      // Mark the startup discovery done only once a pass actually completes, so
+      // a failed pass still re-arms the one-shot startup discovery on the next
+      // resume rather than deferring to the periodic tick.
+      _didInitialAutoAdd = true;
       if (added > 0 && mounted) {
         // Newly discovered repos: refresh the surfaces now; the next poll
         // picks up any attention items they contain.
