@@ -11,11 +11,13 @@ import 'ci_grid_view.dart';
 import 'contributor_cloud_view.dart';
 import 'donut_view.dart';
 import 'freshness_view.dart';
+import 'health_gauge_view.dart';
 import 'heatmap_view.dart';
 import 'provider_split_view.dart';
 import 'pulse_view.dart';
 import 'quadrant_view.dart';
 import 'repo_table_view.dart';
+import 'stacked_area_view.dart';
 import 'team_radar_view.dart';
 import 'treemap_view.dart';
 import 'trend_lines_view.dart';
@@ -43,6 +45,12 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       blurb: 'Headline counters + aggregate trend',
       icon: Icons.speed,
       builder: (d) => PulseView(data: d),
+    ),
+    ViewInfo(
+      title: 'Fleet health',
+      blurb: 'Composite health score gauge',
+      icon: Icons.health_and_safety,
+      builder: (d) => HealthGaugeView(data: d),
     ),
     ViewInfo(
       title: 'Bubble chart',
@@ -91,6 +99,12 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       blurb: 'Overlaid activity trend lines',
       icon: Icons.show_chart,
       builder: (d) => TrendLinesView(data: d),
+    ),
+    ViewInfo(
+      title: 'Stacked activity',
+      blurb: 'Who drives momentum over time',
+      icon: Icons.area_chart,
+      builder: (d) => StackedAreaView(data: d),
     ),
     ViewInfo(
       title: 'Team radar',

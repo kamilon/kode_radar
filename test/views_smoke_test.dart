@@ -10,11 +10,13 @@ import 'package:kode_radar/views/ci_grid_view.dart';
 import 'package:kode_radar/views/contributor_cloud_view.dart';
 import 'package:kode_radar/views/donut_view.dart';
 import 'package:kode_radar/views/freshness_view.dart';
+import 'package:kode_radar/views/health_gauge_view.dart';
 import 'package:kode_radar/views/heatmap_view.dart';
 import 'package:kode_radar/views/provider_split_view.dart';
 import 'package:kode_radar/views/pulse_view.dart';
 import 'package:kode_radar/views/quadrant_view.dart';
 import 'package:kode_radar/views/repo_table_view.dart';
+import 'package:kode_radar/views/stacked_area_view.dart';
 import 'package:kode_radar/views/team_radar_view.dart';
 import 'package:kode_radar/views/treemap_view.dart';
 import 'package:kode_radar/views/trend_lines_view.dart';
@@ -106,6 +108,7 @@ void main() {
 
   final views = <String, Widget Function(InsightsData)>{
     'Pulse': (d) => PulseView(data: d),
+    'HealthGauge': (d) => HealthGaugeView(data: d),
     'Bubble': (d) => BubbleView(data: d),
     'Quadrant': (d) => QuadrantView(data: d),
     'Donut': (d) => DonutView(data: d),
@@ -114,6 +117,7 @@ void main() {
     'AgeHistogram': (d) => AgeHistogramView(data: d),
     'Heatmap': (d) => HeatmapView(data: d),
     'TrendLines': (d) => TrendLinesView(data: d),
+    'StackedArea': (d) => StackedAreaView(data: d),
     'TeamRadar': (d) => TeamRadarView(data: d),
     'Freshness': (d) => FreshnessView(data: d),
     'Contributors': (d) => ContributorCloudView(data: d),
