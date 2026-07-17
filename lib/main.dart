@@ -158,7 +158,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Timer? _autoAddTimer; // Timer for the auto-add discovery pass.
   Timer? _autoAddInitialTimer; // One-shot startup auto-add pass.
   bool _autoAddRunning = false; // Guards against overlapping auto-add passes.
-  bool _didInitialAutoAdd = false; // Whether the startup discovery has run.
+  bool _hasCompletedAutoAdd =
+      false; // Whether at least one auto-add pass has completed.
 
   static const Duration _autoAddStartupDelay = Duration(seconds: 8);
 
@@ -297,10 +298,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       _startAutoAddPeriodic();
       if (_lifecyclePolicy.shouldRunAutoAddOnResume(backgroundedFor)) {
         _runAutoAdd();
-      } else if (!_didInitialAutoAdd) {
-        // We backgrounded before the startup discovery ran (e.g. within the
-        // first few seconds of launch); re-arm it so discovery isn't deferred
-        // to the next periodic tick.
+      } else if (!_hasCompletedAutoAdd) {
+        // Mobile only (the timers were cancelled above): no discovery has
+        // completed yet — e.g. we backgrounded within the first seconds of
+        // launch — so re-arm the startup one-shot rather than waiting for the
+        // next periodic tick.
         _scheduleInitialAutoAdd();
       }
     }
@@ -311,10 +313,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     _autoAddRunning = true;
     try {
       final added = await AutoAddService.run();
-      // Mark the startup discovery done only once a pass actually completes, so
-      // a failed pass still re-arms the one-shot startup discovery on the next
-      // resume rather than deferring to the periodic tick.
-      _didInitialAutoAdd = true;
+      // Record that a pass completed (only after run() succeeds). After a mobile
+      // suspension this stops us re-arming the startup one-shot once discovery
+      // has run at least once; a failed pass leaves it false so it retries on
+      // the next resume.
+      _hasCompletedAutoAdd = true;
       if (added > 0 && mounted) {
         // Newly discovered repos: refresh the surfaces now; the next poll
         // picks up any attention items they contain.
