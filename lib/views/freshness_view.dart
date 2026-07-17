@@ -17,8 +17,9 @@ class FreshnessView extends StatelessWidget {
         final da = daysSince(a.lastActivity, now: now);
         final db = daysSince(b.lastActivity, now: now);
         // Nulls (never any activity) sort last.
-        if (da == null && db == null)
+        if (da == null && db == null) {
           return a.displayName.compareTo(b.displayName);
+        }
         if (da == null) return 1;
         if (db == null) return -1;
         return db.compareTo(da);

@@ -8,9 +8,13 @@ import '../team_store.dart';
 import 'age_histogram_view.dart';
 import 'bubble_view.dart';
 import 'ci_grid_view.dart';
+import 'contributor_cloud_view.dart';
+import 'donut_view.dart';
 import 'freshness_view.dart';
 import 'heatmap_view.dart';
+import 'provider_split_view.dart';
 import 'pulse_view.dart';
+import 'quadrant_view.dart';
 import 'repo_table_view.dart';
 import 'team_radar_view.dart';
 import 'treemap_view.dart';
@@ -45,6 +49,18 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       blurb: 'PR age × count, sized by activity',
       icon: Icons.bubble_chart,
       builder: (d) => BubbleView(data: d),
+    ),
+    ViewInfo(
+      title: 'Triage quadrant',
+      blurb: 'Staleness × load, 2×2 triage',
+      icon: Icons.grid_goldenratio,
+      builder: (d) => QuadrantView(data: d),
+    ),
+    ViewInfo(
+      title: 'Open PR split',
+      blurb: 'Donut of PRs by repo',
+      icon: Icons.donut_large,
+      builder: (d) => DonutView(data: d),
     ),
     ViewInfo(
       title: 'CI health',
@@ -87,6 +103,18 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       blurb: 'What went quiet, ranked',
       icon: Icons.local_fire_department,
       builder: (d) => FreshnessView(data: d),
+    ),
+    ViewInfo(
+      title: 'Contributors',
+      blurb: 'Who is active across repos',
+      icon: Icons.groups_2,
+      builder: (d) => ContributorCloudView(data: d),
+    ),
+    ViewInfo(
+      title: 'Provider split',
+      blurb: 'GitHub vs Azure DevOps',
+      icon: Icons.compare_arrows,
+      builder: (d) => ProviderSplitView(data: d),
     ),
     ViewInfo(
       title: 'Repo table',
