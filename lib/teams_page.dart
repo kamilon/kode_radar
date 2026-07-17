@@ -45,7 +45,7 @@ class _TeamsPageState extends State<TeamsPage> {
         client: AppHttp.client,
       );
       // Record a trend snapshot from this load too (deduped ~1/day).
-      await MetricStore.capture(activities);
+      await MetricStore.capture(activities, restrictToMonitored: true);
       final rollups = TeamService.rollupAll(teams, activities);
       final history = await MetricStore.all();
       final series = <String, List<num>>{

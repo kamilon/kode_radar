@@ -7,9 +7,12 @@ import 'register_github_repo.dart';
 import 'register_ado_repo.dart';
 import 'ignore_store.dart';
 import 'manage_ignored_page.dart';
+import 'metric_store.dart';
+import 'monitored_repos.dart';
 import 'repo_discovery_page.dart';
 import 'repo_discovery_service.dart';
 import 'repo_store.dart';
+import 'team_store.dart';
 import 'token_store.dart';
 
 enum _DeleteChoice { cancel, remove, removeAndIgnore }
@@ -99,7 +102,12 @@ class _ManageReposPageState extends State<ManageReposPage> {
     await _loadRepos();
   }
 
-  String? _ignoreKeyFor(bool github, Map<String, String> repo) {
+  /// The canonical key for a repo, in the shared `github:owner/name` /
+  /// `ado:org/project/name` form produced by [RepoDiscoveryService]. It matches
+  /// the ignore-list key as well as the `RepoActivity` / `MetricStore` / team
+  /// repo key, so it is reused both to ignore a repo and to prune its derived
+  /// data on delete. Returns null for invalid/incomplete entries.
+  String? _repoKeyFor(bool github, Map<String, String> repo) {
     if (repo.containsKey('_invalid')) return null;
     if (github) {
       final owner = repo['owner'];
@@ -173,13 +181,26 @@ class _ManageReposPageState extends State<ManageReposPage> {
     required bool github,
     required Map<String, String> repo,
   }) async {
-    final ignoreKey = _ignoreKeyFor(github, repo);
-    final choice = await _confirmDelete(label, canIgnore: ignoreKey != null);
+    final repoKey = _repoKeyFor(github, repo);
+    final choice = await _confirmDelete(label, canIgnore: repoKey != null);
     if (choice == _DeleteChoice.cancel) return;
-    if (choice == _DeleteChoice.removeAndIgnore && ignoreKey != null) {
-      await _removeAndIgnore(storageKey, index, ignoreKey);
+    if (choice == _DeleteChoice.removeAndIgnore && repoKey != null) {
+      await _removeAndIgnore(storageKey, index, repoKey);
     } else {
       await _deleteRepoAt(storageKey, index);
+    }
+    // Prune data derived from this repo so a removed repo doesn't linger in
+    // trend history or team assignments as a stale, otherwise-unbounded key.
+    // Skip pruning when a duplicate entry still resolves to the same canonical
+    // key, so shared data isn't removed out from under the surviving entry.
+    if (repoKey != null) {
+      final stillMonitored = (await listMonitoredRepos()).any(
+        (monitored) => monitored.repoKey == repoKey,
+      );
+      if (!stillMonitored) {
+        await MetricStore.removeRepo(repoKey);
+        await TeamStore.removeRepoFromAll(repoKey);
+      }
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

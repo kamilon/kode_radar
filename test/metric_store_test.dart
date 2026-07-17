@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kode_radar/activity_service.dart';
 import 'package:kode_radar/metric_store.dart';
@@ -127,6 +129,57 @@ void main() {
     );
     expect(await MetricStore.seriesFor('github:owner/repo'), [3.5, 6.5]);
   });
+
+  test('removeRepo drops history for the given repo only', () async {
+    final now = DateTime.utc(2026, 1, 1, 12);
+
+    await MetricStore.capture([
+      _activity('github:owner/one', openPrCount: 1),
+      _activity('github:owner/two', openPrCount: 2),
+    ], now: now);
+
+    await MetricStore.removeRepo('github:owner/one');
+
+    final all = await MetricStore.all();
+    expect(all.keys, {'github:owner/two'});
+    expect(await MetricStore.historyFor('github:owner/one'), isEmpty);
+  });
+
+  test('removeRepo is a no-op for unknown or blank keys', () async {
+    final now = DateTime.utc(2026, 1, 1, 12);
+    await MetricStore.capture([_activity('github:owner/one')], now: now);
+
+    await MetricStore.removeRepo('github:owner/missing');
+    await MetricStore.removeRepo('  ');
+
+    expect((await MetricStore.all()).keys, {'github:owner/one'});
+  });
+
+  test(
+    'capture with restrictToMonitored skips repos no longer monitored',
+    () async {
+      final now = DateTime.utc(2026, 1, 1, 12);
+      SharedPreferences.setMockInitialValues({
+        'github_repos': [
+          jsonEncode({'owner': 'owner', 'repoName': 'one'}),
+        ],
+      });
+
+      // Simulates an in-flight fetch (computed before a repo was removed) trying
+      // to re-insert history for a repo that is no longer monitored.
+      await MetricStore.capture(
+        [
+          _activity('github:owner/one', openPrCount: 1),
+          _activity('github:owner/gone', openPrCount: 2),
+        ],
+        now: now,
+        restrictToMonitored: true,
+      );
+
+      final all = await MetricStore.all();
+      expect(all.keys, {'github:owner/one'});
+    },
+  );
 }
 
 RepoActivity _activity(

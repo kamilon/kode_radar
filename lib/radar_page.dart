@@ -56,7 +56,7 @@ class _RadarPageState extends State<RadarPage> {
       );
       if (!mounted || seq != _loadSeq) return;
       // Record a trend snapshot (deduped ~1/day), then load per-repo series.
-      await MetricStore.capture(activities);
+      await MetricStore.capture(activities, restrictToMonitored: true);
       final history = await MetricStore.all();
       if (!mounted || seq != _loadSeq) return;
       setState(() {

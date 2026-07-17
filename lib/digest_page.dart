@@ -37,7 +37,7 @@ class _DigestPageState extends State<DigestPage> {
       );
       // Record a trend snapshot from this load too (deduped ~1/day) before
       // reading history, so the digest reflects the latest observation.
-      await MetricStore.capture(activities);
+      await MetricStore.capture(activities, restrictToMonitored: true);
       final history = await MetricStore.all();
       final digest = DigestService.buildDigest(
         teams: teams,
