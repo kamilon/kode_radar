@@ -79,6 +79,27 @@ class TeamStore {
     });
   }
 
+  /// Removes [repoKey] from every team's repo set (e.g. after the repo is
+  /// removed from monitoring) so deleted repos don't linger in team
+  /// assignments. Only writes when something actually changed.
+  static Future<void> removeRepoFromAll(String repoKey) {
+    final key = repoKey.trim();
+    if (key.isEmpty) return Future<void>.value();
+    return _runLocked(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final teams = _readFrom(prefs);
+      var changed = false;
+      for (var index = 0; index < teams.length; index++) {
+        if (!teams[index].repoKeys.contains(key)) continue;
+        teams[index] = teams[index].copyWith(
+          repoKeys: teams[index].repoKeys.where((k) => k != key).toSet(),
+        );
+        changed = true;
+      }
+      if (changed) await _writeTo(prefs, teams);
+    });
+  }
+
   static List<Team> _readFrom(SharedPreferences prefs) {
     final raw = prefs.getString(_teamsKey);
     if (raw == null || raw.trim().isEmpty) return <Team>[];

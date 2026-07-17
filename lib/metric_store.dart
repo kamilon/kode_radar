@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'activity_service.dart';
 import 'metric_snapshot.dart';
+import 'monitored_repos.dart';
+import 'repo_store.dart';
 
 class MetricStore {
   MetricStore._();
@@ -25,15 +27,37 @@ class MetricStore {
   static bool shouldCapture(DateTime? lastAt, DateTime now) =>
       lastAt == null || now.difference(lastAt) >= minCaptureInterval;
 
-  static Future<void> capture(List<RepoActivity> activities, {DateTime? now}) {
+  /// Appends one snapshot per repo in [activities] (deduped to ~1/day).
+  ///
+  /// When [restrictToMonitored] is true, the currently-persisted repo lists are
+  /// re-read inside the lock and any activity whose repo is no longer monitored
+  /// is skipped. This closes a race where a screen's in-flight fetch (computed
+  /// before the user removed a repo) would otherwise re-insert the just-pruned
+  /// history key. It is safe in the normal case because `activities` is itself
+  /// derived from the monitored repos.
+  static Future<void> capture(
+    List<RepoActivity> activities, {
+    DateTime? now,
+    bool restrictToMonitored = false,
+  }) {
     final capturedAt = (now ?? DateTime.now()).toUtc();
     return runLocked(() async {
       final prefs = await SharedPreferences.getInstance();
       final histories = _readFrom(prefs);
       var changed = false;
 
+      final Set<String>? monitored = restrictToMonitored
+          ? parseMonitoredRepos(
+              prefs.getStringList(RepoStore.githubKey) ?? const <String>[],
+              prefs.getStringList(RepoStore.adoKey) ?? const <String>[],
+            ).map((repo) => repo.repoKey).toSet()
+          : null;
+
       for (final activity in activities) {
         if (activity.error != null) {
+          continue;
+        }
+        if (monitored != null && !monitored.contains(activity.repoKey)) {
           continue;
         }
 
@@ -61,6 +85,21 @@ class MetricStore {
       }
 
       if (changed) {
+        await _writeTo(prefs, histories);
+      }
+    });
+  }
+
+  /// Drops all captured history for [repoKey] (e.g. after the repo is removed
+  /// from monitoring) so deleted repos don't linger as unbounded stale keys.
+  /// Only writes when a history actually existed for the key.
+  static Future<void> removeRepo(String repoKey) {
+    final key = repoKey.trim();
+    if (key.isEmpty) return Future<void>.value();
+    return runLocked(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final histories = _readFrom(prefs);
+      if (histories.remove(key) != null) {
         await _writeTo(prefs, histories);
       }
     });
