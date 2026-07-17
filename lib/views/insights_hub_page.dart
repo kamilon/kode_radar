@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../activity_service.dart';
 import '../app_http.dart';
 import '../metric_store.dart';
+import '../people_service.dart';
 import '../team_service.dart';
 import '../team_store.dart';
 import 'age_histogram_view.dart';
@@ -17,6 +18,7 @@ import 'provider_split_view.dart';
 import 'pulse_view.dart';
 import 'quadrant_view.dart';
 import 'repo_table_view.dart';
+import 'review_load_view.dart';
 import 'stacked_area_view.dart';
 import 'team_radar_view.dart';
 import 'treemap_view.dart';
@@ -125,6 +127,12 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       builder: (d) => ContributorCloudView(data: d),
     ),
     ViewInfo(
+      title: 'Review load',
+      blurb: 'Who can unblock whom',
+      icon: Icons.rate_review,
+      builder: (d) => ReviewLoadView(data: d),
+    ),
+    ViewInfo(
       title: 'Provider split',
       blurb: 'GitHub vs Azure DevOps',
       icon: Icons.compare_arrows,
@@ -157,6 +165,7 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       final history = await MetricStore.all();
       final teams = await TeamStore.list();
       final rollups = TeamService.rollupAll(teams, activities);
+      final people = await PeopleService.computeAll(client: AppHttp.client);
       if (!mounted || seq != _loadSeq) return;
       setState(() {
         _data = InsightsData(
@@ -164,6 +173,7 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
           history: history,
           teams: teams,
           rollups: rollups,
+          people: people,
           loadedAt: DateTime.now(),
         );
         _loading = false;

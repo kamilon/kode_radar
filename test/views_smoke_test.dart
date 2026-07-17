@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kode_radar/activity_service.dart';
 import 'package:kode_radar/metric_snapshot.dart';
+import 'package:kode_radar/person.dart';
 import 'package:kode_radar/team.dart';
 import 'package:kode_radar/team_service.dart';
 import 'package:kode_radar/views/age_histogram_view.dart';
@@ -16,6 +17,7 @@ import 'package:kode_radar/views/provider_split_view.dart';
 import 'package:kode_radar/views/pulse_view.dart';
 import 'package:kode_radar/views/quadrant_view.dart';
 import 'package:kode_radar/views/repo_table_view.dart';
+import 'package:kode_radar/views/review_load_view.dart';
 import 'package:kode_radar/views/stacked_area_view.dart';
 import 'package:kode_radar/views/team_radar_view.dart';
 import 'package:kode_radar/views/treemap_view.dart';
@@ -92,6 +94,23 @@ InsightsData _sampleData() {
     history: history,
     teams: teams,
     rollups: TeamService.rollupAll(teams, activities),
+    people: [
+      Person(
+        key: 'github:alice',
+        displayName: 'Alice',
+        githubLogins: const {'alice'},
+        authoredOpenPrs: 3,
+        reviewRequests: 5,
+        isSelf: true,
+      ),
+      Person(
+        key: 'github:bob',
+        displayName: 'Bob',
+        githubLogins: const {'bob'},
+        authoredOpenPrs: 1,
+        reviewRequests: 2,
+      ),
+    ],
     loadedAt: DateTime.now(),
   );
 }
@@ -103,6 +122,7 @@ void main() {
     history: const {},
     teams: const [],
     rollups: const {},
+    people: const [],
     loadedAt: DateTime.now(),
   );
 
@@ -121,6 +141,7 @@ void main() {
     'TeamRadar': (d) => TeamRadarView(data: d),
     'Freshness': (d) => FreshnessView(data: d),
     'Contributors': (d) => ContributorCloudView(data: d),
+    'ReviewLoad': (d) => ReviewLoadView(data: d),
     'ProviderSplit': (d) => ProviderSplitView(data: d),
     'RepoTable': (d) => RepoTableView(data: d),
   };

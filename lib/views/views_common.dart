@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../activity_service.dart';
 import '../metric_snapshot.dart';
+import '../person.dart';
 import '../team.dart';
 import '../team_service.dart';
 
@@ -14,6 +15,7 @@ class InsightsData {
     required this.history,
     required this.teams,
     required this.rollups,
+    required this.people,
     required this.loadedAt,
   });
 
@@ -21,6 +23,7 @@ class InsightsData {
   final Map<String, List<MetricSnapshot>> history;
   final List<Team> teams;
   final Map<String, TeamRollup> rollups;
+  final List<Person> people;
   final DateTime loadedAt;
 
   /// Repos whose fetch succeeded (errored repos would read as healthy zeros).
