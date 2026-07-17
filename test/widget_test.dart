@@ -1,15 +1,26 @@
 // Widget tests for the home navigation shell.
 
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:kode_radar/database/app_database.dart';
 import 'package:kode_radar/main.dart';
+import 'package:kode_radar/metric_store.dart';
 
 void main() {
+  late AppDatabase db;
+
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({});
+    db = AppDatabase.forExecutor(NativeDatabase.memory());
+    MetricStore.debugUseDatabase(db);
+  });
+
+  tearDown(() async {
+    await db.close();
   });
 
   // Pin a narrow surface so the shell renders the bottom NavigationBar (a wide

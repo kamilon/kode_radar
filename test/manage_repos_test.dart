@@ -1,16 +1,26 @@
 import 'dart:convert';
 
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:kode_radar/database/app_database.dart';
 import 'package:kode_radar/manage_repos_page.dart';
 import 'package:kode_radar/metric_store.dart';
 import 'package:kode_radar/team_store.dart';
 
 void main() {
+  late AppDatabase db;
+
   setUp(() {
     FlutterSecureStorage.setMockInitialValues({});
+    db = AppDatabase.forExecutor(NativeDatabase.memory());
+    MetricStore.debugUseDatabase(db);
+  });
+
+  tearDown(() async {
+    await db.close();
   });
 
   testWidgets('lists registered GitHub and ADO repositories', (
@@ -46,7 +56,12 @@ void main() {
       'ado_repos': <String>[],
       'metric_history': jsonEncode({
         repoKey: [
-          {'at': 0, 'openPrs': 1, 'needsReview': 0, 'activityScore': 1},
+          {
+            'at': DateTime.utc(2026, 1, 1).toIso8601String(),
+            'openPrs': 1,
+            'needsReview': 0,
+            'activityScore': 1,
+          },
         ],
       }),
       'teams': jsonEncode([

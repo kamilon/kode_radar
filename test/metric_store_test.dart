@@ -1,15 +1,25 @@
 import 'dart:convert';
 
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kode_radar/activity_service.dart';
+import 'package:kode_radar/database/app_database.dart';
 import 'package:kode_radar/metric_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  late AppDatabase db;
+
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    db = AppDatabase.forExecutor(NativeDatabase.memory());
+    MetricStore.debugUseDatabase(db);
+  });
+
+  tearDown(() async {
+    await db.close();
   });
 
   test('shouldCapture honors the minimum capture interval', () {
@@ -178,6 +188,88 @@ void main() {
 
       final all = await MetricStore.all();
       expect(all.keys, {'github:owner/one'});
+    },
+  );
+
+  test(
+    'imports legacy metric_history from SharedPreferences on first use',
+    () async {
+      // Seed a pre-database history blob, then point the store at a fresh db so
+      // the one-time migration runs against it.
+      SharedPreferences.setMockInitialValues({
+        'metric_history': jsonEncode({
+          'github:owner/legacy': [
+            {
+              'at': DateTime.utc(2026, 1, 1).toIso8601String(),
+              'openPrs': 2,
+              'needsReview': 1,
+              'activityScore': 3,
+            },
+            {
+              'at': DateTime.utc(2026, 1, 2).toIso8601String(),
+              'openPrs': 4,
+              'needsReview': 0,
+              'activityScore': 5,
+            },
+          ],
+        }),
+      });
+      final legacyDb = AppDatabase.forExecutor(NativeDatabase.memory());
+      MetricStore.debugUseDatabase(legacyDb);
+
+      final history = await MetricStore.historyFor('github:owner/legacy');
+      expect(history.map((snapshot) => snapshot.openPrs), [2, 4]);
+
+      // The legacy blob is cleared once the import has committed.
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('metric_history'), isNull);
+
+      await legacyDb.close();
+    },
+  );
+
+  test(
+    're-running migration against the same db does not duplicate rows',
+    () async {
+      final legacy = jsonEncode({
+        'github:owner/legacy': [
+          {
+            'at': DateTime.utc(2026, 1, 1).toIso8601String(),
+            'openPrs': 2,
+            'needsReview': 1,
+            'activityScore': 3,
+          },
+        ],
+      });
+      SharedPreferences.setMockInitialValues({'metric_history': legacy});
+      final migDb = AppDatabase.forExecutor(NativeDatabase.memory());
+      MetricStore.debugUseDatabase(migDb);
+      expect(await MetricStore.historyFor('github:owner/legacy'), hasLength(1));
+
+      // Simulate a later launch against the already-migrated db, even if the blob
+      // somehow reappears: the in-DB marker must prevent a second import.
+      SharedPreferences.setMockInitialValues({'metric_history': legacy});
+      MetricStore.debugUseDatabase(migDb);
+      expect(await MetricStore.historyFor('github:owner/legacy'), hasLength(1));
+
+      await migDb.close();
+    },
+  );
+
+  test(
+    'malformed legacy metric_history is retained, not imported or deleted',
+    () async {
+      SharedPreferences.setMockInitialValues({'metric_history': 'not-json{'});
+      final badDb = AppDatabase.forExecutor(NativeDatabase.memory());
+      MetricStore.debugUseDatabase(badDb);
+
+      expect(await MetricStore.all(), isEmpty);
+
+      // The unparseable blob is preserved so it isn't silently discarded.
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('metric_history'), 'not-json{');
+
+      await badDb.close();
     },
   );
 }
