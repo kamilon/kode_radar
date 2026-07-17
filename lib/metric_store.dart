@@ -242,23 +242,36 @@ class MetricStore {
   static Future<void> _ensureMigrated() => _migration ??= _migrate();
 
   static Future<void> _migrate() async {
-    final db = _database;
     final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(storageKey);
+    final (status, legacy) = _decodeLegacy(raw);
 
-    // The completion marker lives in the DB, so a crash between committing the
-    // imported rows and clearing the legacy key can never re-import.
-    if (await _isImported(db)) {
-      await prefs.remove(storageKey);
-      return;
-    }
-
-    final (status, legacy) = _decodeLegacy(prefs.getString(storageKey));
     if (status == _LegacyDecodeStatus.invalid) {
       // Malformed input: leave the blob untouched (don't mark imported, don't
       // delete) so it isn't silently discarded and a later version can retry.
       debugPrint(
         'MetricStore: legacy $storageKey is malformed; skipping import.',
       );
+      return;
+    }
+
+    if (legacy.isEmpty) {
+      // Nothing to import (absent, or an empty `{}` payload). Do NOT set the
+      // imported marker — otherwise a real payload that appears later (e.g.
+      // after a SharedPreferences restore) would be deleted without importing.
+      // Just clear a stray empty key if one is present.
+      if (raw != null) await prefs.remove(storageKey);
+      return;
+    }
+
+    final db = _database;
+
+    // The completion marker lives in the DB, so a crash between committing the
+    // imported rows and clearing the legacy key can never re-import. If the
+    // marker already exists, a reappeared blob is a duplicate (or crash
+    // leftover): clear it without re-importing.
+    if (await _isImported(db)) {
+      await prefs.remove(storageKey);
       return;
     }
 

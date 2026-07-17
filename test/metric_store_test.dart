@@ -304,6 +304,37 @@ void main() {
       await badDb.close();
     },
   );
+
+  test(
+    'legacy history that appears after an empty first run is imported',
+    () async {
+      // First run with no legacy data must NOT mark the import as done.
+      SharedPreferences.setMockInitialValues({});
+      final db = AppDatabase.forExecutor(NativeDatabase.memory());
+      MetricStore.debugUseDatabase(db);
+      expect(await MetricStore.all(), isEmpty);
+
+      // A later launch (same db) finds a restored metric_history blob: it should
+      // still be imported rather than deleted as "already migrated".
+      SharedPreferences.setMockInitialValues({
+        'metric_history': jsonEncode({
+          'github:owner/restored': [
+            {
+              'at': DateTime.utc(2026, 1, 1).toIso8601String(),
+              'openPrs': 7,
+              'needsReview': 0,
+              'activityScore': 7,
+            },
+          ],
+        }),
+      });
+      MetricStore.debugUseDatabase(db);
+      final history = await MetricStore.historyFor('github:owner/restored');
+      expect(history.map((snapshot) => snapshot.openPrs), [7]);
+
+      await db.close();
+    },
+  );
 }
 
 RepoActivity _activity(
