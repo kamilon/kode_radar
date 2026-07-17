@@ -34,7 +34,6 @@ class PollingLifecyclePolicy {
   /// OS suspends the process, so polling is fully paused.
   final bool keepPollingInBackground;
 
-  /// Whether [state] means the app is effectively backgrounded and polling
   /// Whether [state] means the app is backgrounded (not visible) and polling
   /// should be suspended or slowed.
   ///

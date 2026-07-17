@@ -158,6 +158,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Timer? _autoAddTimer; // Timer for the auto-add discovery pass.
   Timer? _autoAddInitialTimer; // One-shot startup auto-add pass.
   bool _autoAddRunning = false; // Guards against overlapping auto-add passes.
+  bool _didInitialAutoAdd = false; // Whether the startup discovery has run.
+
+  static const Duration _autoAddStartupDelay = Duration(seconds: 8);
 
   late final PollingLifecyclePolicy _lifecyclePolicy = PollingLifecyclePolicy(
     keepPollingInBackground: _isDesktopPlatform,
@@ -207,8 +210,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   void _startAutoAdd() {
     // Run shortly after startup (once the initial load has settled), then on a
     // longer interval than the live-data poll.
-    _autoAddInitialTimer = Timer(const Duration(seconds: 8), _runAutoAdd);
+    _scheduleInitialAutoAdd();
     _startAutoAddPeriodic();
+  }
+
+  void _scheduleInitialAutoAdd() {
+    _autoAddInitialTimer?.cancel();
+    _autoAddInitialTimer = Timer(_autoAddStartupDelay, _runAutoAdd);
   }
 
   void _startAutoAddPeriodic() {
@@ -276,6 +284,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       _startAutoAddPeriodic();
       if (_lifecyclePolicy.shouldRunAutoAddOnResume(backgroundedFor)) {
         _runAutoAdd();
+      } else if (!_didInitialAutoAdd) {
+        // We backgrounded before the startup discovery ran (e.g. within the
+        // first few seconds of launch); re-arm it so discovery isn't deferred
+        // to the next periodic tick.
+        _scheduleInitialAutoAdd();
       }
     }
   }
@@ -283,6 +296,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Future<void> _runAutoAdd() async {
     if (_autoAddRunning) return; // Skip if a pass is already in flight.
     _autoAddRunning = true;
+    _didInitialAutoAdd = true;
     try {
       final added = await AutoAddService.run();
       if (added > 0 && mounted) {
