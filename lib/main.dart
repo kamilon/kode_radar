@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:tray_manager/tray_manager.dart';
+import 'package:window_manager/window_manager.dart';
+
 import 'radar_page.dart';
 import 'attention_inbox_page.dart';
 import 'activity_feed_page.dart';
@@ -15,9 +19,6 @@ import 'snooze_store.dart';
 import 'notification_service.dart';
 import 'config_revision.dart';
 import 'polling_lifecycle.dart';
-import 'dart:async'; // Import for Timer
-import 'package:tray_manager/tray_manager.dart'; // Import tray_manager package
-import 'package:window_manager/window_manager.dart'; // Import window_manager package
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
