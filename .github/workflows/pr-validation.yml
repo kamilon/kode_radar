@@ -47,6 +47,9 @@ jobs:
       - name: Analyze project source
         run: flutter analyze --fatal-infos
 
+      - name: Install sqlite3 (drift tests)
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+
       - name: Run tests
         run: flutter test --coverage
 

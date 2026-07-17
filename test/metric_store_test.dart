@@ -1,15 +1,25 @@
 import 'dart:convert';
 
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kode_radar/activity_service.dart';
+import 'package:kode_radar/database/app_database.dart';
 import 'package:kode_radar/metric_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  late AppDatabase db;
+
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    db = AppDatabase.forExecutor(NativeDatabase.memory());
+    MetricStore.debugUseDatabase(db);
+  });
+
+  tearDown(() async {
+    await db.close();
   });
 
   test('shouldCapture honors the minimum capture interval', () {
@@ -178,6 +188,151 @@ void main() {
 
       final all = await MetricStore.all();
       expect(all.keys, {'github:owner/one'});
+    },
+  );
+
+  test(
+    'imports legacy metric_history from SharedPreferences on first use',
+    () async {
+      // Seed a pre-database history blob, then point the store at a fresh db so
+      // the one-time migration runs against it.
+      SharedPreferences.setMockInitialValues({
+        'metric_history': jsonEncode({
+          'github:owner/legacy': [
+            {
+              'at': DateTime.utc(2026, 1, 1).toIso8601String(),
+              'openPrs': 2,
+              'needsReview': 1,
+              'activityScore': 3,
+            },
+            {
+              'at': DateTime.utc(2026, 1, 2).toIso8601String(),
+              'openPrs': 4,
+              'needsReview': 0,
+              'activityScore': 5,
+            },
+          ],
+        }),
+      });
+      final legacyDb = AppDatabase.forExecutor(NativeDatabase.memory());
+      MetricStore.debugUseDatabase(legacyDb);
+
+      final history = await MetricStore.historyFor('github:owner/legacy');
+      expect(history.map((snapshot) => snapshot.openPrs), [2, 4]);
+
+      // The legacy blob is cleared once the import has committed.
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('metric_history'), isNull);
+
+      await legacyDb.close();
+    },
+  );
+
+  test(
+    're-running migration against the same db does not duplicate rows',
+    () async {
+      final legacy = jsonEncode({
+        'github:owner/legacy': [
+          {
+            'at': DateTime.utc(2026, 1, 1).toIso8601String(),
+            'openPrs': 2,
+            'needsReview': 1,
+            'activityScore': 3,
+          },
+        ],
+      });
+      SharedPreferences.setMockInitialValues({'metric_history': legacy});
+      final migDb = AppDatabase.forExecutor(NativeDatabase.memory());
+      MetricStore.debugUseDatabase(migDb);
+      expect(await MetricStore.historyFor('github:owner/legacy'), hasLength(1));
+
+      // Simulate a later launch against the already-migrated db, even if the blob
+      // somehow reappears: the in-DB marker must prevent a second import.
+      SharedPreferences.setMockInitialValues({'metric_history': legacy});
+      MetricStore.debugUseDatabase(migDb);
+      expect(await MetricStore.historyFor('github:owner/legacy'), hasLength(1));
+
+      await migDb.close();
+    },
+  );
+
+  test('concurrent captures dedup to a single snapshot per repo', () async {
+    final now = DateTime.utc(2026, 1, 1, 12);
+
+    await Future.wait([
+      MetricStore.capture([_activity('github:owner/one')], now: now),
+      MetricStore.capture([_activity('github:owner/one')], now: now),
+      MetricStore.capture([_activity('github:owner/one')], now: now),
+    ]);
+
+    expect(await MetricStore.historyFor('github:owner/one'), hasLength(1));
+  });
+
+  test(
+    'malformed legacy metric_history is retained, not imported or deleted',
+    () async {
+      SharedPreferences.setMockInitialValues({'metric_history': 'not-json{'});
+      final badDb = AppDatabase.forExecutor(NativeDatabase.memory());
+      MetricStore.debugUseDatabase(badDb);
+
+      expect(await MetricStore.all(), isEmpty);
+
+      // The unparseable blob is preserved so it isn't silently discarded.
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('metric_history'), 'not-json{');
+
+      await badDb.close();
+    },
+  );
+
+  test(
+    'legacy history with only unparseable entries is retained, not deleted',
+    () async {
+      // Valid JSON map, but every snapshot has the wrong shape (int `at`), so
+      // nothing decodes — the blob must be kept rather than marked imported.
+      const raw =
+          '{"github:owner/legacy":[{"at":0,"openPrs":1,'
+          '"needsReview":0,"activityScore":1}]}';
+      SharedPreferences.setMockInitialValues({'metric_history': raw});
+      final badDb = AppDatabase.forExecutor(NativeDatabase.memory());
+      MetricStore.debugUseDatabase(badDb);
+
+      expect(await MetricStore.all(), isEmpty);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('metric_history'), raw);
+
+      await badDb.close();
+    },
+  );
+
+  test(
+    'legacy history that appears after an empty first run is imported',
+    () async {
+      // First run with no legacy data must NOT mark the import as done.
+      SharedPreferences.setMockInitialValues({});
+      final db = AppDatabase.forExecutor(NativeDatabase.memory());
+      MetricStore.debugUseDatabase(db);
+      expect(await MetricStore.all(), isEmpty);
+
+      // A later launch (same db) finds a restored metric_history blob: it should
+      // still be imported rather than deleted as "already migrated".
+      SharedPreferences.setMockInitialValues({
+        'metric_history': jsonEncode({
+          'github:owner/restored': [
+            {
+              'at': DateTime.utc(2026, 1, 1).toIso8601String(),
+              'openPrs': 7,
+              'needsReview': 0,
+              'activityScore': 7,
+            },
+          ],
+        }),
+      });
+      MetricStore.debugUseDatabase(db);
+      final history = await MetricStore.historyFor('github:owner/restored');
+      expect(history.map((snapshot) => snapshot.openPrs), [7]);
+
+      await db.close();
     },
   );
 }
