@@ -256,6 +256,18 @@ void main() {
     },
   );
 
+  test('concurrent captures dedup to a single snapshot per repo', () async {
+    final now = DateTime.utc(2026, 1, 1, 12);
+
+    await Future.wait([
+      MetricStore.capture([_activity('github:owner/one')], now: now),
+      MetricStore.capture([_activity('github:owner/one')], now: now),
+      MetricStore.capture([_activity('github:owner/one')], now: now),
+    ]);
+
+    expect(await MetricStore.historyFor('github:owner/one'), hasLength(1));
+  });
+
   test(
     'malformed legacy metric_history is retained, not imported or deleted',
     () async {

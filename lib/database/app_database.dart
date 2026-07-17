@@ -50,7 +50,9 @@ class AppDatabase extends _$AppDatabase {
 
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
-    final dir = await getApplicationDocumentsDirectory();
+    // Application-support (not documents): this is an internal cache/DB, so it
+    // should not be user-visible or included in document backups.
+    final dir = await getApplicationSupportDirectory();
     final file = File(p.join(dir.path, 'kode_radar.sqlite'));
     return NativeDatabase.createInBackground(file);
   });

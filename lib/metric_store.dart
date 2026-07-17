@@ -33,6 +33,19 @@ class MetricStore {
   static AppDatabase? _db;
   static Future<void>? _migration;
 
+  // Serializes mutating operations (capture / removeRepo). drift already
+  // serializes transactions on the single connection, so this is primarily to
+  // make the "monitored" read in `capture` atomic with its insert relative to
+  // `removeRepo` — i.e. a delete can't interleave between a capture reading the
+  // monitored set and writing its snapshot.
+  static Future<void> _lock = Future<void>.value();
+
+  static Future<T> _runLocked<T>(Future<T> Function() action) {
+    final result = _lock.then((_) => action());
+    _lock = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
   static AppDatabase get _database => _db ??= AppDatabase();
 
   /// Test hook: back the store with an injected (e.g. in-memory) database and
@@ -62,45 +75,47 @@ class MetricStore {
     final capturedAt = (now ?? DateTime.now()).toUtc();
     await _ensureMigrated();
 
-    Iterable<RepoActivity> candidates = activities.where(
-      (activity) => activity.error == null,
-    );
-    if (restrictToMonitored) {
-      final prefs = await SharedPreferences.getInstance();
-      final monitored = parseMonitoredRepos(
-        prefs.getStringList(RepoStore.githubKey) ?? const <String>[],
-        prefs.getStringList(RepoStore.adoKey) ?? const <String>[],
-      ).map((repo) => repo.repoKey).toSet();
-      candidates = candidates.where(
-        (activity) => monitored.contains(activity.repoKey),
+    await _runLocked(() async {
+      Iterable<RepoActivity> candidates = activities.where(
+        (activity) => activity.error == null,
       );
-    }
-
-    final pending = candidates.toList();
-    if (pending.isEmpty) return;
-
-    final db = _database;
-    await db.transaction(() async {
-      for (final activity in pending) {
-        final lastAt = await _latestCapturedAt(db, activity.repoKey);
-        if (!shouldCapture(lastAt, capturedAt)) {
-          continue;
-        }
-
-        await db
-            .into(db.metricSnapshots)
-            .insert(
-              MetricSnapshotsCompanion.insert(
-                repoKey: activity.repoKey,
-                capturedAt: capturedAt.millisecondsSinceEpoch,
-                openPrs: activity.openPrCount,
-                needsReview: activity.needsReviewCount,
-                activityScore: activity.activityScore.toDouble(),
-              ),
-            );
-
-        await _pruneToMax(db, activity.repoKey);
+      if (restrictToMonitored) {
+        final prefs = await SharedPreferences.getInstance();
+        final monitored = parseMonitoredRepos(
+          prefs.getStringList(RepoStore.githubKey) ?? const <String>[],
+          prefs.getStringList(RepoStore.adoKey) ?? const <String>[],
+        ).map((repo) => repo.repoKey).toSet();
+        candidates = candidates.where(
+          (activity) => monitored.contains(activity.repoKey),
+        );
       }
+
+      final pending = candidates.toList();
+      if (pending.isEmpty) return;
+
+      final db = _database;
+      await db.transaction(() async {
+        for (final activity in pending) {
+          final lastAt = await _latestCapturedAt(db, activity.repoKey);
+          if (!shouldCapture(lastAt, capturedAt)) {
+            continue;
+          }
+
+          await db
+              .into(db.metricSnapshots)
+              .insert(
+                MetricSnapshotsCompanion.insert(
+                  repoKey: activity.repoKey,
+                  capturedAt: capturedAt.millisecondsSinceEpoch,
+                  openPrs: activity.openPrCount,
+                  needsReview: activity.needsReviewCount,
+                  activityScore: activity.activityScore.toDouble(),
+                ),
+              );
+
+          await _pruneToMax(db, activity.repoKey);
+        }
+      });
     });
   }
 
@@ -156,9 +171,11 @@ class MetricStore {
     final key = repoKey.trim();
     if (key.isEmpty) return;
     await _ensureMigrated();
-    await (_database.delete(
-      _database.metricSnapshots,
-    )..where((t) => t.repoKey.equals(key))).go();
+    await _runLocked(() async {
+      await (_database.delete(
+        _database.metricSnapshots,
+      )..where((t) => t.repoKey.equals(key))).go();
+    });
   }
 
   static Future<DateTime?> _latestCapturedAt(
