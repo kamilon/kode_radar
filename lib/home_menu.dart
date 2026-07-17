@@ -10,6 +10,7 @@ import 'teams_page.dart';
 import 'preferences_page.dart';
 import 'theme_controller.dart';
 import 'config_revision.dart';
+import 'views/insights_hub_page.dart';
 
 /// The shared "more" overflow menu shown on every home surface's app bar. It
 /// reaches the secondary destinations — work items, people, teams, repository
@@ -24,6 +25,7 @@ class HomeMenuButton extends StatelessWidget {
       tooltip: 'More',
       onSelected: (value) => _onSelected(context, value),
       itemBuilder: (context) => const [
+        PopupMenuItem(value: 'insights', child: Text('Insights (views)')),
         PopupMenuItem(value: 'work', child: Text('Assigned to you')),
         PopupMenuItem(value: 'people', child: Text('People')),
         PopupMenuItem(value: 'teams', child: Text('Teams')),
@@ -40,7 +42,11 @@ class HomeMenuButton extends StatelessWidget {
 
   void _onSelected(BuildContext context, String value) {
     final navigator = Navigator.of(context);
-    if (value == 'work') {
+    if (value == 'insights') {
+      navigator.push(
+        MaterialPageRoute(builder: (_) => const InsightsHubPage()),
+      );
+    } else if (value == 'work') {
       navigator.push(MaterialPageRoute(builder: (_) => const WorkItemsPage()));
     } else if (value == 'people') {
       _pushThenRefresh(navigator, const PeoplePage());
