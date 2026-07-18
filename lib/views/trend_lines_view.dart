@@ -54,9 +54,21 @@ class TrendLinesView extends StatelessWidget {
             )
           : Column(
               children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      scoreNote,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 16, 16, 8),
+                    padding: const EdgeInsets.fromLTRB(12, 8, 16, 8),
                     child: LayoutBuilder(
                       builder: (context, c) => CustomPaint(
                         size: Size(c.maxWidth, c.maxHeight),

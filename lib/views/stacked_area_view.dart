@@ -31,9 +31,11 @@ class StackedAreaView extends StatelessWidget {
     }
     final days = daySet.toList()..sort();
 
-    // Per-repo activity-by-day, ranked by total contribution; keep top 5 + rest.
+    // Per-repo activity-by-day keyed by repoKey (not the leaf name, which can
+    // collide across orgs), ranked by total contribution; keep top N + rest.
     final byRepo = <String, Map<DateTime, double>>{};
     final totals = <String, double>{};
+    final labels = <String, String>{};
     data.history.forEach((key, snaps) {
       final name =
           data.activities
@@ -41,6 +43,7 @@ class StackedAreaView extends StatelessWidget {
               .map((a) => a.displayName)
               .fold<String?>(null, (p, e) => p ?? e) ??
           key;
+      labels[key] = name.split('/').last;
       final map = <DateTime, double>{};
       var total = 0.0;
       for (final s in snaps) {
@@ -48,8 +51,8 @@ class StackedAreaView extends StatelessWidget {
         map[d] = (map[d] ?? 0) + s.activityScore.toDouble();
         total += s.activityScore.toDouble();
       }
-      byRepo[name.split('/').last] = map;
-      totals[name.split('/').last] = total;
+      byRepo[key] = map;
+      totals[key] = total;
     });
     final ranked = totals.keys.toList()
       ..sort((a, b) => totals[b]!.compareTo(totals[a]!));
@@ -58,12 +61,14 @@ class StackedAreaView extends StatelessWidget {
     // Build stacked layers (top repos, then "other").
     final layers = <_Layer>[];
     for (var i = 0; i < top.length; i++) {
-      layers.add(_Layer(top[i], byRepo[top[i]]!, _palette[i]));
+      layers.add(
+        _Layer(labels[top[i]] ?? top[i], byRepo[top[i]]!, _palette[i]),
+      );
     }
     if (ranked.length > top.length) {
       final other = <DateTime, double>{};
-      for (final name in ranked.skip(top.length)) {
-        byRepo[name]!.forEach((d, v) => other[d] = (other[d] ?? 0) + v);
+      for (final key in ranked.skip(top.length)) {
+        byRepo[key]!.forEach((d, v) => other[d] = (other[d] ?? 0) + v);
       }
       layers.add(_Layer('other', other, _palette.last));
     }
@@ -80,9 +85,21 @@ class StackedAreaView extends StatelessWidget {
             )
           : Column(
               children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      scoreNote,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 16, 16, 8),
+                    padding: const EdgeInsets.fromLTRB(12, 8, 16, 8),
                     child: LayoutBuilder(
                       builder: (context, c) => CustomPaint(
                         size: Size(c.maxWidth, c.maxHeight),

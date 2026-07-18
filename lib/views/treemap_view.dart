@@ -20,19 +20,39 @@ class TreemapView extends StatelessWidget {
       loadedAt: data.loadedAt,
       child: repos.isEmpty
           ? const ViewEmpty(message: 'No activity to lay out yet.')
-          : Padding(
-              padding: const EdgeInsets.all(8),
-              child: LayoutBuilder(
-                builder: (context, c) {
-                  final cells = _squarify(
-                    repos,
-                    Rect.fromLTWH(0, 0, c.maxWidth, c.maxHeight),
-                  );
-                  return Stack(
-                    children: [for (final cell in cells) _tile(context, cell)],
-                  );
-                },
-              ),
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Area = $scoreNote',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: LayoutBuilder(
+                      builder: (context, c) {
+                        final cells = _squarify(
+                          repos,
+                          Rect.fromLTWH(0, 0, c.maxWidth, c.maxHeight),
+                        );
+                        return Stack(
+                          children: [
+                            for (final cell in cells) _tile(context, cell),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
     );
   }
@@ -109,7 +129,9 @@ class TreemapView extends StatelessWidget {
       final left = items.sublist(0, split + 1);
       final right = items.sublist(split + 1);
       final leftVal = left.fold<double>(0, (s, a) => s + a.activityScore);
-      final frac = total == 0 ? 0.5 : (leftVal / total).clamp(0.1, 0.9);
+      // True proportional split (values are all > 0 here), so extreme ratios
+      // aren't flattened toward 50/50.
+      final frac = total == 0 ? 0.5 : leftVal / total;
       if (r.width >= r.height) {
         final w = r.width * frac;
         layout(left, Rect.fromLTWH(r.left, r.top, w, r.height));

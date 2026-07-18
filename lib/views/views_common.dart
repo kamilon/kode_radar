@@ -80,6 +80,12 @@ Future<void> openUrl(String url) async {
   }
 }
 
+/// Shown on views that encode `activityScore`, which is not raw activity: it
+/// also weights attention (failing CI and long-stuck PRs) so repos that need a
+/// human bubble up. Disclosed so "bigger/hotter" isn't read as pure activity.
+const String scoreNote =
+    'Score blends activity + attention (failing CI / stale PRs raise it).';
+
 // ---- Time helpers -----------------------------------------------------------
 
 int? daysSince(DateTime? value, {DateTime? now}) {

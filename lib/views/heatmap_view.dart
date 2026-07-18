@@ -61,7 +61,7 @@ class HeatmapView extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                   child: Text(
-                    'Activity score per day (${shownDays.length} days)',
+                    'Activity score per day (${shownDays.length} days). $scoreNote',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),

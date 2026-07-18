@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'views_common.dart';
@@ -15,15 +17,13 @@ class AgeHistogramView extends StatelessWidget {
         .where((a) => (a.oldestOpenPrAgeDays ?? -1) >= 0 && a.openPrCount > 0)
         .toList();
 
-    // Count of repos per bucket, and total open PRs per bucket.
+    // Count of repos whose OLDEST open PR falls in each age bucket.
     final repoCounts = <int, int>{};
-    final prCounts = <int, int>{};
     for (final a in withPrs) {
       final age = a.oldestOpenPrAgeDays ?? 0;
       for (var i = 0; i < ageBuckets.length; i++) {
         if (ageBuckets[i].contains(age)) {
           repoCounts[i] = (repoCounts[i] ?? 0) + 1;
-          prCounts[i] = (prCounts[i] ?? 0) + a.openPrCount;
           break;
         }
       }
@@ -35,35 +35,46 @@ class AgeHistogramView extends StatelessWidget {
       loadedAt: data.loadedAt,
       child: withPrs.isEmpty
           ? const ViewEmpty(message: 'No open PRs to bucket by age.')
-          : Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Repos by age of their oldest open PR',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 24),
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        for (var i = 0; i < ageBuckets.length; i++)
+          : LayoutBuilder(
+              builder: (context, c) {
+                // Keep a usable minimum chart height; scroll if the surface is
+                // shorter (e.g. a short desktop window) rather than overflowing.
+                final chartHeight = math.max(160.0, c.maxHeight);
+                return SingleChildScrollView(
+                  child: SizedBox(
+                    height: chartHeight,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Repos by age of their oldest open PR',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 24),
                           Expanded(
-                            child: _bar(
-                              context,
-                              bucket: ageBuckets[i],
-                              repos: repoCounts[i] ?? 0,
-                              prs: prCounts[i] ?? 0,
-                              fraction: (repoCounts[i] ?? 0) / maxRepo,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                for (var i = 0; i < ageBuckets.length; i++)
+                                  Expanded(
+                                    child: _bar(
+                                      context,
+                                      bucket: ageBuckets[i],
+                                      repos: repoCounts[i] ?? 0,
+                                      fraction: (repoCounts[i] ?? 0) / maxRepo,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
     );
   }
@@ -72,7 +83,6 @@ class AgeHistogramView extends StatelessWidget {
     BuildContext context, {
     required AgeBucket bucket,
     required int repos,
-    required int prs,
     required double fraction,
   }) {
     return Padding(
@@ -89,30 +99,31 @@ class AgeHistogramView extends StatelessWidget {
           const SizedBox(height: 4),
           Expanded(
             child: LayoutBuilder(
-              builder: (context, c) => Align(
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  height: repos == 0
-                      ? 2
-                      : (c.maxHeight * fraction).clamp(6.0, c.maxHeight),
-                  decoration: BoxDecoration(
-                    color: bucket.color.withValues(alpha: 0.85),
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(6),
+              builder: (context, c) {
+                // Guard clamp: on a very short surface c.maxHeight can be < the
+                // 6px min, which would make clamp(min, max) throw.
+                final maxH = c.maxHeight;
+                final minVisible = math.min(6.0, maxH);
+                final height = repos == 0
+                    ? math.min(2.0, maxH)
+                    : (maxH * fraction).clamp(minVisible, maxH);
+                return Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Container(
+                    height: height,
+                    decoration: BoxDecoration(
+                      color: bucket.color.withValues(alpha: 0.85),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(6),
+                      ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 6),
           Text(bucket.label, style: Theme.of(context).textTheme.labelMedium),
-          Text(
-            '$prs PRs',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
         ],
       ),
     );

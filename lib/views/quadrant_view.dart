@@ -72,34 +72,39 @@ class _QuadrantPainter extends CustomPainter {
     );
     if (plot.width <= 0 || plot.height <= 0) return;
 
+    // Axis maxima leave room for the fixed thresholds to sit inside the plot
+    // even for small datasets, so a single low-activity repo doesn't get pushed
+    // into "act now".
+    const staleThreshold = 7; // days quiet
+    const loadThreshold = 3; // open PRs
     final maxStale = math.max(
-      1,
+      staleThreshold * 2,
       repos
           .map((r) => daysSince(r.lastActivity, now: now) ?? 0)
           .fold<int>(1, math.max),
     );
     final maxLoad = math.max(
-      1,
+      loadThreshold * 2,
       repos.map((r) => r.openPrCount).fold<int>(1, math.max),
     );
 
-    // Quadrant divider thresholds (mid).
-    final midX = plot.left + plot.width / 2;
-    final midY = plot.top + plot.height / 2;
+    // Dividers at meaningful FIXED thresholds (not the visual midpoint).
+    final divX = plot.left + plot.width * (staleThreshold / maxStale);
+    final divY = plot.bottom - plot.height * (loadThreshold / maxLoad);
 
-    // Quadrant tints (top-right = act now = red).
+    // Quadrant tints (top-right = stale & loaded = act now = red).
     final tints = [
       (
-        Rect.fromLTRB(midX, plot.top, plot.right, midY),
+        Rect.fromLTRB(divX, plot.top, plot.right, divY),
         const Color(0x22C62828),
       ),
-      (Rect.fromLTRB(plot.left, plot.top, midX, midY), const Color(0x221565C0)),
+      (Rect.fromLTRB(plot.left, plot.top, divX, divY), const Color(0x221565C0)),
       (
-        Rect.fromLTRB(plot.left, midY, midX, plot.bottom),
+        Rect.fromLTRB(plot.left, divY, divX, plot.bottom),
         const Color(0x222E7D32),
       ),
       (
-        Rect.fromLTRB(midX, midY, plot.right, plot.bottom),
+        Rect.fromLTRB(divX, divY, plot.right, plot.bottom),
         const Color(0x22EF6C00),
       ),
     ];
@@ -110,8 +115,8 @@ class _QuadrantPainter extends CustomPainter {
     final divider = Paint()
       ..color = dividerColor
       ..strokeWidth = 1;
-    canvas.drawLine(Offset(midX, plot.top), Offset(midX, plot.bottom), divider);
-    canvas.drawLine(Offset(plot.left, midY), Offset(plot.right, midY), divider);
+    canvas.drawLine(Offset(divX, plot.top), Offset(divX, plot.bottom), divider);
+    canvas.drawLine(Offset(plot.left, divY), Offset(plot.right, divY), divider);
 
     // Corner labels.
     _text(
@@ -156,6 +161,7 @@ class _QuadrantPainter extends CustomPainter {
       TextAlign.right,
     );
 
+    var labelled = 0;
     for (final r in repos) {
       final stale = daysSince(r.lastActivity, now: now) ?? maxStale;
       final x = plot.left + plot.width * (stale / maxStale);
@@ -166,14 +172,21 @@ class _QuadrantPainter extends CustomPainter {
         5,
         Paint()..color = color.withValues(alpha: 0.7),
       );
-      _text(
-        canvas,
-        r.displayName.split('/').last,
-        Offset(x + 7, y - 6),
-        labelColor,
-        TextAlign.left,
-        9,
-      );
+      // Only label the actionable "act now" repos (stale AND loaded), capped,
+      // so a large fleet doesn't turn into an unreadable wall of text.
+      if (stale >= staleThreshold &&
+          r.openPrCount >= loadThreshold &&
+          labelled < 8) {
+        labelled++;
+        _text(
+          canvas,
+          r.displayName.split('/').last,
+          Offset(x + 7, y - 6),
+          labelColor,
+          TextAlign.left,
+          9,
+        );
+      }
     }
   }
 

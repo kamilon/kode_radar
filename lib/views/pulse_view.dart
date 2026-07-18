@@ -118,7 +118,7 @@ class PulseView extends StatelessWidget {
                         Text(
                           trend.length < 2
                               ? 'Trend builds up as snapshots accumulate over days.'
-                              : 'Total activity score across all repos per snapshot.',
+                              : 'Total activity score across all repos per snapshot. $scoreNote',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 color: Theme.of(

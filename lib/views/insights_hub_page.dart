@@ -159,13 +159,18 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       _error = null;
     });
     try {
-      final activities = await ActivityService.computeAll(
-        client: AppHttp.client,
-      );
+      // Run the two network passes concurrently so loading People doesn't
+      // serialize behind the repo activity fetch.
+      final (activities, people) = await (
+        ActivityService.computeAll(client: AppHttp.client),
+        PeopleService.computeAll(client: AppHttp.client),
+      ).wait;
+      // Record a trend snapshot from this load too (deduped ~1/day), matching
+      // Radar/Teams/Digest, so opening Insights also advances trend history.
+      await MetricStore.capture(activities, restrictToMonitored: true);
       final history = await MetricStore.all();
       final teams = await TeamStore.list();
       final rollups = TeamService.rollupAll(teams, activities);
-      final people = await PeopleService.computeAll(client: AppHttp.client);
       if (!mounted || seq != _loadSeq) return;
       setState(() {
         _data = InsightsData(

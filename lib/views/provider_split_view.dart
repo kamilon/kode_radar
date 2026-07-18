@@ -81,53 +81,63 @@ class ProviderSplitView extends StatelessWidget {
   }
 
   Widget _dualBar(BuildContext context, int gh, int ado) {
-    final total = (gh + ado).clamp(1, 1 << 30);
+    final total = gh + ado;
+    const ghColor = Color(0xFF24292F);
+    const adoColor = Color(0xFF0078D4);
     return Row(
       children: [
-        Expanded(
-          flex: gh == 0 ? 1 : gh,
-          child: _barSegment(context, gh, const Color(0xFF24292F), left: true),
-        ),
-        const SizedBox(width: 2),
-        Expanded(
-          flex: ado == 0 ? 1 : ado,
-          child: _barSegment(
-            context,
-            ado,
-            const Color(0xFF0078D4),
-            left: false,
+        SizedBox(
+          width: 30,
+          child: Text(
+            '$gh',
+            textAlign: TextAlign.right,
+            style: const TextStyle(color: ghColor, fontWeight: FontWeight.bold),
           ),
         ),
-        // Keep zero-segments from collapsing entirely on both sides.
-        if (total == 0) const SizedBox.shrink(),
-      ],
-    );
-  }
-
-  Widget _barSegment(
-    BuildContext context,
-    int value,
-    Color color, {
-    required bool left,
-  }) {
-    final radius = left
-        ? const BorderRadius.horizontal(left: Radius.circular(6))
-        : const BorderRadius.horizontal(right: Radius.circular(6));
-    return Container(
-      height: 30,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.8),
-        borderRadius: radius,
-      ),
-      alignment: left ? Alignment.centerLeft : Alignment.centerRight,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Text(
-        '$value',
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
+        const SizedBox(width: 8),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: SizedBox(
+              height: 22,
+              child: total == 0
+                  ? Container(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                    )
+                  : Row(
+                      children: [
+                        // flex 0 collapses a zero side, so proportions are true.
+                        Expanded(
+                          flex: gh,
+                          child: Container(
+                            color: ghColor.withValues(alpha: 0.85),
+                          ),
+                        ),
+                        Expanded(
+                          flex: ado,
+                          child: Container(
+                            color: adoColor.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
         ),
-      ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 30,
+          child: Text(
+            '$ado',
+            style: const TextStyle(
+              color: adoColor,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

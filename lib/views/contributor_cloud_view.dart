@@ -45,7 +45,9 @@ class ContributorCloudView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Active across repos (${entries.length} people)',
+                    'Open-PR authors, sized by how many repos they appear in '
+                    '(up to 5 tracked per repo). Collaboration signal — not a '
+                    'leaderboard. ${entries.length} people.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),

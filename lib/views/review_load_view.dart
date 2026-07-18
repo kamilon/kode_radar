@@ -150,11 +150,16 @@ class ReviewLoadView extends StatelessWidget {
   }
 
   String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'[\s/_-]+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '?';
+    final parts = name
+        .trim()
+        .split(RegExp(r'[\s/_-]+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
     if (parts.length == 1) {
-      return parts.first.substring(0, 1).toUpperCase();
+      return parts.first.characters.first.toUpperCase();
     }
-    return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+    return (parts[0].characters.first + parts[1].characters.first)
+        .toUpperCase();
   }
 }

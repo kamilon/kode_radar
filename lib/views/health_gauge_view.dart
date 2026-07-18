@@ -17,9 +17,11 @@ class HealthGaugeView extends StatelessWidget {
     final now = DateTime.now();
 
     // Each factor is a 0..1 score (1 = healthy).
-    final ci = repos.isEmpty
-        ? 1.0
-        : repos.where((a) => a.ciStatus != 'failure').length / repos.length;
+    // CI factor: pass rate among repos with a definitive result (success vs
+    // failure); unknown/running are excluded so all-unknown doesn't read as 100%.
+    final success = repos.where((a) => a.ciStatus == 'success').length;
+    final failure = repos.where((a) => a.ciStatus == 'failure').length;
+    final ci = (success + failure) == 0 ? 1.0 : success / (success + failure);
     final fresh = repos.isEmpty
         ? 1.0
         : repos.where((a) {

@@ -159,4 +159,103 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  // ---- Edge cases the reviewers called out --------------------------------
+
+  InsightsData bundle({
+    List<RepoActivity> activities = const [],
+    Map<String, List<MetricSnapshot>> history = const {},
+    List<Person> people = const [],
+  }) {
+    return InsightsData(
+      activities: activities,
+      history: history,
+      teams: const [],
+      rollups: const {},
+      people: people,
+      loadedAt: DateTime.now(),
+    );
+  }
+
+  testWidgets('AgeHistogram survives a very short surface', (tester) async {
+    tester.view.physicalSize = const Size(400, 120);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(home: AgeHistogramView(data: data)));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('StackedArea keeps repos with duplicate leaf names', (
+    tester,
+  ) async {
+    final dup = bundle(
+      activities: [
+        _activity('github:orgA/app', 'orgA/app'),
+        _activity('github:orgB/app', 'orgB/app'),
+      ],
+      history: {
+        'github:orgA/app': _series(3, 5),
+        'github:orgB/app': _series(3, 9),
+      },
+    );
+    await tester.pumpWidget(MaterialApp(home: StackedAreaView(data: dup)));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ReviewLoad handles odd display names', (tester) async {
+    final odd = bundle(
+      people: [
+        Person(key: 'a', displayName: 'bot_', reviewRequests: 1),
+        Person(key: 'b', displayName: 'team/', authoredOpenPrs: 2),
+        Person(key: 'c', displayName: 'Renée Doe', reviewRequests: 3),
+        Person(key: 'd', displayName: 'a-', reviewRequests: 1),
+        Person(key: 'e', displayName: '', reviewRequests: 1),
+      ],
+    );
+    await tester.pumpWidget(MaterialApp(home: ReviewLoadView(data: odd)));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ProviderSplit handles a single-provider fleet', (tester) async {
+    final ghOnly = bundle(
+      activities: [
+        _activity('github:o/a', 'o/a'),
+        _activity('github:o/b', 'o/b'),
+      ],
+    );
+    await tester.pumpWidget(MaterialApp(home: ProviderSplitView(data: ghOnly)));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('single-repo score views do not crash', (tester) async {
+    final one = bundle(
+      activities: [
+        _activity(
+          'github:o/solo',
+          'o/solo',
+          open: 1,
+          oldest: 1,
+          lastDaysAgo: 1,
+        ),
+      ],
+      history: {'github:o/solo': _series(1, 3)},
+    );
+    final builds = <Widget Function(InsightsData)>[
+      (d) => QuadrantView(data: d),
+      (d) => TreemapView(data: d),
+      (d) => DonutView(data: d),
+      (d) => BubbleView(data: d),
+      (d) => HealthGaugeView(data: d),
+    ];
+    for (final b in builds) {
+      await tester.pumpWidget(MaterialApp(home: b(one)));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    }
+  });
 }
