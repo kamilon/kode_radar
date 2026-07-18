@@ -120,16 +120,25 @@ class HeatmapView extends StatelessWidget {
             ),
           ),
           for (final d in days)
-            Container(
-              width: cell,
-              height: cell,
-              margin: const EdgeInsets.all(1),
-              decoration: BoxDecoration(
-                color: row.byDay.containsKey(d)
-                    ? heatColor((row.byDay[d]! / maxScore).clamp(0.05, 1.0))
-                    : Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(2),
-              ),
+            Builder(
+              builder: (context) {
+                final v = row.byDay[d];
+                // A day with a snapshot but zero activity reads as background
+                // (empty), not a faint colored cell — 0 activity != some
+                // activity. Only strictly-positive scores get a heat color.
+                final color = (v != null && v > 0)
+                    ? heatColor((v / maxScore).clamp(0.05, 1.0))
+                    : Theme.of(context).colorScheme.surfaceContainerHighest;
+                return Container(
+                  width: cell,
+                  height: cell,
+                  margin: const EdgeInsets.all(1),
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                );
+              },
             ),
         ],
       ),
