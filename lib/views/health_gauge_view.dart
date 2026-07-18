@@ -18,10 +18,14 @@ class HealthGaugeView extends StatelessWidget {
 
     // Each factor is a 0..1 score (1 = healthy).
     // CI factor: pass rate among repos with a definitive result (success vs
-    // failure); unknown/running are excluded so all-unknown doesn't read as 100%.
+    // failure). When NO repo has a definitive result it's omitted entirely (not
+    // defaulted to 1.0), so the score never reads as "100% CI passing" with no
+    // CI data.
     final success = repos.where((a) => a.ciStatus == 'success').length;
     final failure = repos.where((a) => a.ciStatus == 'failure').length;
-    final ci = (success + failure) == 0 ? 1.0 : success / (success + failure);
+    final double? ci = (success + failure) == 0
+        ? null
+        : success / (success + failure);
     final fresh = repos.isEmpty
         ? 1.0
         : repos.where((a) {
@@ -40,12 +44,12 @@ class HealthGaugeView extends StatelessWidget {
         : (1 - (totalReview / totalOpen)).clamp(0.0, 1.0);
 
     final factors = <({String label, double value})>[
-      (label: 'CI passing', value: ci),
+      if (ci != null) (label: 'CI passing', value: ci),
       (label: 'Recently active', value: fresh),
       (label: 'PRs not aging', value: aging),
       (label: 'Review kept up', value: review),
     ];
-    final score = repos.isEmpty
+    final score = (repos.isEmpty || factors.isEmpty)
         ? 0
         : (factors.fold<double>(0, (s, f) => s + f.value) /
                   factors.length *

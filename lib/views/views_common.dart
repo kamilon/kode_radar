@@ -8,8 +8,10 @@ import '../team.dart';
 import '../team_service.dart';
 
 /// Pre-loaded data handed to every insights view so each view is a pure widget
-/// (no fetching): the hub loads once and passes this down. Collections are
-/// copied into unmodifiable views so a view can't mutate the shared snapshot.
+/// (no fetching): the hub loads once and passes this down. All collections —
+/// including the nested per-repo history lists and per-team contributor sets —
+/// are copied into unmodifiable views so a view can't mutate the shared
+/// snapshot.
 class InsightsData {
   InsightsData({
     required List<RepoActivity> activities,
@@ -19,9 +21,14 @@ class InsightsData {
     required List<Person> people,
     required this.loadedAt,
   }) : activities = List.unmodifiable(activities),
-       history = Map.unmodifiable(history),
+       history = Map.unmodifiable({
+         for (final e in history.entries)
+           e.key: List<MetricSnapshot>.unmodifiable(e.value),
+       }),
        teams = List.unmodifiable(teams),
-       rollups = Map.unmodifiable(rollups),
+       rollups = Map.unmodifiable({
+         for (final e in rollups.entries) e.key: _readonlyRollup(e.value),
+       }),
        people = List.unmodifiable(people);
 
   final List<RepoActivity> activities;
@@ -37,6 +44,18 @@ class InsightsData {
 
   bool get isEmpty => activities.isEmpty;
 }
+
+/// Rebuilds a [TeamRollup] with an unmodifiable contributor set so the shared
+/// snapshot can't be mutated through it.
+TeamRollup _readonlyRollup(TeamRollup r) => TeamRollup(
+  repoCount: r.repoCount,
+  openPrs: r.openPrs,
+  needsReview: r.needsReview,
+  oldestOpenPrAgeDays: r.oldestOpenPrAgeDays,
+  contributors: Set.unmodifiable(r.contributors),
+  activityScore: r.activityScore,
+  lastActivity: r.lastActivity,
+);
 
 /// A tappable descriptor for the gallery grid on the hub.
 class ViewInfo {
@@ -76,8 +95,9 @@ String ciLabel(String status) => switch (status) {
   _ => 'unknown',
 };
 
-/// Opens a repo URL in the external browser; silently no-ops on any failure
-/// (bad URL, unsupported scheme, or a platform channel exception).
+/// Opens a repo URL in the external browser. Logs and no-ops on any failure
+/// (bad URL, unsupported scheme, or a platform channel exception) so a tap
+/// handler can't crash.
 Future<void> openUrl(String url) async {
   final uri = Uri.tryParse(url);
   if (uri == null) return;
