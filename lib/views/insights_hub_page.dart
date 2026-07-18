@@ -227,6 +227,7 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
     return RefreshIndicator(
       onRefresh: _load,
       child: GridView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(12),
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
           maxCrossAxisExtent: 220,

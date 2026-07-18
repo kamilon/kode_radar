@@ -8,16 +8,21 @@ import '../team.dart';
 import '../team_service.dart';
 
 /// Pre-loaded data handed to every insights view so each view is a pure widget
-/// (no fetching): the hub loads once and passes this down.
+/// (no fetching): the hub loads once and passes this down. Collections are
+/// copied into unmodifiable views so a view can't mutate the shared snapshot.
 class InsightsData {
-  const InsightsData({
-    required this.activities,
-    required this.history,
-    required this.teams,
-    required this.rollups,
-    required this.people,
+  InsightsData({
+    required List<RepoActivity> activities,
+    required Map<String, List<MetricSnapshot>> history,
+    required List<Team> teams,
+    required Map<String, TeamRollup> rollups,
+    required List<Person> people,
     required this.loadedAt,
-  });
+  }) : activities = List.unmodifiable(activities),
+       history = Map.unmodifiable(history),
+       teams = List.unmodifiable(teams),
+       rollups = Map.unmodifiable(rollups),
+       people = List.unmodifiable(people);
 
   final List<RepoActivity> activities;
   final Map<String, List<MetricSnapshot>> history;
@@ -71,12 +76,17 @@ String ciLabel(String status) => switch (status) {
   _ => 'unknown',
 };
 
-/// Opens a repo URL in the external browser; silently no-ops on failure.
+/// Opens a repo URL in the external browser; silently no-ops on any failure
+/// (bad URL, unsupported scheme, or a platform channel exception).
 Future<void> openUrl(String url) async {
   final uri = Uri.tryParse(url);
   if (uri == null) return;
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  try {
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  } catch (e) {
+    debugPrint('openUrl failed for $url: $e');
   }
 }
 

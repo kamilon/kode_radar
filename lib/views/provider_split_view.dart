@@ -108,19 +108,22 @@ class ProviderSplitView extends StatelessWidget {
                     )
                   : Row(
                       children: [
-                        // flex 0 collapses a zero side, so proportions are true.
-                        Expanded(
-                          flex: gh,
-                          child: Container(
-                            color: ghColor.withValues(alpha: 0.85),
+                        // Only emit non-zero segments — Expanded requires
+                        // flex > 0 — so a single-provider fleet shows 100:0.
+                        if (gh > 0)
+                          Expanded(
+                            flex: gh,
+                            child: Container(
+                              color: ghColor.withValues(alpha: 0.85),
+                            ),
                           ),
-                        ),
-                        Expanded(
-                          flex: ado,
-                          child: Container(
-                            color: adoColor.withValues(alpha: 0.85),
+                        if (ado > 0)
+                          Expanded(
+                            flex: ado,
+                            child: Container(
+                              color: adoColor.withValues(alpha: 0.85),
+                            ),
                           ),
-                        ),
                       ],
                     ),
             ),
