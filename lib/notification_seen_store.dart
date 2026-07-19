@@ -85,27 +85,29 @@ class NotificationSeenStore {
     await _runLocked(() async {
       final db = _database;
       await db.transaction(() async {
-        for (final id in currentIds) {
-          // OR REPLACE (not IGNORE) so a re-seen id is bumped to a fresh, newest
-          // autoincrement id — a continuously-current item then never falls into
-          // the oldest-pruned tail and can't be spuriously re-notified. Still
-          // additive across isolates (the id stays present).
-          await db
-              .into(db.notificationSeen)
-              .insert(
-                NotificationSeenCompanion.insert(seenId: id),
-                mode: InsertMode.insertOrReplace,
-              );
-        }
+        // OR REPLACE (not IGNORE) so a re-seen id is bumped to a fresh, newest
+        // autoincrement id — a continuously-current item then never falls into
+        // the oldest-pruned tail and can't be spuriously re-notified. Still
+        // additive across isolates (the id stays present). Batched so N ids are
+        // one round-trip, not N.
+        await db.batch((batch) {
+          batch.insertAll(
+            db.notificationSeen,
+            currentIds.map(
+              (id) => NotificationSeenCompanion.insert(seenId: id),
+            ),
+            mode: InsertMode.insertOrReplace,
+          );
+          batch.insertAll(
+            db.notificationKnownRepos,
+            monitoredRepos.map(
+              (repo) =>
+                  NotificationKnownReposCompanion.insert(repoDisplay: repo),
+            ),
+            mode: InsertMode.insertOrIgnore,
+          );
+        });
         await _pruneSeen(db);
-        for (final repo in monitoredRepos) {
-          await db
-              .into(db.notificationKnownRepos)
-              .insert(
-                NotificationKnownReposCompanion.insert(repoDisplay: repo),
-                mode: InsertMode.insertOrIgnore,
-              );
-        }
         await _setMeta(db, _seededFlag, '1');
       });
     });
@@ -134,6 +136,10 @@ class NotificationSeenStore {
     if (await _hasMeta(db, _importedFlag)) return;
 
     final prefs = await SharedPreferences.getInstance();
+    // Freshen from disk before reading the legacy blobs, so a reused isolate
+    // with a stale cache doesn't import an empty set and then clear the real
+    // legacy keys.
+    await prefs.reload();
     final hadBaseline = prefs.containsKey(_legacySeenKey);
     final seen = prefs.getStringList(_legacySeenKey) ?? const <String>[];
     final known = prefs.getStringList(_legacyKnownReposKey) ?? const <String>[];
@@ -142,22 +148,20 @@ class NotificationSeenStore {
       // Re-check inside the (serialized) transaction so a concurrent isolate
       // can't double-import.
       if (await _hasMeta(db, _importedFlag)) return;
-      for (final id in seen) {
-        await db
-            .into(db.notificationSeen)
-            .insert(
-              NotificationSeenCompanion.insert(seenId: id),
-              mode: InsertMode.insertOrIgnore,
-            );
-      }
-      for (final repo in known) {
-        await db
-            .into(db.notificationKnownRepos)
-            .insert(
-              NotificationKnownReposCompanion.insert(repoDisplay: repo),
-              mode: InsertMode.insertOrIgnore,
-            );
-      }
+      await db.batch((batch) {
+        batch.insertAll(
+          db.notificationSeen,
+          seen.map((id) => NotificationSeenCompanion.insert(seenId: id)),
+          mode: InsertMode.insertOrIgnore,
+        );
+        batch.insertAll(
+          db.notificationKnownRepos,
+          known.map(
+            (repo) => NotificationKnownReposCompanion.insert(repoDisplay: repo),
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
+      });
       // A pre-existing legacy key means a baseline was established, so preserve
       // "not first run" across the migration.
       if (hadBaseline) await _setMeta(db, _seededFlag, '1');
