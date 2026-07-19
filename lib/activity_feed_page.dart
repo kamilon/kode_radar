@@ -11,6 +11,7 @@ import 'identity_store.dart';
 import 'preferences_store.dart';
 import 'saved_view_store.dart';
 import 'seen_store.dart';
+import 'sync_state_store.dart';
 import 'team.dart';
 import 'team_store.dart';
 
@@ -39,7 +40,10 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
   bool _truncated = false;
   int _lookbackDays = ActivityFeedService.defaultLookback.inDays;
   String? _error;
-  DateTime? _lastChecked;
+
+  /// When the feed last refreshed successfully from the network (persisted), so
+  /// the "updated" label stays honest while showing stale cache offline.
+  DateTime? _lastSynced;
 
   /// The previous "last seen" time, captured once, used to flag new events.
   DateTime? _newSince;
@@ -97,12 +101,16 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
       // meaningful when we don't already have events on screen.
       if (_events.isEmpty) {
         final cached = await ActivityEventStore.cached(lookback: lookback);
+        final lastSynced = await SyncStateStore.lastSuccess(
+          SyncStateStore.feedScope,
+        );
         if (!mounted || seq != _loadSeq) return;
         if (cached.isNotEmpty) {
           setState(() {
             _events = cached;
             _teams = teams;
             _lookbackDays = appPrefs.feedLookbackDays;
+            _lastSynced = lastSynced;
             // The cached render carries no source-health signal, so clear any
             // stale failed/truncated notice from a previous refresh while the
             // new network refresh is still in flight.
@@ -143,6 +151,14 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
         );
         if (!mounted || seq != _loadSeq) return;
       }
+      // The refresh counts as a successful sync unless it came back empty
+      // *because* sources failed (fully offline). Record it so the "updated"
+      // label reflects the last real sync, not a cache render.
+      final syncedOk = result.events.isNotEmpty || result.failedSources == 0;
+      if (syncedOk) {
+        await SyncStateStore.markSuccess(SyncStateStore.feedScope);
+        if (!mounted || seq != _loadSeq) return;
+      }
       setState(() {
         _events = merged;
         _failedSources = result.failedSources;
@@ -154,7 +170,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
           _teamId = null;
         }
         _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
-        _lastChecked = DateTime.now();
+        if (syncedOk) _lastSynced = DateTime.now();
         _refreshing = false;
       });
     } catch (e) {
@@ -483,9 +499,9 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
         const SizedBox(height: 6),
         Center(
           child: Text(
-            _lastChecked == null
+            _lastSynced == null
                 ? 'Pull down to refresh.'
-                : 'Checked ${activityRelativeTime(_lastChecked!)} · pull down to refresh.',
+                : 'Updated ${activityRelativeTime(_lastSynced!)} · pull down to refresh.',
             style: TextStyle(color: Colors.grey[600], fontSize: 12),
           ),
         ),

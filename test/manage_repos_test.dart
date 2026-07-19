@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kode_radar/database/app_database.dart';
 import 'package:kode_radar/activity_event_store.dart';
 import 'package:kode_radar/repo_detail_store.dart';
+import 'package:kode_radar/sync_state_store.dart';
 import 'package:kode_radar/manage_repos_page.dart';
 import 'package:kode_radar/metric_store.dart';
 import 'package:kode_radar/team_store.dart';
@@ -21,6 +22,7 @@ void main() {
     MetricStore.debugUseDatabase(db);
     ActivityEventStore.debugUseDatabase(db);
     RepoDetailStore.debugUseDatabase(db);
+    SyncStateStore.debugUseDatabase(db);
   });
 
   tearDown(() async {

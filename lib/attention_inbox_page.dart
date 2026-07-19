@@ -11,6 +11,7 @@ import 'home_menu.dart';
 import 'identity_store.dart';
 import 'notification_service.dart';
 import 'snooze_store.dart';
+import 'sync_state_store.dart';
 
 /// Shows a ranked list of items that need the user's attention across all
 /// monitored repositories (PRs waiting on review, changes requested, stale PRs,
@@ -33,7 +34,10 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
   String? _categoryFilter;
   bool _identitySet = false;
   String? _error;
-  DateTime? _lastChecked;
+
+  /// When the inbox last refreshed successfully from the network (persisted), so
+  /// the "checked" label stays honest while showing stale cache offline.
+  DateTime? _lastSynced;
 
   // Guards against a stale in-flight load applying after a newer one.
   int _loadSeq = 0;
@@ -86,11 +90,15 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       // meaningful when we don't already have items on screen.
       if (_items.isEmpty) {
         final cachedItems = await AttentionStore.cached(snoozedIds: snoozed);
+        final lastSynced = await SyncStateStore.lastSuccess(
+          SyncStateStore.attentionScope,
+        );
         if (!mounted || seq != _loadSeq) return;
         if (cachedItems.isNotEmpty) {
           setState(() {
             _items = cachedItems;
             _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
+            _lastSynced = lastSynced;
           });
         }
       }
@@ -118,6 +126,20 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       // repos couldn't load.
       final cachedReal = await AttentionStore.cached(snoozedIds: freshSnoozed);
       if (!mounted || seq != _loadSeq) return;
+      // A successful sync = we got real items, or a genuinely clean fleet (no
+      // errors). Fully offline (all error items, no real ones) does not count,
+      // so the "checked" label reflects the last real refresh.
+      final hasReal = computed.any(
+        (i) => i.category != AttentionStore.errorCategory,
+      );
+      final hasError = computed.any(
+        (i) => i.category == AttentionStore.errorCategory,
+      );
+      final syncedOk = hasReal || !hasError;
+      if (syncedOk) {
+        await SyncStateStore.markSuccess(SyncStateStore.attentionScope);
+        if (!mounted || seq != _loadSeq) return;
+      }
       final errors = computed
           .where(
             (i) =>
@@ -137,7 +159,7 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       setState(() {
         _items = merged;
         _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
-        _lastChecked = DateTime.now();
+        if (syncedOk) _lastSynced = DateTime.now();
         _refreshing = false;
       });
       // Notify on the fresh, snooze-filtered set (error items are additionally
@@ -321,9 +343,9 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         const SizedBox(height: 6),
         Center(
           child: Text(
-            _lastChecked == null
+            _lastSynced == null
                 ? 'Pull down to refresh.'
-                : 'Checked ${_relativeTime(_lastChecked!)} · pull down to refresh.',
+                : 'Updated ${_relativeTime(_lastSynced!)} · pull down to refresh.',
             style: TextStyle(color: Colors.grey[600], fontSize: 12),
           ),
         ),
@@ -339,7 +361,7 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Text(
-        '$label${_lastChecked == null ? '' : ' · checked ${_relativeTime(_lastChecked!)}'}',
+        '$label${_lastSynced == null ? '' : ' · updated ${_relativeTime(_lastSynced!)}'}',
         style: TextStyle(color: Colors.grey[600], fontSize: 12),
       ),
     );
