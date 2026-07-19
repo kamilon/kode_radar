@@ -247,9 +247,9 @@ class _PreferencesPageState extends State<PreferencesPage>
   /// Describes the most recent background run for the read-only status tile.
   String _backgroundRunSubtitle() {
     final status = _bgStatus;
-    if (status == null) return 'Hasn’t run yet';
+    if (status == null) return 'Hasn\'t run yet';
     final when = _relativeTime(status.at);
-    if (!status.finished) return 'Started $when · didn’t finish';
+    if (!status.finished) return 'Started $when · didn\'t finish';
     if (!status.activityOk) return 'Ran $when · activity refresh failed';
     final repos = status.repoCount == 1
         ? '1 repo'
