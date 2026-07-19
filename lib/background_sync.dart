@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:workmanager/workmanager.dart';
 
+import 'background_sync_status_store.dart';
 import 'notification_service.dart';
 import 'sync_service.dart';
 
@@ -17,9 +18,25 @@ const String backgroundSyncTask = 'com.kamilon.koderadar.sync';
 void backgroundSyncCallbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     WidgetsFlutterBinding.ensureInitialized();
+    // Record that the OS launched the task before doing any work, so a run that
+    // is later killed/expires still shows it started (the key iOS failure mode).
+    // Best-effort — never let status recording affect the task result.
+    try {
+      await BackgroundSyncStatusStore.recordStarted();
+    } catch (e, st) {
+      debugPrint('Background sync: recordStarted failed: $e\n$st');
+    }
     try {
       await NotificationService.init();
       final result = await SyncService.runOnce(background: true);
+      try {
+        await BackgroundSyncStatusStore.recordFinished(
+          activityOk: result.activityOk,
+          repoCount: result.repoCount,
+        );
+      } catch (e, st) {
+        debugPrint('Background sync: recordFinished failed: $e\n$st');
+      }
       // Report failure so the OS can retry/reschedule when nothing useful ran.
       return result.activityOk;
     } catch (e, st) {
