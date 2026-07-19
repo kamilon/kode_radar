@@ -44,10 +44,17 @@ class AttentionItem {
 /// all monitored repos: waiting on review, changes requested, or open a long
 /// time. Items are optionally tagged as the current user's
 /// (`AttentionItem.isMine`) when GitHub logins / ADO names are supplied, and
-/// snoozed items are filtered out. CI-failing repos are surfaced on the Radar,
-/// not here.
+/// snoozed items are filtered out **only when a non-empty `snoozedIds` is
+/// passed to [computeAll]** — callers that cache the full snapshot (e.g. the
+/// inbox) omit it and apply snooze at read time instead. CI-failing repos are
+/// surfaced on the Radar, not here.
 class AttentionService {
   AttentionService._();
+
+  /// Category marking a per-repo fetch failure surfaced in the inbox. These are
+  /// not real attention items — they are never persisted to the cache and never
+  /// trigger notifications.
+  static const String errorCategory = 'error';
 
   /// A PR open longer than this many days (with no pending review/changes) is
   /// surfaced as an "old open PR".

@@ -64,7 +64,14 @@ class NotificationService {
 
   static Future<void> _notifyNewAttention(List<AttentionItem> items) async {
     try {
-      final currentIds = items.map((item) => item.id).toSet();
+      // Error items are per-repo fetch failures, not attention: never notify on
+      // them and never record them in the baseline, so an offline/failed refresh
+      // can't emit a spurious "items need attention" (the ids would otherwise be
+      // "new" for an already-known repo).
+      final attention = items
+          .where((item) => item.category != AttentionService.errorCategory)
+          .toList();
+      final currentIds = attention.map((item) => item.id).toSet();
       final prefs = await SharedPreferences.getInstance();
       // Refresh the in-memory cache from disk first: the background-sync isolate
       // and the resident foreground isolate each cache prefs independently, so
@@ -92,7 +99,7 @@ class NotificationService {
       final newIds = pendingIds(
         seen: seen,
         knownRepos: knownRepos,
-        items: items,
+        items: attention,
         firstRun: firstRun,
       );
       final now = DateTime.now();
@@ -112,7 +119,7 @@ class NotificationService {
 
       if (newIds.isNotEmpty &&
           PreferencesStore.notificationsAllowed(appPrefs, now)) {
-        final newItems = items
+        final newItems = attention
             .where((item) => newIds.contains(item.id))
             .toList(growable: false);
         await _showSummaryNotification(newItems);
@@ -156,8 +163,12 @@ class NotificationService {
     required bool firstRun,
   }) {
     if (firstRun) return const <String>{};
-    final currentIds = items.map((item) => item.id).toSet();
-    final newRepoItemIds = items
+    // Never treat per-repo fetch failures as new attention.
+    final attention = items
+        .where((item) => item.category != AttentionService.errorCategory)
+        .toList();
+    final currentIds = attention.map((item) => item.id).toSet();
+    final newRepoItemIds = attention
         .where((item) => !knownRepos.contains(item.repoDisplay))
         .map((item) => item.id)
         .toSet();

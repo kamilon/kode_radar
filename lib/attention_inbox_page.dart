@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'app_http.dart';
 import 'attention_service.dart';
+import 'attention_store.dart';
 import 'config_revision.dart';
 import 'home_menu.dart';
 import 'identity_store.dart';
@@ -23,7 +24,11 @@ class AttentionInboxPage extends StatefulWidget {
 
 class _AttentionInboxPageState extends State<AttentionInboxPage> {
   List<AttentionItem> _items = const [];
-  bool _loading = true;
+
+  /// A load (cache render + network refresh) is in flight. Gates the manual
+  /// Refresh action so overlapping network fetches/DB writes can't stack on top
+  /// of an in-flight refresh; the cache-first render still updates underneath.
+  bool _refreshing = true;
   bool _mineOnly = false;
   String? _categoryFilter;
   bool _identitySet = false;
@@ -32,6 +37,11 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
 
   // Guards against a stale in-flight load applying after a newer one.
   int _loadSeq = 0;
+
+  /// Show the full-screen spinner only when a load is in flight and there's
+  /// nothing cached to render yet; once items are on screen, content stays
+  /// visible while the network refresh continues underneath.
+  bool get _showSpinner => _refreshing && _items.isEmpty && _error == null;
 
   @override
   void initState() {
@@ -63,34 +73,91 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
   Future<void> _load() async {
     final seq = ++_loadSeq;
     setState(() {
-      _loading = true;
+      _refreshing = true;
       _error = null;
     });
     try {
       final snoozed = await SnoozeStore.snoozedIds();
       final selfGithub = await IdentityStore.selfGithubLogins();
       final selfAdo = await IdentityStore.selfAdoNames();
-      final items = await AttentionService.computeAll(
+
+      // Phase A: render the cached snapshot immediately so a cold start isn't a
+      // blank spinner while the network fetch runs (or if it's offline). Only
+      // meaningful when we don't already have items on screen.
+      if (_items.isEmpty) {
+        final cachedItems = await AttentionStore.cached(snoozedIds: snoozed);
+        if (!mounted || seq != _loadSeq) return;
+        if (cachedItems.isNotEmpty) {
+          setState(() {
+            _items = cachedItems;
+            _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
+          });
+        }
+      }
+
+      // Phase B: refresh from the network and persist the snapshot. Compute
+      // WITHOUT snooze filtering so `save` sees each repo's true success/failure
+      // (a snoozed-away item or a dismissed error marker must not make a repo
+      // look "clean" and wipe its last-known-good cache); snooze is applied only
+      // when rendering/notifying below.
+      final computed = await AttentionService.computeAll(
         client: AppHttp.client,
-        snoozedIds: snoozed,
         selfGithubLogins: selfGithub,
         selfAdoNames: selfAdo,
       );
       if (!mounted || seq != _loadSeq) return;
+      await AttentionStore.save(computed);
+      if (!mounted || seq != _loadSeq) return;
+      // Re-read snoozes now (a dismiss may have happened during the fetch) so a
+      // just-dismissed item can't flicker back into the rendered snapshot.
+      final freshSnoozed = await SnoozeStore.snoozedIds();
+      if (!mounted || seq != _loadSeq) return;
+      // Render the persisted snapshot (which keeps last-known-good items for any
+      // repo that failed this round) plus this round's fresh error items, so an
+      // offline/partial refresh never blanks the inbox yet still surfaces which
+      // repos couldn't load.
+      final cachedReal = await AttentionStore.cached(snoozedIds: freshSnoozed);
+      if (!mounted || seq != _loadSeq) return;
+      final errors = computed
+          .where(
+            (i) =>
+                i.category == AttentionStore.errorCategory &&
+                !freshSnoozed.contains(i.id),
+          )
+          .toList();
+      final merged = [...cachedReal, ...errors]
+        ..sort((a, b) {
+          final bySeverity = b.severity.compareTo(a.severity);
+          if (bySeverity != 0) return bySeverity;
+          final byRepo = a.repoDisplay.compareTo(b.repoDisplay);
+          if (byRepo != 0) return byRepo;
+          // Stable final tie-breaker so ties don't reorder between renders.
+          return a.id.compareTo(b.id);
+        });
       setState(() {
-        _items = items;
+        _items = merged;
         _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
         _lastChecked = DateTime.now();
-        _loading = false;
+        _refreshing = false;
       });
-      unawaited(NotificationService.notifyNewAttention(items));
+      // Notify on the fresh, snooze-filtered set (error items are additionally
+      // excluded inside NotificationService).
+      unawaited(
+        NotificationService.notifyNewAttention(
+          computed.where((i) => !freshSnoozed.contains(i.id)).toList(),
+        ),
+      );
     } catch (e) {
       debugPrint('AttentionInbox failed to load: $e');
       if (!mounted || seq != _loadSeq) return;
       setState(() {
-        _error =
-            'Something went wrong while loading your inbox. Pull down to try again.';
-        _loading = false;
+        // Keep any cached items rendered in Phase A rather than replacing them
+        // with an error state; only show the error when we have nothing.
+        if (_items.isEmpty) {
+          _error =
+              'Something went wrong while loading your inbox. Pull down to try again.';
+        }
+        _refreshing = false;
       });
     }
   }
@@ -106,20 +173,29 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
             tooltip: _mineOnly
                 ? 'Showing yours — tap for all'
                 : 'Show only mine',
-            onPressed: _loading ? null : _toggleMine,
+            onPressed: _showSpinner ? null : _toggleMine,
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
-            onPressed: _loading ? null : _load,
+            onPressed: _refreshing ? null : _load,
           ),
           const HomeMenuButton(),
         ],
       ),
-      body: _loading
+      body: _showSpinner
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(onRefresh: _load, child: _buildContent()),
+          : RefreshIndicator(onRefresh: _refresh, child: _buildContent()),
     );
+  }
+
+  /// Pull-to-refresh handler. If a load is already in flight (e.g. the
+  /// initial/config-driven load that this RefreshIndicator doesn't own), ignore
+  /// the pull instead of starting a second concurrent network fetch; the
+  /// in-flight load updates the list when it completes.
+  Future<void> _refresh() async {
+    if (_refreshing) return;
+    await _load();
   }
 
   void _toggleMine() {

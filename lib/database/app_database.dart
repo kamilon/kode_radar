@@ -52,6 +52,30 @@ class ActivityEvents extends Table {
   BoolColumn get isMine => boolean()();
 }
 
+/// Cached attention-inbox items (Phase 2b). A ranked snapshot of PRs needing
+/// action across all monitored repos, so the inbox renders instantly on cold
+/// start / offline. `id` is the deterministic identity the service already
+/// assigns (e.g. `reviewRequested:owner/name:PR #12`) and is used as the PK so
+/// a recompute replaces rather than duplicates. Transient `error` items are not
+/// persisted. The generated row class is named `AttentionItemRow` to avoid
+/// colliding with the `AttentionItem` DTO.
+@DataClassName('AttentionItemRow')
+@TableIndex(name: 'idx_attention_items_repo_display', columns: {#repoDisplay})
+class AttentionItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get category => text()();
+  IntColumn get severity => integer()();
+  TextColumn get title => text()();
+  TextColumn get subtitle => text()();
+  TextColumn get repoDisplay => text()();
+  TextColumn get url => text().nullable()();
+  IntColumn get ageDays => integer().nullable()();
+  BoolColumn get isMine => boolean()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Small key/value table for database-local bookkeeping (e.g. one-time
 /// migration markers that must commit atomically with the data they guard).
 @DataClassName('AppMetaRow')
@@ -66,7 +90,9 @@ class AppMeta extends Table {
 /// The application's local SQLite database. Holds cached, aggregated monitoring
 /// data that would not fit in `SharedPreferences` at scale. Configuration
 /// (tokens, repo lists, preferences) continues to live in `SharedPreferences`.
-@DriftDatabase(tables: [MetricSnapshots, AppMeta, ActivityEvents])
+@DriftDatabase(
+  tables: [MetricSnapshots, AppMeta, ActivityEvents, AttentionItems],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -75,7 +101,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forExecutor(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -106,6 +132,16 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE UNIQUE INDEX IF NOT EXISTS idx_activity_events_repo_event '
           'ON activity_events (repo_key, event_id)',
+        );
+      }
+      // v3 adds the attention-inbox cache (Phase 2b). Same idempotent-DDL
+      // reasoning as above; the PK index is part of `CREATE TABLE`, so only the
+      // secondary repo_display index needs an explicit statement.
+      if (from < 3) {
+        await m.createTable(attentionItems);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_attention_items_repo_display '
+          'ON attention_items (repo_display)',
         );
       }
     },

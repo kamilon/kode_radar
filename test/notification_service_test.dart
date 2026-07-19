@@ -111,6 +111,24 @@ void main() {
       );
       expect(pending, {'b'});
     });
+
+    test('excludes per-repo error items (offline failure never notifies)', () {
+      final errorItem = AttentionItem(
+        id: 'error:r1',
+        category: AttentionService.errorCategory,
+        severity: 0,
+        title: 'Could not load',
+        subtitle: 'r1',
+        repoDisplay: 'r1',
+      );
+      final pending = NotificationService.pendingIds(
+        seen: const {'a'},
+        knownRepos: const {'r1'},
+        items: [errorItem],
+        firstRun: false,
+      );
+      expect(pending, isEmpty);
+    });
   });
 
   group('mergeSeen', () {
