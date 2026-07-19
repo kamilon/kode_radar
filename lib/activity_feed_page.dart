@@ -89,9 +89,18 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
   /// persists, or a repo delete prunes) update the list automatically.
   void _subscribe(Duration lookback) {
     _eventsSub?.cancel();
-    _eventsSub = ActivityEventStore.watch(lookback: lookback).listen((events) {
-      if (mounted) setState(() => _events = events);
-    });
+    _eventsSub = ActivityEventStore.watch(lookback: lookback).listen(
+      (events) {
+        if (!mounted) return;
+        setState(() {
+          _events = events;
+          // A late cache emission should clear a stale error screen that a
+          // failed refresh set before the cache arrived.
+          if (events.isNotEmpty) _error = null;
+        });
+      },
+      onError: (Object e) => debugPrint('ActivityFeed watch stream error: $e'),
+    );
   }
 
   Future<void> _load() async {
@@ -121,11 +130,9 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
         SyncStateStore.feedScope,
       );
       if (!mounted || seq != _loadSeq) return;
-      // (Re)subscribe the reactive cache stream on first load or a lookback
-      // change; the stream drives `_events` from here on.
-      if (_eventsSub == null || appPrefs.feedLookbackDays != _lookbackDays) {
-        _subscribe(lookback);
-      }
+      // Re-subscribe every load with a fresh cutoff so the "last N days" window
+      // slides as time passes (not just when the configured lookback changes).
+      _subscribe(lookback);
       setState(() {
         _teams = teams;
         _lookbackDays = appPrefs.feedLookbackDays;
