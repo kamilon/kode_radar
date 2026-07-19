@@ -130,27 +130,4 @@ void main() {
       expect(pending, isEmpty);
     });
   });
-
-  group('mergeSeen', () {
-    test('unions so a transiently-absent id is retained (no re-notify)', () {
-      // The repo behind 'b' failed this cycle so 'b' is missing from current,
-      // but it must stay in the baseline so recovery does not re-notify it.
-      expect(NotificationService.mergeSeen(const {'a', 'b'}, const {'a'}), {
-        'a',
-        'b',
-      });
-    });
-
-    test('adds newly seen ids', () {
-      expect(NotificationService.mergeSeen(const {'a'}, const {'a', 'b'}), {
-        'a',
-        'b',
-      });
-    });
-
-    test('resets to the current snapshot beyond the growth cap', () {
-      final huge = {for (var i = 0; i < 6000; i++) 'id$i'};
-      expect(NotificationService.mergeSeen(huge, const {'a', 'b'}), {'a', 'b'});
-    });
-  });
 }

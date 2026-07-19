@@ -3737,6 +3737,381 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateRow> {
   }
 }
 
+class $NotificationSeenTable extends NotificationSeen
+    with TableInfo<$NotificationSeenTable, NotificationSeenRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NotificationSeenTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _seenIdMeta = const VerificationMeta('seenId');
+  @override
+  late final GeneratedColumn<String> seenId = GeneratedColumn<String>(
+    'seen_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, seenId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'notification_seen';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<NotificationSeenRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('seen_id')) {
+      context.handle(
+        _seenIdMeta,
+        seenId.isAcceptableOrUnknown(data['seen_id']!, _seenIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_seenIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  NotificationSeenRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NotificationSeenRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      seenId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}seen_id'],
+      )!,
+    );
+  }
+
+  @override
+  $NotificationSeenTable createAlias(String alias) {
+    return $NotificationSeenTable(attachedDatabase, alias);
+  }
+}
+
+class NotificationSeenRow extends DataClass
+    implements Insertable<NotificationSeenRow> {
+  final int id;
+  final String seenId;
+  const NotificationSeenRow({required this.id, required this.seenId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['seen_id'] = Variable<String>(seenId);
+    return map;
+  }
+
+  NotificationSeenCompanion toCompanion(bool nullToAbsent) {
+    return NotificationSeenCompanion(id: Value(id), seenId: Value(seenId));
+  }
+
+  factory NotificationSeenRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NotificationSeenRow(
+      id: serializer.fromJson<int>(json['id']),
+      seenId: serializer.fromJson<String>(json['seenId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'seenId': serializer.toJson<String>(seenId),
+    };
+  }
+
+  NotificationSeenRow copyWith({int? id, String? seenId}) =>
+      NotificationSeenRow(id: id ?? this.id, seenId: seenId ?? this.seenId);
+  NotificationSeenRow copyWithCompanion(NotificationSeenCompanion data) {
+    return NotificationSeenRow(
+      id: data.id.present ? data.id.value : this.id,
+      seenId: data.seenId.present ? data.seenId.value : this.seenId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NotificationSeenRow(')
+          ..write('id: $id, ')
+          ..write('seenId: $seenId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, seenId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NotificationSeenRow &&
+          other.id == this.id &&
+          other.seenId == this.seenId);
+}
+
+class NotificationSeenCompanion extends UpdateCompanion<NotificationSeenRow> {
+  final Value<int> id;
+  final Value<String> seenId;
+  const NotificationSeenCompanion({
+    this.id = const Value.absent(),
+    this.seenId = const Value.absent(),
+  });
+  NotificationSeenCompanion.insert({
+    this.id = const Value.absent(),
+    required String seenId,
+  }) : seenId = Value(seenId);
+  static Insertable<NotificationSeenRow> custom({
+    Expression<int>? id,
+    Expression<String>? seenId,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (seenId != null) 'seen_id': seenId,
+    });
+  }
+
+  NotificationSeenCompanion copyWith({Value<int>? id, Value<String>? seenId}) {
+    return NotificationSeenCompanion(
+      id: id ?? this.id,
+      seenId: seenId ?? this.seenId,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (seenId.present) {
+      map['seen_id'] = Variable<String>(seenId.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NotificationSeenCompanion(')
+          ..write('id: $id, ')
+          ..write('seenId: $seenId')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $NotificationKnownReposTable extends NotificationKnownRepos
+    with TableInfo<$NotificationKnownReposTable, NotificationKnownRepoRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NotificationKnownReposTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _repoDisplayMeta = const VerificationMeta(
+    'repoDisplay',
+  );
+  @override
+  late final GeneratedColumn<String> repoDisplay = GeneratedColumn<String>(
+    'repo_display',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [repoDisplay];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'notification_known_repos';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<NotificationKnownRepoRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('repo_display')) {
+      context.handle(
+        _repoDisplayMeta,
+        repoDisplay.isAcceptableOrUnknown(
+          data['repo_display']!,
+          _repoDisplayMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_repoDisplayMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {repoDisplay};
+  @override
+  NotificationKnownRepoRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NotificationKnownRepoRow(
+      repoDisplay: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}repo_display'],
+      )!,
+    );
+  }
+
+  @override
+  $NotificationKnownReposTable createAlias(String alias) {
+    return $NotificationKnownReposTable(attachedDatabase, alias);
+  }
+}
+
+class NotificationKnownRepoRow extends DataClass
+    implements Insertable<NotificationKnownRepoRow> {
+  final String repoDisplay;
+  const NotificationKnownRepoRow({required this.repoDisplay});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['repo_display'] = Variable<String>(repoDisplay);
+    return map;
+  }
+
+  NotificationKnownReposCompanion toCompanion(bool nullToAbsent) {
+    return NotificationKnownReposCompanion(repoDisplay: Value(repoDisplay));
+  }
+
+  factory NotificationKnownRepoRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NotificationKnownRepoRow(
+      repoDisplay: serializer.fromJson<String>(json['repoDisplay']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'repoDisplay': serializer.toJson<String>(repoDisplay),
+    };
+  }
+
+  NotificationKnownRepoRow copyWith({String? repoDisplay}) =>
+      NotificationKnownRepoRow(repoDisplay: repoDisplay ?? this.repoDisplay);
+  NotificationKnownRepoRow copyWithCompanion(
+    NotificationKnownReposCompanion data,
+  ) {
+    return NotificationKnownRepoRow(
+      repoDisplay: data.repoDisplay.present
+          ? data.repoDisplay.value
+          : this.repoDisplay,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NotificationKnownRepoRow(')
+          ..write('repoDisplay: $repoDisplay')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => repoDisplay.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NotificationKnownRepoRow &&
+          other.repoDisplay == this.repoDisplay);
+}
+
+class NotificationKnownReposCompanion
+    extends UpdateCompanion<NotificationKnownRepoRow> {
+  final Value<String> repoDisplay;
+  final Value<int> rowid;
+  const NotificationKnownReposCompanion({
+    this.repoDisplay = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NotificationKnownReposCompanion.insert({
+    required String repoDisplay,
+    this.rowid = const Value.absent(),
+  }) : repoDisplay = Value(repoDisplay);
+  static Insertable<NotificationKnownRepoRow> custom({
+    Expression<String>? repoDisplay,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (repoDisplay != null) 'repo_display': repoDisplay,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NotificationKnownReposCompanion copyWith({
+    Value<String>? repoDisplay,
+    Value<int>? rowid,
+  }) {
+    return NotificationKnownReposCompanion(
+      repoDisplay: repoDisplay ?? this.repoDisplay,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (repoDisplay.present) {
+      map['repo_display'] = Variable<String>(repoDisplay.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NotificationKnownReposCompanion(')
+          ..write('repoDisplay: $repoDisplay, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3750,6 +4125,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $RepoRunsTable repoRuns = $RepoRunsTable(this);
   late final $RepoReleasesTable repoReleases = $RepoReleasesTable(this);
   late final $SyncStateTable syncState = $SyncStateTable(this);
+  late final $NotificationSeenTable notificationSeen = $NotificationSeenTable(
+    this,
+  );
+  late final $NotificationKnownReposTable notificationKnownRepos =
+      $NotificationKnownReposTable(this);
   late final Index idxMetricSnapshotsRepoKey = Index(
     'idx_metric_snapshots_repo_key',
     'CREATE INDEX idx_metric_snapshots_repo_key ON metric_snapshots (repo_key)',
@@ -3782,6 +4162,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_repo_releases_repo_key',
     'CREATE INDEX idx_repo_releases_repo_key ON repo_releases (repo_key)',
   );
+  late final Index idxNotificationSeenSeenId = Index(
+    'idx_notification_seen_seen_id',
+    'CREATE UNIQUE INDEX idx_notification_seen_seen_id ON notification_seen (seen_id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3795,6 +4179,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     repoRuns,
     repoReleases,
     syncState,
+    notificationSeen,
+    notificationKnownRepos,
     idxMetricSnapshotsRepoKey,
     idxActivityEventsRepoKey,
     idxActivityEventsOccurredAt,
@@ -3803,6 +4189,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxRepoPullsRepoKey,
     idxRepoRunsRepoKey,
     idxRepoReleasesRepoKey,
+    idxNotificationSeenSeenId,
   ];
 }
 
@@ -5742,6 +6129,286 @@ typedef $$SyncStateTableProcessedTableManager =
       SyncStateRow,
       PrefetchHooks Function()
     >;
+typedef $$NotificationSeenTableCreateCompanionBuilder =
+    NotificationSeenCompanion Function({Value<int> id, required String seenId});
+typedef $$NotificationSeenTableUpdateCompanionBuilder =
+    NotificationSeenCompanion Function({Value<int> id, Value<String> seenId});
+
+class $$NotificationSeenTableFilterComposer
+    extends Composer<_$AppDatabase, $NotificationSeenTable> {
+  $$NotificationSeenTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get seenId => $composableBuilder(
+    column: $table.seenId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$NotificationSeenTableOrderingComposer
+    extends Composer<_$AppDatabase, $NotificationSeenTable> {
+  $$NotificationSeenTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get seenId => $composableBuilder(
+    column: $table.seenId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$NotificationSeenTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NotificationSeenTable> {
+  $$NotificationSeenTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get seenId =>
+      $composableBuilder(column: $table.seenId, builder: (column) => column);
+}
+
+class $$NotificationSeenTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $NotificationSeenTable,
+          NotificationSeenRow,
+          $$NotificationSeenTableFilterComposer,
+          $$NotificationSeenTableOrderingComposer,
+          $$NotificationSeenTableAnnotationComposer,
+          $$NotificationSeenTableCreateCompanionBuilder,
+          $$NotificationSeenTableUpdateCompanionBuilder,
+          (
+            NotificationSeenRow,
+            BaseReferences<
+              _$AppDatabase,
+              $NotificationSeenTable,
+              NotificationSeenRow
+            >,
+          ),
+          NotificationSeenRow,
+          PrefetchHooks Function()
+        > {
+  $$NotificationSeenTableTableManager(
+    _$AppDatabase db,
+    $NotificationSeenTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NotificationSeenTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NotificationSeenTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$NotificationSeenTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> seenId = const Value.absent(),
+              }) => NotificationSeenCompanion(id: id, seenId: seenId),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String seenId,
+              }) => NotificationSeenCompanion.insert(id: id, seenId: seenId),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$NotificationSeenTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $NotificationSeenTable,
+      NotificationSeenRow,
+      $$NotificationSeenTableFilterComposer,
+      $$NotificationSeenTableOrderingComposer,
+      $$NotificationSeenTableAnnotationComposer,
+      $$NotificationSeenTableCreateCompanionBuilder,
+      $$NotificationSeenTableUpdateCompanionBuilder,
+      (
+        NotificationSeenRow,
+        BaseReferences<
+          _$AppDatabase,
+          $NotificationSeenTable,
+          NotificationSeenRow
+        >,
+      ),
+      NotificationSeenRow,
+      PrefetchHooks Function()
+    >;
+typedef $$NotificationKnownReposTableCreateCompanionBuilder =
+    NotificationKnownReposCompanion Function({
+      required String repoDisplay,
+      Value<int> rowid,
+    });
+typedef $$NotificationKnownReposTableUpdateCompanionBuilder =
+    NotificationKnownReposCompanion Function({
+      Value<String> repoDisplay,
+      Value<int> rowid,
+    });
+
+class $$NotificationKnownReposTableFilterComposer
+    extends Composer<_$AppDatabase, $NotificationKnownReposTable> {
+  $$NotificationKnownReposTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get repoDisplay => $composableBuilder(
+    column: $table.repoDisplay,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$NotificationKnownReposTableOrderingComposer
+    extends Composer<_$AppDatabase, $NotificationKnownReposTable> {
+  $$NotificationKnownReposTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get repoDisplay => $composableBuilder(
+    column: $table.repoDisplay,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$NotificationKnownReposTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NotificationKnownReposTable> {
+  $$NotificationKnownReposTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get repoDisplay => $composableBuilder(
+    column: $table.repoDisplay,
+    builder: (column) => column,
+  );
+}
+
+class $$NotificationKnownReposTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $NotificationKnownReposTable,
+          NotificationKnownRepoRow,
+          $$NotificationKnownReposTableFilterComposer,
+          $$NotificationKnownReposTableOrderingComposer,
+          $$NotificationKnownReposTableAnnotationComposer,
+          $$NotificationKnownReposTableCreateCompanionBuilder,
+          $$NotificationKnownReposTableUpdateCompanionBuilder,
+          (
+            NotificationKnownRepoRow,
+            BaseReferences<
+              _$AppDatabase,
+              $NotificationKnownReposTable,
+              NotificationKnownRepoRow
+            >,
+          ),
+          NotificationKnownRepoRow,
+          PrefetchHooks Function()
+        > {
+  $$NotificationKnownReposTableTableManager(
+    _$AppDatabase db,
+    $NotificationKnownReposTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NotificationKnownReposTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$NotificationKnownReposTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$NotificationKnownReposTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> repoDisplay = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NotificationKnownReposCompanion(
+                repoDisplay: repoDisplay,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String repoDisplay,
+                Value<int> rowid = const Value.absent(),
+              }) => NotificationKnownReposCompanion.insert(
+                repoDisplay: repoDisplay,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$NotificationKnownReposTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $NotificationKnownReposTable,
+      NotificationKnownRepoRow,
+      $$NotificationKnownReposTableFilterComposer,
+      $$NotificationKnownReposTableOrderingComposer,
+      $$NotificationKnownReposTableAnnotationComposer,
+      $$NotificationKnownReposTableCreateCompanionBuilder,
+      $$NotificationKnownReposTableUpdateCompanionBuilder,
+      (
+        NotificationKnownRepoRow,
+        BaseReferences<
+          _$AppDatabase,
+          $NotificationKnownReposTable,
+          NotificationKnownRepoRow
+        >,
+      ),
+      NotificationKnownRepoRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -5762,4 +6429,11 @@ class $AppDatabaseManager {
       $$RepoReleasesTableTableManager(_db, _db.repoReleases);
   $$SyncStateTableTableManager get syncState =>
       $$SyncStateTableTableManager(_db, _db.syncState);
+  $$NotificationSeenTableTableManager get notificationSeen =>
+      $$NotificationSeenTableTableManager(_db, _db.notificationSeen);
+  $$NotificationKnownReposTableTableManager get notificationKnownRepos =>
+      $$NotificationKnownReposTableTableManager(
+        _db,
+        _db.notificationKnownRepos,
+      );
 }

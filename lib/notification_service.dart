@@ -5,22 +5,12 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'attention_service.dart';
+import 'notification_seen_store.dart';
 import 'preferences_store.dart';
 import 'repo_store.dart';
 
 class NotificationService {
   NotificationService._();
-
-  static const String _seenKey = 'seen_attention';
-
-  /// Repos whose first snapshot has been seeded, so adding a repo doesn't
-  /// replay its whole existing backlog as "new".
-  static const String _knownReposKey = 'known_attention_repos';
-
-  /// Safety cap on the monotonic seen-id set (the baseline only grows via
-  /// union); a very long uptime resets to the current snapshot rather than
-  /// growing without bound.
-  static const int _maxSeenIds = 5000;
 
   static const int _summaryNotificationId = 42001;
   static const String _channelId = 'attention_inbox';
@@ -73,29 +63,32 @@ class NotificationService {
           .toList();
       final currentIds = attention.map((item) => item.id).toSet();
       final prefs = await SharedPreferences.getInstance();
-      // Refresh the in-memory cache from disk first: the background-sync isolate
-      // and the resident foreground isolate each cache prefs independently, so
-      // without this a resident foreground could re-notify items the background
-      // sync already alerted on (and clobber its advanced baseline). This closes
-      // the common sequential case; a truly-simultaneous foreground+background
-      // notify could still last-writer-win (rare — the background task runs when
-      // the app is suspended and not actively notifying). A fully atomic
-      // cross-isolate baseline would move the seen set into the DB (follow-up).
+      // Freshen the cached prefs from disk: the seen baseline is now atomic in
+      // the DB, but the repo lists and notification settings are still read from
+      // SharedPreferences here, so a reused background isolate should still pick
+      // up foreground config changes (e.g. a repo added, or notifications
+      // disabled) before deciding.
       await prefs.reload();
       // Mark every monitored repo "known" — including ones that currently have
       // zero attention items — so adding a repo silences only its existing
       // backlog while the first attention item that later appears in a
-      // quiet-at-add repo still notifies.
+      // quiet-at-add repo still notifies. (Repo lists remain configuration in
+      // SharedPreferences.)
       final monitoredRepos = monitoredRepoDisplays(
         prefs.getStringList(RepoStore.githubKey) ?? const <String>[],
         prefs.getStringList(RepoStore.adoKey) ?? const <String>[],
       );
-      // On the very first run there is no baseline, so seed silently instead of
-      // notifying for every existing item.
-      final firstRun = !prefs.containsKey(_seenKey);
-      final seen = (prefs.getStringList(_seenKey) ?? const <String>[]).toSet();
-      final knownRepos =
-          (prefs.getStringList(_knownReposKey) ?? const <String>[]).toSet();
+      // The seen baseline lives in the DB (Phase 4): the foreground and the
+      // background-sync isolate record it additively, so neither clobbers the
+      // other's snapshot. (The notification *decision* itself — read baseline,
+      // notify, then record — is still per-isolate, so a truly-simultaneous
+      // foreground+background run could each notify the same item once; that is
+      // rare because the background task runs while the app is suspended and not
+      // actively notifying, and the additive baseline prevents any re-notify on
+      // the following cycle.)
+      final firstRun = !await NotificationSeenStore.isSeeded();
+      final seen = await NotificationSeenStore.seenIds();
+      final knownRepos = await NotificationSeenStore.knownRepos();
       final newIds = pendingIds(
         seen: seen,
         knownRepos: knownRepos,
@@ -131,18 +124,11 @@ class NotificationService {
         firstRun: firstRun,
         inQuietHours: inQuietHours,
       )) {
-        // Union so ids are never dropped: a transiently-failed repo keeps its
-        // baseline (recovery doesn't re-notify) and one caller's snapshot can't
-        // clobber another's. Repos are recorded so their first appearance is
-        // only ever seeded once.
-        await prefs.setStringList(
-          _seenKey,
-          mergeSeen(seen, currentIds).toList()..sort(),
-        );
-        await prefs.setStringList(
-          _knownReposKey,
-          knownRepos.union(monitoredRepos).toList()..sort(),
-        );
+        // Additive, atomic union in the DB: ids are never dropped (a
+        // transiently-failed repo keeps its baseline) and concurrent isolates
+        // can't clobber each other's snapshot. Repos are recorded so their first
+        // appearance is only ever seeded once.
+        await NotificationSeenStore.recordBaseline(currentIds, monitoredRepos);
       }
     } catch (e) {
       debugPrint('Failed to process attention notifications: $e');
@@ -173,15 +159,6 @@ class NotificationService {
         .map((item) => item.id)
         .toSet();
     return diffNew(seen, currentIds).difference(newRepoItemIds);
-  }
-
-  /// The next baseline: the union of the existing [seen] set and the current
-  /// snapshot, so ids are never dropped. A very large set (long uptime) resets
-  /// to the current snapshot to bound growth.
-  @visibleForTesting
-  static Set<String> mergeSeen(Set<String> seen, Set<String> currentIds) {
-    final merged = seen.union(currentIds);
-    return merged.length > _maxSeenIds ? currentIds : merged;
   }
 
   /// The `repoDisplay` of every monitored repository, derived from the persisted
