@@ -133,14 +133,25 @@ class _PreferencesPageState extends State<PreferencesPage> {
                   value: _prefs.backgroundSyncEnabled,
                   onChanged: BackgroundSync.isSupported
                       ? (value) async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final ok = value
+                              ? await BackgroundSync.enable()
+                              : await BackgroundSync.disable();
+                          if (!ok) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  value
+                                      ? 'Could not enable background sync.'
+                                      : 'Could not disable background sync.',
+                                ),
+                              ),
+                            );
+                            return; // leave the switch and stored pref as-is
+                          }
                           await PreferencesStore.setBackgroundSyncEnabled(
                             value,
                           );
-                          if (value) {
-                            await BackgroundSync.enable();
-                          } else {
-                            await BackgroundSync.disable();
-                          }
                           if (!mounted) return;
                           setState(
                             () => _prefs = _prefs.copyWith(

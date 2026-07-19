@@ -86,12 +86,16 @@ class HomeMenuButton extends StatelessWidget {
       const SnackBar(content: Text('Syncing…'), duration: Duration(seconds: 2)),
     );
     try {
-      final count = await SyncService.runOnce(force: true);
+      final result = await SyncService.runOnce(force: true);
       bumpConfigRevision();
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Synced ${count == 1 ? '1 repo' : '$count repos'}.'),
+          content: Text(
+            result.activityOk
+                ? 'Synced ${result.repoCount == 1 ? '1 repo' : '${result.repoCount} repos'}.'
+                : 'Sync failed — check your connection and tokens.',
+          ),
         ),
       );
     } catch (e) {

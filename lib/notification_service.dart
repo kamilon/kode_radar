@@ -66,6 +66,11 @@ class NotificationService {
     try {
       final currentIds = items.map((item) => item.id).toSet();
       final prefs = await SharedPreferences.getInstance();
+      // Refresh the in-memory cache from disk first: the background-sync isolate
+      // and the resident foreground isolate each cache prefs independently, so
+      // without this a resident foreground could re-notify items the background
+      // sync already alerted on (and clobber its advanced baseline).
+      await prefs.reload();
       // Mark every monitored repo "known" — including ones that currently have
       // zero attention items — so adding a repo silences only its existing
       // backlog while the first attention item that later appears in a

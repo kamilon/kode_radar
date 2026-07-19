@@ -254,8 +254,14 @@ class MetricStore {
   }
 
   /// Imports pre-database history from [storageKey] into the database exactly
-  /// once. Memoized so it runs at most once per process.
-  static Future<void> _ensureMigrated() => _migration ??= _migrate();
+  /// once. Memoized so it runs at most once per process; a failure clears the
+  /// memo so a later call can retry (and doesn't poison every future call).
+  static Future<void> _ensureMigrated() {
+    return _migration ??= _migrate().catchError((Object e) {
+      _migration = null;
+      throw e;
+    });
+  }
 
   static Future<void> _migrate() async {
     final prefs = await SharedPreferences.getInstance();
@@ -291,8 +297,12 @@ class MetricStore {
       return;
     }
 
-    // Insert the rows and the completion marker atomically.
+    // Insert the rows and the completion marker atomically, re-checking the
+    // marker INSIDE the (serialized) transaction so a second isolate that
+    // migrated concurrently can't double-import.
+    var imported = false;
     await db.transaction(() async {
+      if (await _isImported(db)) return;
       for (final entry in legacy.entries) {
         for (final snapshot in entry.value) {
           await db
@@ -313,11 +323,12 @@ class MetricStore {
           .insertOnConflictUpdate(
             AppMetaCompanion.insert(key: _importedFlag, value: '1'),
           );
+      imported = true;
     });
 
     // Safe now that the marker is committed: a crash here just leaves a stale
     // key that the early `_isImported` branch clears on the next run.
-    await prefs.remove(storageKey);
+    if (imported) await prefs.remove(storageKey);
   }
 
   static Future<bool> _isImported(AppDatabase db) async {

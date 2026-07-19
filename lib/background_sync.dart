@@ -19,12 +19,13 @@ void backgroundSyncCallbackDispatcher() {
     WidgetsFlutterBinding.ensureInitialized();
     try {
       await NotificationService.init();
-      await SyncService.runOnce();
+      final result = await SyncService.runOnce(background: true);
+      // Report failure so the OS can retry/reschedule when nothing useful ran.
+      return result.activityOk;
     } catch (e) {
       debugPrint('Background sync task failed: $e');
+      return false;
     }
-    // Report success so the OS keeps scheduling the periodic task.
-    return true;
   });
 }
 
@@ -45,8 +46,10 @@ class BackgroundSync {
     _initialized = true;
   }
 
-  static Future<void> enable() async {
-    if (!isSupported) return;
+  /// Registers the periodic task. Returns false (and logs) if registration
+  /// fails, so the caller can surface it rather than claiming success.
+  static Future<bool> enable() async {
+    if (!isSupported) return false;
     try {
       await _ensureInitialized();
       if (Platform.isAndroid) {
@@ -68,18 +71,23 @@ class BackgroundSync {
           inputData: <String, dynamic>{},
         );
       }
+      return true;
     } catch (e) {
       debugPrint('BackgroundSync.enable failed: $e');
+      return false;
     }
   }
 
-  static Future<void> disable() async {
-    if (!isSupported) return;
+  static Future<bool> disable() async {
+    if (!isSupported) return false;
     try {
       await _ensureInitialized();
-      await Workmanager().cancelAll();
+      // Cancel only our task, not any other work the app might schedule later.
+      await Workmanager().cancelByUniqueName(backgroundSyncTask);
+      return true;
     } catch (e) {
       debugPrint('BackgroundSync.disable failed: $e');
+      return false;
     }
   }
 }

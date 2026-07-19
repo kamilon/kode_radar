@@ -57,9 +57,12 @@ LazyDatabase _openConnection() {
     return NativeDatabase.createInBackground(
       file,
       // WAL lets the app and a background-sync isolate (which opens its own
-      // connection to this file) read/write concurrently without "database is
-      // locked" errors.
-      setup: (rawDb) => rawDb.execute('PRAGMA journal_mode=WAL;'),
+      // connection to this file) read/write concurrently; busy_timeout makes a
+      // writer wait for a brief lock instead of failing fast with SQLITE_BUSY.
+      setup: (rawDb) {
+        rawDb.execute('PRAGMA journal_mode=WAL;');
+        rawDb.execute('PRAGMA busy_timeout=5000;');
+      },
     );
   });
 }

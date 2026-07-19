@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../metric_snapshot.dart';
 import 'views_common.dart';
 
 /// A contribution-graph-style grid: repos as rows, recent snapshot days as
@@ -37,11 +38,10 @@ class HeatmapView extends StatelessWidget {
               .fold<String?>(null, (p, e) => p ?? e) ??
           key;
       final byDay = <DateTime, double>{};
-      for (final s in snaps) {
-        final d = DateTime.utc(s.at.year, s.at.month, s.at.day);
-        final v = s.activityScore.toDouble();
-        byDay[d] = (byDay[d] ?? 0) + v;
-        if (byDay[d]! > maxScore) maxScore = byDay[d]!;
+      for (final entry in latestSnapshotByDay(snaps).entries) {
+        final v = entry.value.activityScore.toDouble();
+        byDay[entry.key] = v;
+        if (v > maxScore) maxScore = v;
       }
       rows.add(_Row(name.split('/').last, byDay));
     });
