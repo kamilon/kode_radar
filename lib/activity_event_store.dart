@@ -63,6 +63,32 @@ class ActivityEventStore {
     DateTime? now,
     String? repoKey,
   }) async {
+    final rows = await _selectCached(
+      lookback: lookback,
+      now: now,
+      repoKey: repoKey,
+    ).get();
+    return rows.map(_toEvent).toList();
+  }
+
+  /// A reactive stream of the cached events (same shape as [cached]) that
+  /// re-emits whenever the `activity_events` table changes — so a page bound to
+  /// it updates automatically when a refresh (or another writer) persists new
+  /// data. [now]/[lookback] fix the window at subscription time.
+  static Stream<List<ActivityEvent>> watch({
+    Duration lookback = ActivityFeedService.defaultLookback,
+    DateTime? now,
+    String? repoKey,
+  }) {
+    return _selectCached(
+      lookback: lookback,
+      now: now,
+      repoKey: repoKey,
+    ).watch().map((rows) => rows.map(_toEvent).toList());
+  }
+
+  static SimpleSelectStatement<$ActivityEventsTable, ActivityEventRow>
+  _selectCached({required Duration lookback, DateTime? now, String? repoKey}) {
     final since = (now ?? DateTime.now()).toUtc().subtract(lookback);
     final db = _database;
     final query = db.select(db.activityEvents)
@@ -72,18 +98,13 @@ class ActivityEventStore {
     if (repoKey != null) {
       query.where((t) => t.repoKey.equals(repoKey));
     }
-    final rows =
-        await (query
-              ..orderBy([
-                (t) => OrderingTerm(
-                  expression: t.occurredAt,
-                  mode: OrderingMode.desc,
-                ),
-                (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
-              ])
-              ..limit(ActivityFeedService.maxEvents))
-            .get();
-    return rows.map(_toEvent).toList();
+    query
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.occurredAt, mode: OrderingMode.desc),
+        (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
+      ])
+      ..limit(ActivityFeedService.maxEvents);
+    return query;
   }
 
   /// Upserts [events] into the cache (keyed by `(repoKey, eventId)`), prunes

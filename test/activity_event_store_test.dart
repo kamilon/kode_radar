@@ -280,6 +280,23 @@ void main() {
     expect(cached.map((e) => e.id).toList(), ['1', '3']);
   });
 
+  test('watch emits the cache and re-emits after a save', () async {
+    final emissions = <List<String>>[];
+    final sub = ActivityEventStore.watch(now: now).listen((events) {
+      emissions.add(events.map((e) => e.id).toList());
+    });
+    // Initial emission (empty cache).
+    await pumpEventQueue();
+    await ActivityEventStore.save([
+      _event(id: 'a', repoKey: 'github:owner/name', occurredAt: now),
+    ], now: now);
+    await pumpEventQueue();
+    await sub.cancel();
+
+    expect(emissions.first, isEmpty);
+    expect(emissions.last, ['a']);
+  });
+
   test('removeRepo drops only the given repo', () async {
     await ActivityEventStore.save([
       _event(id: '1', repoKey: 'github:a/a', occurredAt: now),

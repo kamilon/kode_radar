@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'activity_event.dart';
@@ -53,6 +55,11 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
   // config-triggered reload); the newest load always wins.
   int _loadSeq = 0;
 
+  /// Reactive subscription to the cached events: drives `_events` (instant
+  /// cache on cold start, and auto-updates whenever a refresh persists new
+  /// data). Re-subscribed when the lookback window changes.
+  StreamSubscription<List<ActivityEvent>>? _eventsSub;
+
   /// Selected type groups; empty means "all kinds".
   final Set<String> _groups = <String>{};
 
@@ -68,6 +75,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
 
   @override
   void dispose() {
+    _eventsSub?.cancel();
     configRevision.removeListener(_onConfigChanged);
     super.dispose();
   }
@@ -76,11 +84,34 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
     if (mounted) _load();
   }
 
+  /// (Re)subscribes the reactive cache stream for [lookback]. The initial
+  /// emission renders the cache instantly; later emissions (e.g. after a refresh
+  /// persists, or a repo delete prunes) update the list automatically.
+  void _subscribe(Duration lookback) {
+    _eventsSub?.cancel();
+    _eventsSub = ActivityEventStore.watch(lookback: lookback).listen(
+      (events) {
+        if (!mounted) return;
+        setState(() {
+          _events = events;
+          // A late cache emission should clear a stale error screen that a
+          // failed refresh set before the cache arrived.
+          if (events.isNotEmpty) _error = null;
+        });
+      },
+      onError: (Object e) => debugPrint('ActivityFeed watch stream error: $e'),
+    );
+  }
+
   Future<void> _load() async {
     final seq = ++_loadSeq;
     setState(() {
       _refreshing = true;
       _error = null;
+      // Clear any stale source-health notice while the new refresh is in
+      // flight; it's set fresh from the network result below.
+      _failedSources = 0;
+      _truncated = false;
     });
     try {
       // Capture the previous last-seen once (so "new" highlights stay stable
@@ -95,41 +126,25 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
       final selfAdo = await IdentityStore.selfAdoNames();
       final appPrefs = await PreferencesStore.load();
       final lookback = Duration(days: appPrefs.feedLookbackDays);
-
-      // Phase A: render the cached feed immediately so a cold start isn't a
-      // blank spinner while the network fetch runs (or if it's offline). Only
-      // meaningful when we don't already have events on screen.
-      if (_events.isEmpty) {
-        final cached = await ActivityEventStore.cached(lookback: lookback);
-        final lastSynced = await SyncStateStore.lastSuccess(
-          SyncStateStore.feedScope,
-        );
-        if (!mounted || seq != _loadSeq) return;
-        // Set the provenance label even when the cache is empty (a scope that
-        // synced successfully but had nothing to show), so its "updated" time
-        // survives a restart/offline open.
-        if (cached.isNotEmpty || lastSynced != null) {
-          setState(() {
-            if (cached.isNotEmpty) {
-              _events = cached;
-              // The cached render carries no source-health signal, so clear any
-              // stale failed/truncated notice from a previous refresh while the
-              // new network refresh is still in flight.
-              _failedSources = 0;
-              _truncated = false;
-            }
-            _teams = teams;
-            _lookbackDays = appPrefs.feedLookbackDays;
-            _lastSynced = lastSynced;
-            if (_teamId != null && !teams.any((t) => t.id == _teamId)) {
-              _teamId = null;
-            }
-            _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
-          });
+      final lastSynced = await SyncStateStore.lastSuccess(
+        SyncStateStore.feedScope,
+      );
+      if (!mounted || seq != _loadSeq) return;
+      // Re-subscribe every load with a fresh cutoff so the "last N days" window
+      // slides as time passes (not just when the configured lookback changes).
+      _subscribe(lookback);
+      setState(() {
+        _teams = teams;
+        _lookbackDays = appPrefs.feedLookbackDays;
+        _lastSynced = lastSynced;
+        if (_teamId != null && !teams.any((t) => t.id == _teamId)) {
+          _teamId = null;
         }
-      }
+        _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
+      });
 
-      // Phase B: refresh from the network and persist the result to the cache.
+      // Refresh from the network and persist the result; the stream then emits
+      // the merged cache and updates `_events` automatically.
       final result = await ActivityFeedService.computeAll(
         client: AppHttp.client,
         selfGithubLogins: selfGithub,
@@ -138,12 +153,6 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
       );
       if (!mounted || seq != _loadSeq) return;
       await ActivityEventStore.save(result.events, restrictToMonitored: true);
-      if (!mounted || seq != _loadSeq) return;
-      // Render the persisted cache (not `result.events` directly) so a fully
-      // offline load — where per-source failures yield an empty result rather
-      // than an exception — keeps showing cached events instead of blanking,
-      // and a partial failure shows the union of fresh + still-cached events.
-      final merged = await ActivityEventStore.cached(lookback: lookback);
       if (!mounted || seq != _loadSeq) return;
       // Advance the watermark to the newest event this network refresh
       // returned — a provider timestamp, so device-clock skew can't poison it,
@@ -167,16 +176,8 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
         if (!mounted || seq != _loadSeq) return;
       }
       setState(() {
-        _events = merged;
         _failedSources = result.failedSources;
         _truncated = result.truncated;
-        _lookbackDays = appPrefs.feedLookbackDays;
-        _teams = teams;
-        // Drop a stale team filter if the team was deleted.
-        if (_teamId != null && !teams.any((t) => t.id == _teamId)) {
-          _teamId = null;
-        }
-        _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
         if (syncedOk) _lastSynced = DateTime.now();
         _refreshing = false;
       });
@@ -184,9 +185,8 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
       debugPrint('ActivityFeed failed to load: $e');
       if (!mounted || seq != _loadSeq) return;
       setState(() {
-        // If we already rendered cached events (Phase A), keep them on screen
-        // rather than replacing them with an error state; the refresh simply
-        // didn't land this time. Only show the error when we have nothing.
+        // Keep any cached events (the stream drives them) rather than replacing
+        // them with an error state; only show the error when we have nothing.
         if (_events.isEmpty) {
           _error =
               'Something went wrong while loading the feed. Pull down to try again.';
