@@ -161,8 +161,10 @@ void main() {
   );
 
   test('v2 -> v3 upgrade creates a working attention_items table', () async {
-    // A v2-shaped database (activity_events cache exists, attention_items does
-    // not), user_version = 2, so opening AppDatabase runs onUpgrade(2 -> 3).
+    // Set user_version = 2 so opening AppDatabase runs onUpgrade(2 -> 3) rather
+    // than onCreate. We don't materialize the other v2 tables because this test
+    // only exercises the v3 step (creating attention_items), which is
+    // independent of them.
     final native = sqlite3.openInMemory();
     native.execute('PRAGMA user_version = 2;');
     final upgraded = AppDatabase.forExecutor(
