@@ -54,7 +54,12 @@ class SyncService {
     // Freshen the config cache from disk: a reused background isolate could hold
     // a stale monitored-repo list / preferences, which would skew the
     // `restrictToMonitored` cache prune and the provenance monitored-count.
-    await (await SharedPreferences.getInstance()).reload();
+    // Swallow failures so runOnce keeps its never-throw contract.
+    try {
+      await (await SharedPreferences.getInstance()).reload();
+    } catch (e, st) {
+      debugPrint('SyncService: prefs reload failed: $e\n$st');
+    }
 
     // NOTE: the per-repo cache writes below are serialized only within an
     // isolate (each store's static lock). A background run happens while the app
@@ -99,9 +104,13 @@ class SyncService {
           ),
         );
         await AttentionStore.save(items);
-        // Provenance: a real sync unless every monitored repo errored.
+        // Provenance: a real sync unless every monitored repo errored. Count
+        // errored repos by distinct repoDisplay to line up with monitoredCount
+        // (which parseMonitoredRepos de-dupes by repoKey).
         final erroredRepos = items
             .where((i) => i.category == AttentionStore.errorCategory)
+            .map((i) => i.repoDisplay)
+            .toSet()
             .length;
         final prefs = await SharedPreferences.getInstance();
         final monitoredCount = parseMonitoredRepos(
