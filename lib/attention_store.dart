@@ -54,14 +54,24 @@ class AttentionStore {
               (t) =>
                   OrderingTerm(expression: t.severity, mode: OrderingMode.desc),
               (t) => OrderingTerm(expression: t.repoDisplay),
+              // Final tie-breaker so same-severity items in the same repo have a
+              // stable order (SQLite is otherwise free to reorder them, causing
+              // list jitter between cache and network renders).
+              (t) => OrderingTerm(expression: t.id),
             ]))
             .get();
     return rows.where((r) => !snoozedIds.contains(r.id)).map(_toItem).toList();
   }
 
   /// Replaces the cached snapshot from a freshly-[computed] list (as returned by
-  /// [AttentionService.computeAll], which already excludes snoozed items and
-  /// emits one `error` item per repo that failed to load).
+  /// [AttentionService.computeAll], which emits one `error` item per repo that
+  /// failed to load).
+  ///
+  /// Callers should pass the FULL snapshot (do not pre-filter snoozed items):
+  /// the cache is the source of truth for what each repo currently has, and
+  /// snooze is a display concern applied at read time by [cached]. Pre-filtering
+  /// would make a snoozed-away or dismissed item look like the repo went clean
+  /// and wrongly evict its cached data.
   ///
   /// Repos that returned an `error` this round keep their previously-cached
   /// items (so a transient/offline failure doesn't drop their data); every other

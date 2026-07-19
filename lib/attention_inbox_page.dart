@@ -129,7 +129,10 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         ..sort((a, b) {
           final bySeverity = b.severity.compareTo(a.severity);
           if (bySeverity != 0) return bySeverity;
-          return a.repoDisplay.compareTo(b.repoDisplay);
+          final byRepo = a.repoDisplay.compareTo(b.repoDisplay);
+          if (byRepo != 0) return byRepo;
+          // Stable final tie-breaker so ties don't reorder between renders.
+          return a.id.compareTo(b.id);
         });
       setState(() {
         _items = merged;

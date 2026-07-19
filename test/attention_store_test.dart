@@ -69,6 +69,17 @@ void main() {
     expect(cached.first.ageDays, 2);
   });
 
+  test('cached breaks severity+repo ties deterministically by id', () async {
+    await AttentionStore.save([
+      _item(id: 'z', repoDisplay: 'owner/one', severity: 3000),
+      _item(id: 'a', repoDisplay: 'owner/one', severity: 3000),
+      _item(id: 'm', repoDisplay: 'owner/one', severity: 3000),
+    ]);
+
+    final cached = await AttentionStore.cached();
+    expect(cached.map((e) => e.id).toList(), ['a', 'm', 'z']);
+  });
+
   test('cached filters out snoozed ids on read', () async {
     await AttentionStore.save([
       _item(id: 'a', repoDisplay: 'owner/one'),
