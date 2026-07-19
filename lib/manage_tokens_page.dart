@@ -302,6 +302,10 @@ class _ManageTokensPageState extends State<ManageTokensPage> {
   }
 
   Widget _buildCheckStatus(StoredTokenCheck check) {
+    // The status icon and the gap to its text; the secondary budget line is
+    // indented by their sum so it aligns under the status text.
+    const iconSize = 16.0;
+    const iconGap = 6.0;
     // A stored "authenticated" result only reflects the moment it was checked;
     // after a while the token may have been revoked, so de-emphasize old
     // successes rather than implying current validity.
@@ -336,8 +340,8 @@ class _ManageTokensPageState extends State<ManageTokensPage> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 6),
+            Icon(icon, size: iconSize, color: color),
+            const SizedBox(width: iconGap),
             Expanded(
               child: Text('$text$suffix', style: TextStyle(color: color)),
             ),
@@ -345,7 +349,7 @@ class _ManageTokensPageState extends State<ManageTokensPage> {
         ),
         if (check.rateLimitRemaining != null)
           Padding(
-            padding: const EdgeInsets.only(top: 2, left: 22),
+            padding: const EdgeInsets.only(top: 2, left: iconSize + iconGap),
             child: Text(
               _rateLimitText(check),
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
