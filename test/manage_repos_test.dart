@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kode_radar/database/app_database.dart';
+import 'package:kode_radar/activity_event_store.dart';
 import 'package:kode_radar/manage_repos_page.dart';
 import 'package:kode_radar/metric_store.dart';
 import 'package:kode_radar/team_store.dart';
@@ -17,6 +18,7 @@ void main() {
     FlutterSecureStorage.setMockInitialValues({});
     db = AppDatabase.forExecutor(NativeDatabase.memory());
     MetricStore.debugUseDatabase(db);
+    ActivityEventStore.debugUseDatabase(db);
   });
 
   tearDown(() async {

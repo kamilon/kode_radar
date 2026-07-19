@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'activity_event.dart';
 import 'activity_event_list.dart';
+import 'activity_event_store.dart';
 import 'activity_feed_service.dart';
 import 'app_http.dart';
 import 'config_revision.dart';
@@ -84,17 +85,48 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
       final selfGithub = await IdentityStore.selfGithubLogins();
       final selfAdo = await IdentityStore.selfAdoNames();
       final appPrefs = await PreferencesStore.load();
+      final lookback = Duration(days: appPrefs.feedLookbackDays);
+
+      // Phase A: render the cached feed immediately so a cold start isn't a
+      // blank spinner while the network fetch runs (or if it's offline). Only
+      // meaningful when we don't already have events on screen.
+      if (_events.isEmpty) {
+        final cached = await ActivityEventStore.cached(lookback: lookback);
+        if (!mounted || seq != _loadSeq) return;
+        if (cached.isNotEmpty) {
+          setState(() {
+            _events = cached;
+            _teams = teams;
+            _lookbackDays = appPrefs.feedLookbackDays;
+            if (_teamId != null && !teams.any((t) => t.id == _teamId)) {
+              _teamId = null;
+            }
+            _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
+            _loading = false;
+          });
+        }
+      }
+
+      // Phase B: refresh from the network and persist the result to the cache.
       final result = await ActivityFeedService.computeAll(
         client: AppHttp.client,
         selfGithubLogins: selfGithub,
         selfAdoNames: selfAdo,
-        lookback: Duration(days: appPrefs.feedLookbackDays),
+        lookback: lookback,
       );
       if (!mounted || seq != _loadSeq) return;
-      // Advance the watermark to the newest event we actually loaded — a
-      // provider timestamp, so device-clock skew can't poison it, and only on
-      // a successful load so a failure/quick pop never consumes unseen items.
-      // markSeen never moves the marker backwards.
+      await ActivityEventStore.save(result.events, restrictToMonitored: true);
+      if (!mounted || seq != _loadSeq) return;
+      // Render the persisted cache (not `result.events` directly) so a fully
+      // offline load — where per-source failures yield an empty result rather
+      // than an exception — keeps showing cached events instead of blanking,
+      // and a partial failure shows the union of fresh + still-cached events.
+      final merged = await ActivityEventStore.cached(lookback: lookback);
+      if (!mounted || seq != _loadSeq) return;
+      // Advance the watermark to the newest event this network refresh
+      // returned — a provider timestamp, so device-clock skew can't poison it,
+      // and only on a successful load so a failure/quick pop never consumes
+      // unseen items. markSeen never moves the marker backwards.
       if (result.events.isNotEmpty) {
         await SeenStore.markSeen(
           SeenStore.feedKey,
@@ -103,7 +135,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
         if (!mounted || seq != _loadSeq) return;
       }
       setState(() {
-        _events = result.events;
+        _events = merged;
         _failedSources = result.failedSources;
         _truncated = result.truncated;
         _lookbackDays = appPrefs.feedLookbackDays;
@@ -120,8 +152,13 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
       debugPrint('ActivityFeed failed to load: $e');
       if (!mounted || seq != _loadSeq) return;
       setState(() {
-        _error =
-            'Something went wrong while loading the feed. Pull down to try again.';
+        // If we already rendered cached events (Phase A), keep them on screen
+        // rather than replacing them with an error state; the refresh simply
+        // didn't land this time. Only show the error when we have nothing.
+        if (_events.isEmpty) {
+          _error =
+              'Something went wrong while loading the feed. Pull down to try again.';
+        }
         _loading = false;
       });
     }
