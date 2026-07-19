@@ -1,13 +1,21 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'activity_event_store.dart';
+import 'activity_feed_service.dart';
 import 'activity_service.dart';
 import 'app_http.dart';
 import 'attention_service.dart';
+import 'attention_store.dart';
 import 'identity_store.dart';
 import 'metric_store.dart';
+import 'monitored_repos.dart';
 import 'notification_service.dart';
+import 'preferences_store.dart';
+import 'repo_store.dart';
 import 'snooze_store.dart';
+import 'sync_state_store.dart';
 
 /// Outcome of a sync. [activityOk] reflects whether the repo-activity + trend
 /// capture half succeeded (the part a manual "Sync now" reports on); attention
@@ -23,15 +31,17 @@ class SyncResult {
 /// poll attention on their own timers; this centralizes the on-demand and
 /// background paths.)
 ///
-/// It refreshes repo activity and records a trend snapshot, then recomputes the
-/// attention inbox and notifies for anything new. It never throws — each half
-/// is isolated so a failure in one doesn't skip the other.
+/// It refreshes repo activity and records a trend snapshot, refreshes the
+/// attention inbox (notifying for anything new and persisting its cache), and
+/// refreshes the activity-feed cache, so the offline caches and their "Updated"
+/// provenance are current even when the sync ran in the background. It never
+/// throws — each phase is isolated so a failure in one doesn't skip the others.
 class SyncService {
   SyncService._();
 
   /// Runs one full sync. Pass [force] to bypass the trend-capture interval (used
   /// by "Sync now" so it always records a data point). Pass [background] to run
-  /// the two halves concurrently under a deadline that fits iOS's tight
+  /// the phases concurrently under a deadline that fits iOS's tight
   /// `BGAppRefreshTask` budget.
   static Future<SyncResult> runOnce({
     http.Client? client,
@@ -41,12 +51,14 @@ class SyncService {
     final httpClient = client ?? AppHttp.client;
     final deadline = background ? const Duration(seconds: 25) : null;
 
+    Future<T> withDeadline<T>(Future<T> future) =>
+        deadline == null ? future : future.timeout(deadline);
+
     Future<SyncResult> activityPhase() async {
       try {
-        final future = ActivityService.computeAll(client: httpClient);
-        final activities = deadline == null
-            ? await future
-            : await future.timeout(deadline);
+        final activities = await withDeadline(
+          ActivityService.computeAll(client: httpClient),
+        );
         await MetricStore.capture(
           activities,
           restrictToMonitored: true,
@@ -64,18 +76,53 @@ class SyncService {
         final snoozed = await SnoozeStore.snoozedIds();
         final selfGithub = await IdentityStore.selfGithubLogins();
         final selfAdo = await IdentityStore.selfAdoNames();
-        final future = AttentionService.computeAll(
-          client: httpClient,
-          snoozedIds: snoozed,
-          selfGithubLogins: selfGithub,
-          selfAdoNames: selfAdo,
+        // Compute WITHOUT snooze filtering so the persisted cache sees each
+        // repo's true success/failure (matching the inbox page); snooze is
+        // applied only when notifying.
+        final items = await withDeadline(
+          AttentionService.computeAll(
+            client: httpClient,
+            selfGithubLogins: selfGithub,
+            selfAdoNames: selfAdo,
+          ),
         );
-        final items = deadline == null
-            ? await future
-            : await future.timeout(deadline);
-        await NotificationService.notifyNewAttention(items);
+        await AttentionStore.save(items);
+        // Provenance: a real sync unless every monitored repo errored.
+        final erroredRepos = items
+            .where((i) => i.category == AttentionStore.errorCategory)
+            .length;
+        final prefs = await SharedPreferences.getInstance();
+        final monitoredCount = parseMonitoredRepos(
+          prefs.getStringList(RepoStore.githubKey) ?? const <String>[],
+          prefs.getStringList(RepoStore.adoKey) ?? const <String>[],
+        ).length;
+        if (monitoredCount == 0 || erroredRepos < monitoredCount) {
+          await SyncStateStore.markSuccess(SyncStateStore.attentionScope);
+        }
+        await NotificationService.notifyNewAttention(
+          items.where((i) => !snoozed.contains(i.id)).toList(),
+        );
       } catch (e, st) {
         debugPrint('SyncService: attention failed: $e\n$st');
+      }
+    }
+
+    Future<void> feedPhase() async {
+      try {
+        final appPrefs = await PreferencesStore.load();
+        final lookback = Duration(days: appPrefs.feedLookbackDays);
+        final result = await withDeadline(
+          ActivityFeedService.computeAll(
+            client: httpClient,
+            lookback: lookback,
+          ),
+        );
+        await ActivityEventStore.save(result.events, restrictToMonitored: true);
+        if (result.failedSources == 0 || result.okSources > 0) {
+          await SyncStateStore.markSuccess(SyncStateStore.feedScope);
+        }
+      } catch (e, st) {
+        debugPrint('SyncService: feed cache failed: $e\n$st');
       }
     }
 
@@ -86,12 +133,14 @@ class SyncService {
       await Future.wait([
         activityPhase().then((r) => result = r),
         attentionPhase(),
+        feedPhase(),
       ]);
       return result;
     }
 
     final result = await activityPhase();
     await attentionPhase();
+    await feedPhase();
     return result;
   }
 }
