@@ -13,11 +13,12 @@ class AttentionItem {
     required this.id,
     required this.category,
     required this.severity,
-    required this.title,
-    required this.subtitle,
+    required this.titleTemplate,
+    required this.subtitleTemplate,
     required this.repoDisplay,
     this.url,
     this.ageDays,
+    this.createdAt,
     this.isMine = false,
   });
 
@@ -30,14 +31,42 @@ class AttentionItem {
   /// Higher = more urgent (used for ranking). Category dominates age.
   final int severity;
 
-  final String title;
-  final String subtitle;
+  /// Title/subtitle templates. Age-dependent items embed [ageToken] where the
+  /// age phrase goes, so [title]/[subtitle] can render a freshly-computed age
+  /// (from [ageDays]) rather than a value frozen at fetch time. These raw
+  /// templates are what the cache persists.
+  final String titleTemplate;
+  final String subtitleTemplate;
+
   final String repoDisplay;
   final String? url;
+
+  /// Whole days since the item's underlying PR was opened. Recomputed on read
+  /// from [createdAt] when the item comes from the cache, so it doesn't freeze.
   final int? ageDays;
+
+  /// When the underlying PR was created, persisted so [ageDays] (and the
+  /// displayed age) can be recomputed on read. Null for error markers and for
+  /// legacy cached rows written before this was stored.
+  final DateTime? createdAt;
 
   /// True when the current user is the PR author or a requested reviewer.
   final bool isMine;
+
+  /// Placeholder marking where the age phrase belongs in a template, so a
+  /// cached item's displayed age reflects "now" instead of its fetch time. Uses
+  /// a private-use code point that never appears in real PR text.
+  static const String ageToken = '\uE000';
+
+  /// The display title, with any [ageToken] replaced by the current age phrase.
+  String get title => _withAge(titleTemplate);
+
+  /// The display subtitle, with any [ageToken] replaced by the current age.
+  String get subtitle => _withAge(subtitleTemplate);
+
+  String _withAge(String template) => template.contains(ageToken)
+      ? template.replaceAll(ageToken, AttentionService.ageText(ageDays))
+      : template;
 }
 
 /// Computes a ranked, team-wide list of pull requests that need action across
@@ -151,6 +180,7 @@ class AttentionService {
       final author = _nestedString(pr['author'], 'login') ?? 'unknown';
       final url = _stringValue(pr, 'url');
       final age = _ageDays(pr['createdAt'], now);
+      final createdAt = parseCreatedAt(pr['createdAt']);
       final decision = _stringValue(pr, 'reviewDecision');
       // reviewDecision is null on repos without required reviews, so also
       // inspect each author's latest opinionated review. Supersession is
@@ -180,6 +210,7 @@ class AttentionService {
             author,
             age,
             url,
+            createdAt: createdAt,
             isMine: mine,
           ),
         );
@@ -194,12 +225,22 @@ class AttentionService {
             author,
             age,
             url,
+            createdAt: createdAt,
             isMine: mine,
           ),
         );
       } else if ((age ?? 0) > oldOpenPrDays) {
         items.add(
-          _oldOpen(repoDisplay, label, title, author, age, url, isMine: mine),
+          _oldOpen(
+            repoDisplay,
+            label,
+            title,
+            author,
+            age,
+            url,
+            createdAt: createdAt,
+            isMine: mine,
+          ),
         );
       }
     }
@@ -255,6 +296,7 @@ class AttentionService {
       final title = _stringValue(pr, 'title') ?? 'Untitled PR';
       final author = _nestedString(pr['createdBy'], 'displayName') ?? 'unknown';
       final age = _ageDays(pr['creationDate'], now);
+      final createdAt = parseCreatedAt(pr['creationDate']);
       final url = id == null
           ? null
           : 'https://dev.azure.com/$organization/$project/_git/$name/'
@@ -289,6 +331,7 @@ class AttentionService {
             author,
             age,
             url,
+            createdAt: createdAt,
             isMine: mine,
           ),
         );
@@ -301,6 +344,7 @@ class AttentionService {
             author,
             age,
             url,
+            createdAt: createdAt,
             isMine: mine,
           ),
         );
@@ -313,6 +357,7 @@ class AttentionService {
             author,
             age,
             url,
+            createdAt: createdAt,
             isMine: mine,
           ),
         );
@@ -328,18 +373,20 @@ class AttentionService {
     String author,
     int? ageDays,
     String? url, {
+    DateTime? createdAt,
     bool isMine = false,
   }) {
     return AttentionItem(
       id: 'reviewRequested:$repoDisplay:$prLabel',
       category: 'reviewRequested',
       severity: _severity(_tierReviewRequested, ageDays),
-      title: '$prLabel waiting on review',
-      subtitle:
-          '$repoDisplay · $title · opened ${_ageText(ageDays)} by $author',
+      titleTemplate: '$prLabel waiting on review',
+      subtitleTemplate:
+          '$repoDisplay · $title · opened ${AttentionItem.ageToken} by $author',
       repoDisplay: repoDisplay,
       url: url,
       ageDays: ageDays,
+      createdAt: createdAt,
       isMine: isMine,
     );
   }
@@ -351,18 +398,20 @@ class AttentionService {
     String author,
     int? ageDays,
     String? url, {
+    DateTime? createdAt,
     bool isMine = false,
   }) {
     return AttentionItem(
       id: 'changesRequested:$repoDisplay:$prLabel',
       category: 'changesRequested',
       severity: _severity(_tierChangesRequested, ageDays),
-      title: '$prLabel has changes requested',
-      subtitle:
-          '$repoDisplay · $title · opened ${_ageText(ageDays)} by $author',
+      titleTemplate: '$prLabel has changes requested',
+      subtitleTemplate:
+          '$repoDisplay · $title · opened ${AttentionItem.ageToken} by $author',
       repoDisplay: repoDisplay,
       url: url,
       ageDays: ageDays,
+      createdAt: createdAt,
       isMine: isMine,
     );
   }
@@ -374,17 +423,20 @@ class AttentionService {
     String author,
     int? ageDays,
     String? url, {
+    DateTime? createdAt,
     bool isMine = false,
   }) {
     return AttentionItem(
       id: 'oldOpenPr:$repoDisplay:$prLabel',
       category: 'oldOpenPr',
       severity: _severity(_tierOldOpen, ageDays),
-      title: '$prLabel open for ${_ageText(ageDays)}',
-      subtitle: '$repoDisplay · $title · by $author · no pending review',
+      titleTemplate: '$prLabel open for ${AttentionItem.ageToken}',
+      subtitleTemplate:
+          '$repoDisplay · $title · by $author · no pending review',
       repoDisplay: repoDisplay,
       url: url,
       ageDays: ageDays,
+      createdAt: createdAt,
       isMine: isMine,
     );
   }
@@ -394,22 +446,30 @@ class AttentionService {
       id: 'error:$repoDisplay',
       category: 'error',
       severity: _severity(_tierError, null),
-      title: reason,
-      subtitle: repoDisplay,
+      titleTemplate: reason,
+      subtitleTemplate: repoDisplay,
       repoDisplay: repoDisplay,
     );
   }
 
-  static String _ageText(int? ageDays) {
+  /// Formats an age in days as a short phrase (e.g. "today", "1 day",
+  /// "3 days"). Public so [AttentionItem] can substitute a freshly-computed age
+  /// into its display strings on read.
+  static String ageText(int? ageDays) {
     if (ageDays == null) return 'recently';
     if (ageDays <= 0) return 'today';
     if (ageDays == 1) return '1 day';
     return '$ageDays days';
   }
 
-  static int? _ageDays(dynamic isoDate, DateTime now) {
+  /// Parses an ISO-8601 date string, or null if it isn't a valid date string.
+  static DateTime? parseCreatedAt(dynamic isoDate) {
     if (isoDate is! String) return null;
-    final parsed = DateTime.tryParse(isoDate);
+    return DateTime.tryParse(isoDate);
+  }
+
+  static int? _ageDays(dynamic isoDate, DateTime now) {
+    final parsed = parseCreatedAt(isoDate);
     if (parsed == null) return null;
     final diff = now.difference(parsed).inDays;
     return diff < 0 ? 0 : diff;

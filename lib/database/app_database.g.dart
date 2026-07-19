@@ -1405,6 +1405,17 @@ class $AttentionItemsTable extends AttentionItems
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isMineMeta = const VerificationMeta('isMine');
   @override
   late final GeneratedColumn<bool> isMine = GeneratedColumn<bool>(
@@ -1427,6 +1438,7 @@ class $AttentionItemsTable extends AttentionItems
     repoDisplay,
     url,
     ageDays,
+    createdAt,
     isMine,
   ];
   @override
@@ -1501,6 +1513,12 @@ class $AttentionItemsTable extends AttentionItems
         ageDays.isAcceptableOrUnknown(data['age_days']!, _ageDaysMeta),
       );
     }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
     if (data.containsKey('is_mine')) {
       context.handle(
         _isMineMeta,
@@ -1550,6 +1568,10 @@ class $AttentionItemsTable extends AttentionItems
         DriftSqlType.int,
         data['${effectivePrefix}age_days'],
       ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      ),
       isMine: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_mine'],
@@ -1573,6 +1595,7 @@ class AttentionItemRow extends DataClass
   final String repoDisplay;
   final String? url;
   final int? ageDays;
+  final int? createdAt;
   final bool isMine;
   const AttentionItemRow({
     required this.id,
@@ -1583,6 +1606,7 @@ class AttentionItemRow extends DataClass
     required this.repoDisplay,
     this.url,
     this.ageDays,
+    this.createdAt,
     required this.isMine,
   });
   @override
@@ -1600,6 +1624,9 @@ class AttentionItemRow extends DataClass
     if (!nullToAbsent || ageDays != null) {
       map['age_days'] = Variable<int>(ageDays);
     }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<int>(createdAt);
+    }
     map['is_mine'] = Variable<bool>(isMine);
     return map;
   }
@@ -1616,6 +1643,9 @@ class AttentionItemRow extends DataClass
       ageDays: ageDays == null && nullToAbsent
           ? const Value.absent()
           : Value(ageDays),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
       isMine: Value(isMine),
     );
   }
@@ -1634,6 +1664,7 @@ class AttentionItemRow extends DataClass
       repoDisplay: serializer.fromJson<String>(json['repoDisplay']),
       url: serializer.fromJson<String?>(json['url']),
       ageDays: serializer.fromJson<int?>(json['ageDays']),
+      createdAt: serializer.fromJson<int?>(json['createdAt']),
       isMine: serializer.fromJson<bool>(json['isMine']),
     );
   }
@@ -1649,6 +1680,7 @@ class AttentionItemRow extends DataClass
       'repoDisplay': serializer.toJson<String>(repoDisplay),
       'url': serializer.toJson<String?>(url),
       'ageDays': serializer.toJson<int?>(ageDays),
+      'createdAt': serializer.toJson<int?>(createdAt),
       'isMine': serializer.toJson<bool>(isMine),
     };
   }
@@ -1662,6 +1694,7 @@ class AttentionItemRow extends DataClass
     String? repoDisplay,
     Value<String?> url = const Value.absent(),
     Value<int?> ageDays = const Value.absent(),
+    Value<int?> createdAt = const Value.absent(),
     bool? isMine,
   }) => AttentionItemRow(
     id: id ?? this.id,
@@ -1672,6 +1705,7 @@ class AttentionItemRow extends DataClass
     repoDisplay: repoDisplay ?? this.repoDisplay,
     url: url.present ? url.value : this.url,
     ageDays: ageDays.present ? ageDays.value : this.ageDays,
+    createdAt: createdAt.present ? createdAt.value : this.createdAt,
     isMine: isMine ?? this.isMine,
   );
   AttentionItemRow copyWithCompanion(AttentionItemsCompanion data) {
@@ -1686,6 +1720,7 @@ class AttentionItemRow extends DataClass
           : this.repoDisplay,
       url: data.url.present ? data.url.value : this.url,
       ageDays: data.ageDays.present ? data.ageDays.value : this.ageDays,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       isMine: data.isMine.present ? data.isMine.value : this.isMine,
     );
   }
@@ -1701,6 +1736,7 @@ class AttentionItemRow extends DataClass
           ..write('repoDisplay: $repoDisplay, ')
           ..write('url: $url, ')
           ..write('ageDays: $ageDays, ')
+          ..write('createdAt: $createdAt, ')
           ..write('isMine: $isMine')
           ..write(')'))
         .toString();
@@ -1716,6 +1752,7 @@ class AttentionItemRow extends DataClass
     repoDisplay,
     url,
     ageDays,
+    createdAt,
     isMine,
   );
   @override
@@ -1730,6 +1767,7 @@ class AttentionItemRow extends DataClass
           other.repoDisplay == this.repoDisplay &&
           other.url == this.url &&
           other.ageDays == this.ageDays &&
+          other.createdAt == this.createdAt &&
           other.isMine == this.isMine);
 }
 
@@ -1742,6 +1780,7 @@ class AttentionItemsCompanion extends UpdateCompanion<AttentionItemRow> {
   final Value<String> repoDisplay;
   final Value<String?> url;
   final Value<int?> ageDays;
+  final Value<int?> createdAt;
   final Value<bool> isMine;
   final Value<int> rowid;
   const AttentionItemsCompanion({
@@ -1753,6 +1792,7 @@ class AttentionItemsCompanion extends UpdateCompanion<AttentionItemRow> {
     this.repoDisplay = const Value.absent(),
     this.url = const Value.absent(),
     this.ageDays = const Value.absent(),
+    this.createdAt = const Value.absent(),
     this.isMine = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1765,6 +1805,7 @@ class AttentionItemsCompanion extends UpdateCompanion<AttentionItemRow> {
     required String repoDisplay,
     this.url = const Value.absent(),
     this.ageDays = const Value.absent(),
+    this.createdAt = const Value.absent(),
     required bool isMine,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1783,6 +1824,7 @@ class AttentionItemsCompanion extends UpdateCompanion<AttentionItemRow> {
     Expression<String>? repoDisplay,
     Expression<String>? url,
     Expression<int>? ageDays,
+    Expression<int>? createdAt,
     Expression<bool>? isMine,
     Expression<int>? rowid,
   }) {
@@ -1795,6 +1837,7 @@ class AttentionItemsCompanion extends UpdateCompanion<AttentionItemRow> {
       if (repoDisplay != null) 'repo_display': repoDisplay,
       if (url != null) 'url': url,
       if (ageDays != null) 'age_days': ageDays,
+      if (createdAt != null) 'created_at': createdAt,
       if (isMine != null) 'is_mine': isMine,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1809,6 +1852,7 @@ class AttentionItemsCompanion extends UpdateCompanion<AttentionItemRow> {
     Value<String>? repoDisplay,
     Value<String?>? url,
     Value<int?>? ageDays,
+    Value<int?>? createdAt,
     Value<bool>? isMine,
     Value<int>? rowid,
   }) {
@@ -1821,6 +1865,7 @@ class AttentionItemsCompanion extends UpdateCompanion<AttentionItemRow> {
       repoDisplay: repoDisplay ?? this.repoDisplay,
       url: url ?? this.url,
       ageDays: ageDays ?? this.ageDays,
+      createdAt: createdAt ?? this.createdAt,
       isMine: isMine ?? this.isMine,
       rowid: rowid ?? this.rowid,
     );
@@ -1853,6 +1898,9 @@ class AttentionItemsCompanion extends UpdateCompanion<AttentionItemRow> {
     if (ageDays.present) {
       map['age_days'] = Variable<int>(ageDays.value);
     }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
     if (isMine.present) {
       map['is_mine'] = Variable<bool>(isMine.value);
     }
@@ -1873,6 +1921,7 @@ class AttentionItemsCompanion extends UpdateCompanion<AttentionItemRow> {
           ..write('repoDisplay: $repoDisplay, ')
           ..write('url: $url, ')
           ..write('ageDays: $ageDays, ')
+          ..write('createdAt: $createdAt, ')
           ..write('isMine: $isMine, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -4898,6 +4947,7 @@ typedef $$AttentionItemsTableCreateCompanionBuilder =
       required String repoDisplay,
       Value<String?> url,
       Value<int?> ageDays,
+      Value<int?> createdAt,
       required bool isMine,
       Value<int> rowid,
     });
@@ -4911,6 +4961,7 @@ typedef $$AttentionItemsTableUpdateCompanionBuilder =
       Value<String> repoDisplay,
       Value<String?> url,
       Value<int?> ageDays,
+      Value<int?> createdAt,
       Value<bool> isMine,
       Value<int> rowid,
     });
@@ -4961,6 +5012,11 @@ class $$AttentionItemsTableFilterComposer
 
   ColumnFilters<int> get ageDays => $composableBuilder(
     column: $table.ageDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5019,6 +5075,11 @@ class $$AttentionItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isMine => $composableBuilder(
     column: $table.isMine,
     builder: (column) => ColumnOrderings(column),
@@ -5059,6 +5120,9 @@ class $$AttentionItemsTableAnnotationComposer
 
   GeneratedColumn<int> get ageDays =>
       $composableBuilder(column: $table.ageDays, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
   GeneratedColumn<bool> get isMine =>
       $composableBuilder(column: $table.isMine, builder: (column) => column);
@@ -5109,6 +5173,7 @@ class $$AttentionItemsTableTableManager
                 Value<String> repoDisplay = const Value.absent(),
                 Value<String?> url = const Value.absent(),
                 Value<int?> ageDays = const Value.absent(),
+                Value<int?> createdAt = const Value.absent(),
                 Value<bool> isMine = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AttentionItemsCompanion(
@@ -5120,6 +5185,7 @@ class $$AttentionItemsTableTableManager
                 repoDisplay: repoDisplay,
                 url: url,
                 ageDays: ageDays,
+                createdAt: createdAt,
                 isMine: isMine,
                 rowid: rowid,
               ),
@@ -5133,6 +5199,7 @@ class $$AttentionItemsTableTableManager
                 required String repoDisplay,
                 Value<String?> url = const Value.absent(),
                 Value<int?> ageDays = const Value.absent(),
+                Value<int?> createdAt = const Value.absent(),
                 required bool isMine,
                 Value<int> rowid = const Value.absent(),
               }) => AttentionItemsCompanion.insert(
@@ -5144,6 +5211,7 @@ class $$AttentionItemsTableTableManager
                 repoDisplay: repoDisplay,
                 url: url,
                 ageDays: ageDays,
+                createdAt: createdAt,
                 isMine: isMine,
                 rowid: rowid,
               ),

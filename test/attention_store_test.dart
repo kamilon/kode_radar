@@ -14,16 +14,18 @@ AttentionItem _item({
   String subtitle = 'subtitle',
   String? url = 'https://example.com/1',
   int? ageDays = 2,
+  DateTime? createdAt,
   bool isMine = false,
 }) => AttentionItem(
   id: id,
   category: category,
   severity: severity,
-  title: title,
-  subtitle: subtitle,
+  titleTemplate: title,
+  subtitleTemplate: subtitle,
   repoDisplay: repoDisplay,
   url: url,
   ageDays: ageDays,
+  createdAt: createdAt,
   isMine: isMine,
 );
 
@@ -31,8 +33,8 @@ AttentionItem _error(String repoDisplay) => AttentionItem(
   id: 'error:$repoDisplay',
   category: AttentionStore.errorCategory,
   severity: 0,
-  title: 'Could not load',
-  subtitle: repoDisplay,
+  titleTemplate: 'Could not load',
+  subtitleTemplate: repoDisplay,
   repoDisplay: repoDisplay,
 );
 
@@ -67,6 +69,70 @@ void main() {
     // Fields round-trip.
     expect(cached.first.repoDisplay, 'owner/one');
     expect(cached.first.ageDays, 2);
+  });
+
+  test('cached recomputes item age from createdAt at read time', () async {
+    final created = DateTime.utc(2026, 1, 1);
+    await AttentionStore.save([
+      _item(
+        id: 'a',
+        repoDisplay: 'owner/one',
+        // Age-token subtitle, as the service builds for review-requested items.
+        subtitle: 'owner/one · Title · opened ${AttentionItem.ageToken} by me',
+        ageDays: 2,
+        createdAt: created,
+      ),
+    ]);
+
+    // 10 days after creation: age advances and the displayed subtitle reflects
+    // it, instead of freezing at the fetch-time value of 2.
+    final ten = await AttentionStore.cached(
+      now: created.add(const Duration(days: 10)),
+    );
+    expect(ten.single.ageDays, 10);
+    expect(ten.single.subtitle, 'owner/one · Title · opened 10 days by me');
+
+    // 40 days after creation, still without a re-save.
+    final forty = await AttentionStore.cached(
+      now: created.add(const Duration(days: 40)),
+    );
+    expect(forty.single.ageDays, 40);
+    expect(forty.single.subtitle, contains('opened 40 days'));
+  });
+
+  test(
+    'cached falls back to stored ageDays when createdAt is absent',
+    () async {
+      await AttentionStore.save([
+        _item(id: 'a', repoDisplay: 'owner/one', ageDays: 7),
+      ]);
+      final cached = await AttentionStore.cached(now: DateTime.utc(2030));
+      expect(cached.single.ageDays, 7);
+    },
+  );
+
+  test('cached re-ranks by the recomputed age within a category', () async {
+    final now = DateTime.utc(2026, 2, 1);
+    await AttentionStore.save([
+      // Fetched long ago at age 2 (severity 3002) but now 20 days old.
+      _item(
+        id: 'old',
+        repoDisplay: 'owner/one',
+        severity: 3002,
+        createdAt: now.subtract(const Duration(days: 20)),
+      ),
+      // Fetched recently at age 5 (severity 3005), still 5 days old.
+      _item(
+        id: 'new',
+        repoDisplay: 'owner/two',
+        severity: 3005,
+        createdAt: now.subtract(const Duration(days: 5)),
+      ),
+    ]);
+    final ranked = await AttentionStore.cached(now: now);
+    // 'old' (now 20 days) outranks 'new' (5 days) despite its lower *stored*
+    // severity, because severity is recomputed from the fresh age on read.
+    expect(ranked.map((e) => e.id).toList(), ['old', 'new']);
   });
 
   test('cached breaks severity+repo ties deterministically by id', () async {
@@ -193,6 +259,48 @@ void main() {
     await AttentionStore.save([_item(id: 'a', repoDisplay: 'owner/one')]);
     final cached = await AttentionStore.cached();
     expect(cached.map((e) => e.id).toList(), ['a']);
+
+    await upgraded.close();
+  });
+
+  test('v7 -> v8 upgrade adds created_at and recomputes age', () async {
+    // Materialize the pre-v8 attention_items schema (no created_at) at
+    // user_version = 7, so opening AppDatabase runs the v8 ALTER ADD COLUMN.
+    final native = sqlite3.openInMemory();
+    native.execute('''
+      CREATE TABLE attention_items (
+        id TEXT NOT NULL PRIMARY KEY,
+        category TEXT NOT NULL,
+        severity INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        subtitle TEXT NOT NULL,
+        repo_display TEXT NOT NULL,
+        url TEXT,
+        age_days INTEGER,
+        is_mine INTEGER NOT NULL
+      );
+    ''');
+    native.execute('PRAGMA user_version = 7;');
+    final upgraded = AppDatabase.forExecutor(
+      NativeDatabase.opened(native, closeUnderlyingOnClose: true),
+    );
+    AttentionStore.debugUseDatabase(upgraded);
+
+    final created = DateTime.utc(2026, 1, 1);
+    await AttentionStore.save([
+      _item(
+        id: 'a',
+        repoDisplay: 'owner/one',
+        subtitle: 'owner/one · T · opened ${AttentionItem.ageToken} by me',
+        createdAt: created,
+      ),
+    ]);
+    // The new created_at column persisted, so age recomputes on read.
+    final cached = await AttentionStore.cached(
+      now: created.add(const Duration(days: 5)),
+    );
+    expect(cached.single.ageDays, 5);
+    expect(cached.single.subtitle, contains('opened 5 days'));
 
     await upgraded.close();
   });

@@ -44,22 +44,47 @@ class AttentionStore {
 
   /// Returns the cached snapshot ranked most-urgent first (severity desc, then
   /// repo) — a one-shot read companion to [watch]. Snooze is applied by callers
-  /// at display time (see `AttentionInboxPage`), not here.
-  static Future<List<AttentionItem>> cached() async {
+  /// at display time (see `AttentionInboxPage`), not here. [now] fixes the
+  /// clock used to recompute each item's age (defaults to the current time).
+  static Future<List<AttentionItem>> cached({DateTime? now}) async {
+    final at = now ?? DateTime.now();
     final rows = await _selectRanked().get();
-    return rows.map(_toItem).toList();
+    return _mapRanked(rows, at);
   }
 
   /// A reactive stream of the full ranked cached snapshot that re-emits whenever
   /// the `attention_items` table changes — so a page bound to it renders the
   /// cache instantly on cold start and updates automatically when a refresh (or
-  /// another in-isolate writer) persists new data.
+  /// another in-isolate writer) persists new data. Each emission recomputes ages
+  /// against the current time.
   ///
   /// Unlike [cached] this does NOT apply a snooze filter: snooze is a display
   /// concern the page layers on top (via `SnoozeStore`) while the cache stays
   /// the source of truth for what each repo currently has.
   static Stream<List<AttentionItem>> watch() {
-    return _selectRanked().watch().map((rows) => rows.map(_toItem).toList());
+    return _selectRanked().watch().map(
+      (rows) => _mapRanked(rows, DateTime.now()),
+    );
+  }
+
+  /// Maps rows to items (recomputing age + severity against [now]) and re-ranks
+  /// them. The re-rank is needed because the SQL `ORDER BY` uses the *stored*
+  /// severity, but severity is recomputed on read from the fresh age, so a
+  /// long-stale item (e.g. retained from a repo that failed to refresh) sorts
+  /// correctly against a freshly-fetched one within its category.
+  static List<AttentionItem> _mapRanked(
+    List<AttentionItemRow> rows,
+    DateTime now,
+  ) {
+    final items = rows.map((r) => _toItem(r, now)).toList();
+    items.sort((a, b) {
+      final bySeverity = b.severity.compareTo(a.severity);
+      if (bySeverity != 0) return bySeverity;
+      final byRepo = a.repoDisplay.compareTo(b.repoDisplay);
+      if (byRepo != 0) return byRepo;
+      return a.id.compareTo(b.id);
+    });
+    return items;
   }
 
   static SimpleSelectStatement<$AttentionItemsTable, AttentionItemRow>
@@ -121,28 +146,59 @@ class AttentionStore {
     });
   }
 
-  static AttentionItem _toItem(AttentionItemRow row) => AttentionItem(
-    id: row.id,
-    category: row.category,
-    severity: row.severity,
-    title: row.title,
-    subtitle: row.subtitle,
-    repoDisplay: row.repoDisplay,
-    url: row.url,
-    ageDays: row.ageDays,
-    isMine: row.isMine,
-  );
+  static AttentionItem _toItem(AttentionItemRow row, DateTime now) {
+    final createdAt = row.createdAt == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(row.createdAt!, isUtc: true);
+    // Recompute the age from the stored creation time so a cached item's
+    // displayed age reflects "now" instead of freezing at its fetch-time value.
+    // Fall back to the stored ageDays for rows written before created_at was
+    // persisted.
+    final int? ageDays;
+    if (createdAt == null) {
+      ageDays = row.ageDays;
+    } else {
+      final diff = now.difference(createdAt).inDays;
+      ageDays = diff < 0 ? 0 : diff;
+    }
+    // Recompute severity from the fresh age too (age is the low 3 digits;
+    // category tier is the rest), so ranking within a category tracks the
+    // displayed age instead of the fetch-time value. Legacy rows without a
+    // createdAt keep their stored severity.
+    final int severity;
+    if (createdAt == null) {
+      severity = row.severity;
+    } else {
+      final tier = (row.severity ~/ 1000) * 1000;
+      severity = tier + (ageDays ?? 0).clamp(0, 999);
+    }
+    return AttentionItem(
+      id: row.id,
+      category: row.category,
+      severity: severity,
+      titleTemplate: row.title,
+      subtitleTemplate: row.subtitle,
+      repoDisplay: row.repoDisplay,
+      url: row.url,
+      ageDays: ageDays,
+      createdAt: createdAt,
+      isMine: row.isMine,
+    );
+  }
 
   static AttentionItemsCompanion _toCompanion(AttentionItem item) =>
       AttentionItemsCompanion.insert(
         id: item.id,
         category: item.category,
         severity: item.severity,
-        title: item.title,
-        subtitle: item.subtitle,
+        // Persist the templates (with the unresolved age token), so the age is
+        // re-substituted with a fresh value on read.
+        title: item.titleTemplate,
+        subtitle: item.subtitleTemplate,
         repoDisplay: item.repoDisplay,
         url: Value(item.url),
         ageDays: Value(item.ageDays),
+        createdAt: Value(item.createdAt?.toUtc().millisecondsSinceEpoch),
         isMine: item.isMine,
       );
 }

@@ -70,6 +70,7 @@ class AttentionItems extends Table {
   TextColumn get repoDisplay => text()();
   TextColumn get url => text().nullable()();
   IntColumn get ageDays => integer().nullable()();
+  IntColumn get createdAt => integer().nullable()();
   BoolColumn get isMine => boolean()();
 
   @override
@@ -203,7 +204,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forExecutor(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -305,6 +306,25 @@ class AppDatabase extends _$AppDatabase {
           'ON notification_seen (seen_id)',
         );
         await m.createTable(notificationKnownRepos);
+      }
+      // v8 adds `created_at` to attention_items so a cached item's displayed age
+      // can be recomputed on read (unfreezing it offline), mirroring the v6
+      // repo_pulls change. Ensure the table exists first (keep the step
+      // self-contained), then add the column with a single idempotent
+      // `ALTER TABLE ADD COLUMN`, tolerating "duplicate column" from a
+      // concurrent migrator or a jump from <3 where `createTable` already built
+      // the current schema.
+      if (from < 8) {
+        await m.createTable(attentionItems);
+        try {
+          await customStatement(
+            'ALTER TABLE attention_items ADD COLUMN created_at INTEGER',
+          );
+        } on Exception catch (e) {
+          if (!e.toString().toLowerCase().contains('duplicate column')) {
+            rethrow;
+          }
+        }
       }
     },
   );
