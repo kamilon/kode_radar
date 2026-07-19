@@ -5,12 +5,17 @@ import 'package:kode_radar/repo_detail_service.dart';
 import 'package:kode_radar/repo_detail_store.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-RepoPr _pr(String label, {String reviewState = 'waiting'}) => RepoPr(
+RepoPr _pr(
+  String label, {
+  String reviewState = 'waiting',
+  DateTime? createdAt,
+}) => RepoPr(
   label: label,
   title: 'title $label',
   author: 'octocat',
   reviewState: reviewState,
   ageDays: 3,
+  createdAt: createdAt,
   url: 'https://example.com/$label',
 );
 
@@ -154,6 +159,37 @@ void main() {
     expect(other.pulls.map((p) => p.label).toList(), ['PR #9']);
   });
 
+  test('cached recomputes PR age from createdAt at read time', () async {
+    final created = DateTime.utc(2026, 1, 1);
+    await RepoDetailStore.save(
+      repo,
+      RepoDetailData(pulls: [_pr('PR #1', createdAt: created)]),
+    );
+
+    // 10 days after creation.
+    final ten = await RepoDetailStore.cached(
+      repo,
+      releasesSupported: true,
+      now: created.add(const Duration(days: 10)),
+    );
+    expect(ten.pulls.single.ageDays, 10);
+
+    // 40 days after creation — the age advances without a re-save (doesn't
+    // freeze at the fetch-time value of 3).
+    final forty = await RepoDetailStore.cached(
+      repo,
+      releasesSupported: true,
+      now: created.add(const Duration(days: 40)),
+    );
+    expect(forty.pulls.single.ageDays, 40);
+  });
+
+  test('cached falls back to stored ageDays when createdAt is null', () async {
+    await RepoDetailStore.save(repo, RepoDetailData(pulls: [_pr('PR #1')]));
+    final cached = await RepoDetailStore.cached(repo, releasesSupported: true);
+    expect(cached.pulls.single.ageDays, 3);
+  });
+
   test('v3 -> v4 upgrade creates working repo-detail tables', () async {
     // Set user_version = 3 so opening AppDatabase runs onUpgrade(3 -> 4) rather
     // than onCreate; the other tables aren't materialized because the v4 step
@@ -168,6 +204,58 @@ void main() {
     await RepoDetailStore.save(repo, RepoDetailData(pulls: [_pr('PR #1')]));
     final cached = await RepoDetailStore.cached(repo, releasesSupported: true);
     expect(cached.pulls.map((p) => p.label).toList(), ['PR #1']);
+
+    await upgraded.close();
+  });
+
+  test('v5 -> v6 upgrade recreates repo_pulls with created_at', () async {
+    // Build a v5-era database by hand: repo_pulls WITHOUT created_at (plus the
+    // sibling tables cached() reads), holding a stale row. Opening AppDatabase
+    // runs onUpgrade(5 -> 6), which drops & recreates repo_pulls with the new
+    // created_at column (clearing the stale row).
+    final native = sqlite3.openInMemory();
+    native.execute(
+      'CREATE TABLE repo_pulls (id INTEGER PRIMARY KEY AUTOINCREMENT, '
+      'repo_key TEXT NOT NULL, label TEXT NOT NULL, title TEXT NOT NULL, '
+      'author TEXT NOT NULL, review_state TEXT NOT NULL, age_days INTEGER, '
+      'draft INTEGER NOT NULL, url TEXT)',
+    );
+    native.execute(
+      'CREATE TABLE repo_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, '
+      'repo_key TEXT NOT NULL, name TEXT NOT NULL, status TEXT NOT NULL, '
+      'conclusion TEXT NOT NULL, branch TEXT, finished_at INTEGER, url TEXT)',
+    );
+    native.execute(
+      'CREATE TABLE repo_releases (id INTEGER PRIMARY KEY AUTOINCREMENT, '
+      'repo_key TEXT NOT NULL, tag TEXT NOT NULL, name TEXT, author TEXT, '
+      'published_at INTEGER, url TEXT)',
+    );
+    native.execute(
+      "INSERT INTO repo_pulls (repo_key, label, title, author, review_state, "
+      "age_days, draft, url) VALUES "
+      "('$repo', 'PR #stale', 't', 'a', 'waiting', 3, 0, NULL)",
+    );
+    native.execute('PRAGMA user_version = 5;');
+
+    final upgraded = AppDatabase.forExecutor(
+      NativeDatabase.opened(native, closeUnderlyingOnClose: true),
+    );
+    RepoDetailStore.debugUseDatabase(upgraded);
+
+    final created = DateTime.utc(2026, 2, 1);
+    await RepoDetailStore.save(
+      repo,
+      RepoDetailData(pulls: [_pr('PR #1', createdAt: created)]),
+    );
+    final cached = await RepoDetailStore.cached(
+      repo,
+      releasesSupported: true,
+      now: created.add(const Duration(days: 5)),
+    );
+    // Stale row dropped by the migration; new row's age recomputed from
+    // created_at.
+    expect(cached.pulls.map((p) => p.label).toList(), ['PR #1']);
+    expect(cached.pulls.single.ageDays, 5);
 
     await upgraded.close();
   });

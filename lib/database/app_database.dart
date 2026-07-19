@@ -91,6 +91,7 @@ class RepoPulls extends Table {
   TextColumn get author => text()();
   TextColumn get reviewState => text()();
   IntColumn get ageDays => integer().nullable()();
+  IntColumn get createdAt => integer().nullable()();
   BoolColumn get draft => boolean()();
   TextColumn get url => text().nullable()();
 }
@@ -170,7 +171,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forExecutor(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -236,6 +237,18 @@ class AppDatabase extends _$AppDatabase {
       // `CREATE TABLE IF NOT EXISTS`, so no secondary index is needed.
       if (from < 5) {
         await m.createTable(syncState);
+      }
+      // v6 adds `created_at` to repo_pulls so a cached PR's age can be recomputed
+      // on read (Phase 3b). repo_pulls is a cache, so drop & recreate it with the
+      // new schema (idempotent DDL; the next refresh repopulates) rather than a
+      // non-idempotent `ALTER TABLE ... ADD COLUMN`.
+      if (from < 6) {
+        await customStatement('DROP TABLE IF EXISTS repo_pulls');
+        await m.createTable(repoPulls);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_repo_pulls_repo_key '
+          'ON repo_pulls (repo_key)',
+        );
       }
     },
   );

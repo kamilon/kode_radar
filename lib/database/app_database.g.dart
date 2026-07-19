@@ -1959,6 +1959,17 @@ class $RepoPullsTable extends RepoPulls
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _draftMeta = const VerificationMeta('draft');
   @override
   late final GeneratedColumn<bool> draft = GeneratedColumn<bool>(
@@ -1989,6 +2000,7 @@ class $RepoPullsTable extends RepoPulls
     author,
     reviewState,
     ageDays,
+    createdAt,
     draft,
     url,
   ];
@@ -2056,6 +2068,12 @@ class $RepoPullsTable extends RepoPulls
         ageDays.isAcceptableOrUnknown(data['age_days']!, _ageDaysMeta),
       );
     }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
     if (data.containsKey('draft')) {
       context.handle(
         _draftMeta,
@@ -2107,6 +2125,10 @@ class $RepoPullsTable extends RepoPulls
         DriftSqlType.int,
         data['${effectivePrefix}age_days'],
       ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      ),
       draft: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}draft'],
@@ -2132,6 +2154,7 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
   final String author;
   final String reviewState;
   final int? ageDays;
+  final int? createdAt;
   final bool draft;
   final String? url;
   const RepoPrRow({
@@ -2142,6 +2165,7 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
     required this.author,
     required this.reviewState,
     this.ageDays,
+    this.createdAt,
     required this.draft,
     this.url,
   });
@@ -2156,6 +2180,9 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
     map['review_state'] = Variable<String>(reviewState);
     if (!nullToAbsent || ageDays != null) {
       map['age_days'] = Variable<int>(ageDays);
+    }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<int>(createdAt);
     }
     map['draft'] = Variable<bool>(draft);
     if (!nullToAbsent || url != null) {
@@ -2175,6 +2202,9 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
       ageDays: ageDays == null && nullToAbsent
           ? const Value.absent()
           : Value(ageDays),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
       draft: Value(draft),
       url: url == null && nullToAbsent ? const Value.absent() : Value(url),
     );
@@ -2193,6 +2223,7 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
       author: serializer.fromJson<String>(json['author']),
       reviewState: serializer.fromJson<String>(json['reviewState']),
       ageDays: serializer.fromJson<int?>(json['ageDays']),
+      createdAt: serializer.fromJson<int?>(json['createdAt']),
       draft: serializer.fromJson<bool>(json['draft']),
       url: serializer.fromJson<String?>(json['url']),
     );
@@ -2208,6 +2239,7 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
       'author': serializer.toJson<String>(author),
       'reviewState': serializer.toJson<String>(reviewState),
       'ageDays': serializer.toJson<int?>(ageDays),
+      'createdAt': serializer.toJson<int?>(createdAt),
       'draft': serializer.toJson<bool>(draft),
       'url': serializer.toJson<String?>(url),
     };
@@ -2221,6 +2253,7 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
     String? author,
     String? reviewState,
     Value<int?> ageDays = const Value.absent(),
+    Value<int?> createdAt = const Value.absent(),
     bool? draft,
     Value<String?> url = const Value.absent(),
   }) => RepoPrRow(
@@ -2231,6 +2264,7 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
     author: author ?? this.author,
     reviewState: reviewState ?? this.reviewState,
     ageDays: ageDays.present ? ageDays.value : this.ageDays,
+    createdAt: createdAt.present ? createdAt.value : this.createdAt,
     draft: draft ?? this.draft,
     url: url.present ? url.value : this.url,
   );
@@ -2245,6 +2279,7 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
           ? data.reviewState.value
           : this.reviewState,
       ageDays: data.ageDays.present ? data.ageDays.value : this.ageDays,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       draft: data.draft.present ? data.draft.value : this.draft,
       url: data.url.present ? data.url.value : this.url,
     );
@@ -2260,6 +2295,7 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
           ..write('author: $author, ')
           ..write('reviewState: $reviewState, ')
           ..write('ageDays: $ageDays, ')
+          ..write('createdAt: $createdAt, ')
           ..write('draft: $draft, ')
           ..write('url: $url')
           ..write(')'))
@@ -2275,6 +2311,7 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
     author,
     reviewState,
     ageDays,
+    createdAt,
     draft,
     url,
   );
@@ -2289,6 +2326,7 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
           other.author == this.author &&
           other.reviewState == this.reviewState &&
           other.ageDays == this.ageDays &&
+          other.createdAt == this.createdAt &&
           other.draft == this.draft &&
           other.url == this.url);
 }
@@ -2301,6 +2339,7 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
   final Value<String> author;
   final Value<String> reviewState;
   final Value<int?> ageDays;
+  final Value<int?> createdAt;
   final Value<bool> draft;
   final Value<String?> url;
   const RepoPullsCompanion({
@@ -2311,6 +2350,7 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
     this.author = const Value.absent(),
     this.reviewState = const Value.absent(),
     this.ageDays = const Value.absent(),
+    this.createdAt = const Value.absent(),
     this.draft = const Value.absent(),
     this.url = const Value.absent(),
   });
@@ -2322,6 +2362,7 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
     required String author,
     required String reviewState,
     this.ageDays = const Value.absent(),
+    this.createdAt = const Value.absent(),
     required bool draft,
     this.url = const Value.absent(),
   }) : repoKey = Value(repoKey),
@@ -2338,6 +2379,7 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
     Expression<String>? author,
     Expression<String>? reviewState,
     Expression<int>? ageDays,
+    Expression<int>? createdAt,
     Expression<bool>? draft,
     Expression<String>? url,
   }) {
@@ -2349,6 +2391,7 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
       if (author != null) 'author': author,
       if (reviewState != null) 'review_state': reviewState,
       if (ageDays != null) 'age_days': ageDays,
+      if (createdAt != null) 'created_at': createdAt,
       if (draft != null) 'draft': draft,
       if (url != null) 'url': url,
     });
@@ -2362,6 +2405,7 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
     Value<String>? author,
     Value<String>? reviewState,
     Value<int?>? ageDays,
+    Value<int?>? createdAt,
     Value<bool>? draft,
     Value<String?>? url,
   }) {
@@ -2373,6 +2417,7 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
       author: author ?? this.author,
       reviewState: reviewState ?? this.reviewState,
       ageDays: ageDays ?? this.ageDays,
+      createdAt: createdAt ?? this.createdAt,
       draft: draft ?? this.draft,
       url: url ?? this.url,
     );
@@ -2402,6 +2447,9 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
     if (ageDays.present) {
       map['age_days'] = Variable<int>(ageDays.value);
     }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
     if (draft.present) {
       map['draft'] = Variable<bool>(draft.value);
     }
@@ -2421,6 +2469,7 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
           ..write('author: $author, ')
           ..write('reviewState: $reviewState, ')
           ..write('ageDays: $ageDays, ')
+          ..write('createdAt: $createdAt, ')
           ..write('draft: $draft, ')
           ..write('url: $url')
           ..write(')'))
@@ -4745,6 +4794,7 @@ typedef $$RepoPullsTableCreateCompanionBuilder =
       required String author,
       required String reviewState,
       Value<int?> ageDays,
+      Value<int?> createdAt,
       required bool draft,
       Value<String?> url,
     });
@@ -4757,6 +4807,7 @@ typedef $$RepoPullsTableUpdateCompanionBuilder =
       Value<String> author,
       Value<String> reviewState,
       Value<int?> ageDays,
+      Value<int?> createdAt,
       Value<bool> draft,
       Value<String?> url,
     });
@@ -4802,6 +4853,11 @@ class $$RepoPullsTableFilterComposer
 
   ColumnFilters<int> get ageDays => $composableBuilder(
     column: $table.ageDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4860,6 +4916,11 @@ class $$RepoPullsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get draft => $composableBuilder(
     column: $table.draft,
     builder: (column) => ColumnOrderings(column),
@@ -4902,6 +4963,9 @@ class $$RepoPullsTableAnnotationComposer
 
   GeneratedColumn<int> get ageDays =>
       $composableBuilder(column: $table.ageDays, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
   GeneratedColumn<bool> get draft =>
       $composableBuilder(column: $table.draft, builder: (column) => column);
@@ -4948,6 +5012,7 @@ class $$RepoPullsTableTableManager
                 Value<String> author = const Value.absent(),
                 Value<String> reviewState = const Value.absent(),
                 Value<int?> ageDays = const Value.absent(),
+                Value<int?> createdAt = const Value.absent(),
                 Value<bool> draft = const Value.absent(),
                 Value<String?> url = const Value.absent(),
               }) => RepoPullsCompanion(
@@ -4958,6 +5023,7 @@ class $$RepoPullsTableTableManager
                 author: author,
                 reviewState: reviewState,
                 ageDays: ageDays,
+                createdAt: createdAt,
                 draft: draft,
                 url: url,
               ),
@@ -4970,6 +5036,7 @@ class $$RepoPullsTableTableManager
                 required String author,
                 required String reviewState,
                 Value<int?> ageDays = const Value.absent(),
+                Value<int?> createdAt = const Value.absent(),
                 required bool draft,
                 Value<String?> url = const Value.absent(),
               }) => RepoPullsCompanion.insert(
@@ -4980,6 +5047,7 @@ class $$RepoPullsTableTableManager
                 author: author,
                 reviewState: reviewState,
                 ageDays: ageDays,
+                createdAt: createdAt,
                 draft: draft,
                 url: url,
               ),

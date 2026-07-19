@@ -42,7 +42,9 @@ class RepoDetailStore {
   static Future<RepoDetailData> cached(
     String repoKey, {
     required bool releasesSupported,
+    DateTime? now,
   }) {
+    final at = now ?? DateTime.now();
     // Read all three tables under the same lock the mutators use, so a
     // concurrent save/removeRepo can't interleave between the SELECTs and yield
     // an inconsistent composite (e.g. pulls from before a save, runs from
@@ -65,7 +67,7 @@ class RepoDetailStore {
                 ..orderBy([(t) => OrderingTerm(expression: t.id)]))
               .get();
       return RepoDetailData(
-        pulls: pulls.map(_toPr).toList(),
+        pulls: pulls.map((row) => _toPr(row, at)).toList(),
         ci: runs.map(_toRun).toList(),
         releases: releases.map(_toRelease).toList(),
         releasesSupported: releasesSupported,
@@ -132,15 +134,31 @@ class RepoDetailStore {
     });
   }
 
-  static RepoPr _toPr(RepoPrRow row) => RepoPr(
-    label: row.label,
-    title: row.title,
-    author: row.author,
-    reviewState: row.reviewState,
-    ageDays: row.ageDays,
-    draft: row.draft,
-    url: row.url,
-  );
+  static RepoPr _toPr(RepoPrRow row, DateTime now) {
+    final createdAt = row.createdAt == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(row.createdAt!, isUtc: true);
+    // Recompute age from the stored creation time so a cached PR's age reflects
+    // "now" on read instead of freezing at its fetch-time value. Fall back to
+    // the stored ageDays for rows written before created_at was persisted.
+    final int? ageDays;
+    if (createdAt == null) {
+      ageDays = row.ageDays;
+    } else {
+      final diff = now.difference(createdAt).inDays;
+      ageDays = diff < 0 ? 0 : diff;
+    }
+    return RepoPr(
+      label: row.label,
+      title: row.title,
+      author: row.author,
+      reviewState: row.reviewState,
+      ageDays: ageDays,
+      createdAt: createdAt,
+      draft: row.draft,
+      url: row.url,
+    );
+  }
 
   static RepoRun _toRun(RepoRunRow row) => RepoRun(
     name: row.name,
@@ -171,6 +189,7 @@ class RepoDetailStore {
         author: pr.author,
         reviewState: pr.reviewState,
         ageDays: Value(pr.ageDays),
+        createdAt: Value(pr.createdAt?.toUtc().millisecondsSinceEpoch),
         draft: pr.draft,
         url: Value(pr.url),
       );
