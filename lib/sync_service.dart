@@ -51,6 +51,18 @@ class SyncService {
     final httpClient = client ?? AppHttp.client;
     final deadline = background ? const Duration(seconds: 25) : null;
 
+    // Freshen the config cache from disk: a reused background isolate could hold
+    // a stale monitored-repo list / preferences, which would skew the
+    // `restrictToMonitored` cache prune and the provenance monitored-count.
+    await (await SharedPreferences.getInstance()).reload();
+
+    // NOTE: the per-repo cache writes below are serialized only within an
+    // isolate (each store's static lock). A background run happens while the app
+    // is suspended, so it rarely overlaps a foreground write; if it did, the
+    // later snapshot could briefly overwrite a newer one — self-corrected on the
+    // next foreground load. A cross-isolate write-generation guard is a possible
+    // follow-up.
+
     Future<T> withDeadline<T>(Future<T> future) =>
         deadline == null ? future : future.timeout(deadline);
 
@@ -111,10 +123,16 @@ class SyncService {
       try {
         final appPrefs = await PreferencesStore.load();
         final lookback = Duration(days: appPrefs.feedLookbackDays);
+        final selfGithub = await IdentityStore.selfGithubLogins();
+        final selfAdo = await IdentityStore.selfAdoNames();
         final result = await withDeadline(
           ActivityFeedService.computeAll(
             client: httpClient,
             lookback: lookback,
+            // Pass identities so cached events keep their correct `isMine`
+            // instead of being overwritten as not-mine.
+            selfGithubLogins: selfGithub,
+            selfAdoNames: selfAdo,
           ),
         );
         await ActivityEventStore.save(result.events, restrictToMonitored: true);
