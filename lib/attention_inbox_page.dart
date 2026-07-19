@@ -189,9 +189,10 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
     );
   }
 
-  /// Pull-to-refresh handler. Coalesces with an already-running load (e.g. the
-  /// initial/config-driven load that isn't owned by this RefreshIndicator) so a
-  /// pull can't kick off a second concurrent network fetch.
+  /// Pull-to-refresh handler. If a load is already in flight (e.g. the
+  /// initial/config-driven load that this RefreshIndicator doesn't own), ignore
+  /// the pull instead of starting a second concurrent network fetch; the
+  /// in-flight load updates the list when it completes.
   Future<void> _refresh() async {
     if (_refreshing) return;
     await _load();
