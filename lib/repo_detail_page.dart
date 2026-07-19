@@ -65,14 +65,18 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
       // Phase A: render cached detail + this repo's cached timeline events
       // immediately so a cold start / offline open isn't a blank spinner.
       if (!_hasContent) {
-        final cachedDetail = await RepoDetailStore.cached(
-          _repo.repoKey,
-          releasesSupported: _releasesSupported,
-        );
-        final repoEvents = await ActivityEventStore.cached(
-          repoKey: _repo.repoKey,
-        );
+        // Run the two cache reads concurrently to cut cold-start latency; the
+        // seq/mounted guards below still apply.
+        final cachedResults = await Future.wait([
+          RepoDetailStore.cached(
+            _repo.repoKey,
+            releasesSupported: _releasesSupported,
+          ),
+          ActivityEventStore.cached(repoKey: _repo.repoKey),
+        ]);
         if (!mounted || seq != _loadSeq) return;
+        final cachedDetail = cachedResults[0] as RepoDetailData;
+        final repoEvents = cachedResults[1] as List<ActivityEvent>;
         if (cachedDetail.pulls.isNotEmpty ||
             cachedDetail.ci.isNotEmpty ||
             cachedDetail.releases.isNotEmpty ||
