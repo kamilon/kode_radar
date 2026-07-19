@@ -46,10 +46,11 @@ class BackgroundSync {
     _initialized = true;
   }
 
-  /// Registers the periodic task. Returns false (and logs) if registration
-  /// fails, so the caller can surface it rather than claiming success.
+  /// Registers the periodic task. On unsupported platforms (desktop) this is a
+  /// no-op and returns true. Returns false (and logs) only if registration
+  /// actually fails, so the caller can surface a real error.
   static Future<bool> enable() async {
-    if (!isSupported) return false;
+    if (!isSupported) return true;
     try {
       await _ensureInitialized();
       if (Platform.isAndroid) {
@@ -79,7 +80,7 @@ class BackgroundSync {
   }
 
   static Future<bool> disable() async {
-    if (!isSupported) return false;
+    if (!isSupported) return true;
     try {
       await _ensureInitialized();
       // Cancel only our task, not any other work the app might schedule later.

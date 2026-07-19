@@ -69,7 +69,11 @@ class NotificationService {
       // Refresh the in-memory cache from disk first: the background-sync isolate
       // and the resident foreground isolate each cache prefs independently, so
       // without this a resident foreground could re-notify items the background
-      // sync already alerted on (and clobber its advanced baseline).
+      // sync already alerted on (and clobber its advanced baseline). This closes
+      // the common sequential case; a truly-simultaneous foreground+background
+      // notify could still last-writer-win (rare — the background task runs when
+      // the app is suspended and not actively notifying). A fully atomic
+      // cross-isolate baseline would move the seen set into the DB (follow-up).
       await prefs.reload();
       // Mark every monitored repo "known" — including ones that currently have
       // zero attention items — so adding a repo silences only its existing

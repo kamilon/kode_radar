@@ -257,9 +257,10 @@ class MetricStore {
   /// once. Memoized so it runs at most once per process; a failure clears the
   /// memo so a later call can retry (and doesn't poison every future call).
   static Future<void> _ensureMigrated() {
-    return _migration ??= _migrate().catchError((Object e) {
+    return _migration ??= _migrate().catchError((Object e, StackTrace st) {
       _migration = null;
-      throw e;
+      // Preserve the original stack so migration failures stay diagnosable.
+      Error.throwWithStackTrace(e, st);
     });
   }
 

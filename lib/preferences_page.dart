@@ -130,7 +130,9 @@ class _PreferencesPageState extends State<PreferencesPage> {
                               'on iOS). “Sync now” in the menu works anytime.'
                         : 'This desktop app refreshes while it is running.',
                   ),
-                  value: _prefs.backgroundSyncEnabled,
+                  value:
+                      _prefs.backgroundSyncEnabled &&
+                      BackgroundSync.isSupported,
                   onChanged: BackgroundSync.isSupported
                       ? (value) async {
                           final messenger = ScaffoldMessenger.of(context);

@@ -87,6 +87,7 @@ class HomeMenuButton extends StatelessWidget {
     );
     try {
       final result = await SyncService.runOnce(force: true);
+      if (!context.mounted) return;
       bumpConfigRevision();
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(
@@ -99,6 +100,7 @@ class HomeMenuButton extends StatelessWidget {
         ),
       );
     } catch (e) {
+      if (!context.mounted) return;
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(const SnackBar(content: Text('Sync failed.')));
     }
