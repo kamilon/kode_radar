@@ -105,17 +105,22 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
           SyncStateStore.feedScope,
         );
         if (!mounted || seq != _loadSeq) return;
-        if (cached.isNotEmpty) {
+        // Set the provenance label even when the cache is empty (a scope that
+        // synced successfully but had nothing to show), so its "updated" time
+        // survives a restart/offline open.
+        if (cached.isNotEmpty || lastSynced != null) {
           setState(() {
-            _events = cached;
+            if (cached.isNotEmpty) {
+              _events = cached;
+              // The cached render carries no source-health signal, so clear any
+              // stale failed/truncated notice from a previous refresh while the
+              // new network refresh is still in flight.
+              _failedSources = 0;
+              _truncated = false;
+            }
             _teams = teams;
             _lookbackDays = appPrefs.feedLookbackDays;
             _lastSynced = lastSynced;
-            // The cached render carries no source-health signal, so clear any
-            // stale failed/truncated notice from a previous refresh while the
-            // new network refresh is still in flight.
-            _failedSources = 0;
-            _truncated = false;
             if (_teamId != null && !teams.any((t) => t.id == _teamId)) {
               _teamId = null;
             }
@@ -151,10 +156,12 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
         );
         if (!mounted || seq != _loadSeq) return;
       }
-      // The refresh counts as a successful sync unless it came back empty
-      // *because* sources failed (fully offline). Record it so the "updated"
-      // label reflects the last real sync, not a cache render.
-      final syncedOk = result.events.isNotEmpty || result.failedSources == 0;
+      // The refresh counts as a successful sync when at least one source loaded
+      // (or the whole fleet is clean) — NOT when it came back empty because
+      // every source failed (fully offline). Using okSources (not emptiness)
+      // means a persistently-failing repo alongside a quiet fleet doesn't
+      // freeze the "updated" label.
+      final syncedOk = result.failedSources == 0 || result.okSources > 0;
       if (syncedOk) {
         await SyncStateStore.markSuccess(SyncStateStore.feedScope);
         if (!mounted || seq != _loadSeq) return;

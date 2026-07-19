@@ -84,13 +84,20 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
         final cachedDetail = cachedResults[0] as RepoDetailData;
         final repoEvents = cachedResults[1] as List<ActivityEvent>;
         final lastSynced = cachedResults[2] as DateTime?;
-        if (cachedDetail.pulls.isNotEmpty ||
+        final hasCache =
+            cachedDetail.pulls.isNotEmpty ||
             cachedDetail.ci.isNotEmpty ||
             cachedDetail.releases.isNotEmpty ||
-            repoEvents.isNotEmpty) {
+            repoEvents.isNotEmpty;
+        // Set the provenance label even when there's no cached content (a scope
+        // that synced successfully but had nothing to show), so its "updated"
+        // time survives a restart/offline open.
+        if (hasCache || lastSynced != null) {
           setState(() {
-            _data = cachedDetail;
-            _events = repoEvents;
+            if (hasCache) {
+              _data = cachedDetail;
+              _events = repoEvents;
+            }
             _lastSynced = lastSynced;
           });
         }
@@ -131,14 +138,15 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
       if (timeline.isEmpty && feed.failedSources > 0) {
         timeline = _events;
       }
-      // A successful sync = at least one source refreshed without failing.
-      // Fully offline (every source failed) does not count, so the header's
-      // "updated" label reflects the last real refresh.
+      // A successful sync = at least one *persisted* detail source (pulls / CI /
+      // releases) refreshed without failing. The timeline isn't part of this
+      // cache (it reuses the shared feed cache), so it doesn't gate provenance —
+      // otherwise the "updated" time could advance while the persisted tabs show
+      // stale data. Fully offline (every detail source failed) does not count.
       final syncedOk =
           !freshDetail.pullsFailed ||
           !freshDetail.ciFailed ||
-          (_releasesSupported && !freshDetail.releasesFailed) ||
-          feed.failedSources == 0;
+          (_releasesSupported && !freshDetail.releasesFailed);
       if (syncedOk) {
         await SyncStateStore.markSuccess(
           SyncStateStore.repoScope(_repo.repoKey),

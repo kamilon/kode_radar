@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'app_http.dart';
@@ -9,7 +10,9 @@ import 'attention_store.dart';
 import 'config_revision.dart';
 import 'home_menu.dart';
 import 'identity_store.dart';
+import 'monitored_repos.dart';
 import 'notification_service.dart';
+import 'repo_store.dart';
 import 'snooze_store.dart';
 import 'sync_state_store.dart';
 
@@ -94,9 +97,12 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
           SyncStateStore.attentionScope,
         );
         if (!mounted || seq != _loadSeq) return;
-        if (cachedItems.isNotEmpty) {
+        // Set the provenance label even when the cache is empty (a clean inbox
+        // that synced successfully), so its "checked" time survives a
+        // restart/offline open.
+        if (cachedItems.isNotEmpty || lastSynced != null) {
           setState(() {
-            _items = cachedItems;
+            if (cachedItems.isNotEmpty) _items = cachedItems;
             _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
             _lastSynced = lastSynced;
           });
@@ -126,16 +132,21 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       // repos couldn't load.
       final cachedReal = await AttentionStore.cached(snoozedIds: freshSnoozed);
       if (!mounted || seq != _loadSeq) return;
-      // A successful sync = we got real items, or a genuinely clean fleet (no
-      // errors). Fully offline (all error items, no real ones) does not count,
-      // so the "checked" label reflects the last real refresh.
-      final hasReal = computed.any(
-        (i) => i.category != AttentionStore.errorCategory,
-      );
-      final hasError = computed.any(
-        (i) => i.category == AttentionStore.errorCategory,
-      );
-      final syncedOk = hasReal || !hasError;
+      // A successful sync = at least one monitored repo was fetched without an
+      // error (it had real items or was cleanly empty). Compare the number of
+      // errored repos (one error item each) to the monitored count so a
+      // persistently-failing repo alongside an empty (healthy) inbox doesn't
+      // freeze the "checked" label. Fully offline (every repo errored) = not ok.
+      final erroredRepos = computed
+          .where((i) => i.category == AttentionStore.errorCategory)
+          .length;
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted || seq != _loadSeq) return;
+      final monitoredCount = parseMonitoredRepos(
+        prefs.getStringList(RepoStore.githubKey) ?? const <String>[],
+        prefs.getStringList(RepoStore.adoKey) ?? const <String>[],
+      ).length;
+      final syncedOk = monitoredCount == 0 || erroredRepos < monitoredCount;
       if (syncedOk) {
         await SyncStateStore.markSuccess(SyncStateStore.attentionScope);
         if (!mounted || seq != _loadSeq) return;
