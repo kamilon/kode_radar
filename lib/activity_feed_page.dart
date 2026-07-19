@@ -27,7 +27,12 @@ class ActivityFeedPage extends StatefulWidget {
 class _ActivityFeedPageState extends State<ActivityFeedPage> {
   List<ActivityEvent> _events = const [];
   List<Team> _teams = const [];
-  bool _loading = true;
+
+  /// A load (cache render + network refresh) is in flight. Gates the manual
+  /// Refresh action so a user can't stack overlapping network fetches/DB writes
+  /// on top of an in-flight refresh; cache-first renders still update the UI
+  /// underneath it.
+  bool _refreshing = true;
   bool _mineOnly = false;
   bool _identitySet = false;
   int _failedSources = 0;
@@ -70,7 +75,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
   Future<void> _load() async {
     final seq = ++_loadSeq;
     setState(() {
-      _loading = true;
+      _refreshing = true;
       _error = null;
     });
     try {
@@ -107,7 +112,6 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
               _teamId = null;
             }
             _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
-            _loading = false;
           });
         }
       }
@@ -151,7 +155,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
         }
         _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
         _lastChecked = DateTime.now();
-        _loading = false;
+        _refreshing = false;
       });
     } catch (e) {
       debugPrint('ActivityFeed failed to load: $e');
@@ -164,7 +168,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
           _error =
               'Something went wrong while loading the feed. Pull down to try again.';
         }
-        _loading = false;
+        _refreshing = false;
       });
     }
   }
@@ -194,6 +198,11 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
     if (since == null) return 0;
     return _visibleEvents.where((e) => e.occurredAt.isAfter(since)).length;
   }
+
+  /// Show the full-screen spinner only when a load is in flight and there's
+  /// nothing cached to render yet; once cache (or fresh) events are on screen,
+  /// content stays visible while the network refresh continues underneath.
+  bool get _showSpinner => _refreshing && _events.isEmpty && _error == null;
 
   void _applyView(SavedView view) {
     setState(() {
@@ -330,19 +339,19 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
             tooltip: _mineOnly
                 ? 'Showing yours — tap for all'
                 : 'Show only mine',
-            onPressed: _loading
+            onPressed: _showSpinner
                 ? null
                 : () => setState(() => _mineOnly = !_mineOnly),
           ),
           IconButton(
             icon: const Icon(Icons.bookmarks_outlined),
             tooltip: 'Saved views',
-            onPressed: _loading ? null : _openSavedViews,
+            onPressed: _showSpinner ? null : _openSavedViews,
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
-            onPressed: _loading ? null : _load,
+            onPressed: _refreshing ? null : _load,
           ),
           const HomeMenuButton(),
         ],
@@ -351,14 +360,14 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
         children: [
           _buildFilterBar(),
           const Divider(height: 1),
-          if (!_loading && _error == null) sinceLastLookedBanner(_newCount),
-          if (!_loading && _error == null)
+          if (!_showSpinner && _error == null) sinceLastLookedBanner(_newCount),
+          if (!_showSpinner && _error == null)
             activitySourceNotice(
               failedSources: _failedSources,
               truncated: _truncated,
             ),
           Expanded(
-            child: _loading
+            child: _showSpinner
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(onRefresh: _load, child: _buildContent()),
           ),
@@ -372,7 +381,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
       FilterChip(
         label: const Text('All'),
         selected: _groups.isEmpty,
-        onSelected: _loading ? null : (_) => setState(_groups.clear),
+        onSelected: _showSpinner ? null : (_) => setState(_groups.clear),
       ),
       for (final group in ActivityType.groups)
         Padding(
@@ -380,7 +389,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
           child: FilterChip(
             label: Text(ActivityType.groupLabel(group)),
             selected: _groups.contains(group),
-            onSelected: _loading
+            onSelected: _showSpinner
                 ? null
                 : (selected) => setState(() {
                     if (selected) {
@@ -413,7 +422,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
                     value: _teamId,
                     isDense: true,
                     hint: const Text('All teams'),
-                    onChanged: _loading
+                    onChanged: _showSpinner
                         ? null
                         : (value) => setState(() => _teamId = value),
                     items: [
