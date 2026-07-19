@@ -24,6 +24,7 @@ class RepoPr {
     required this.author,
     required this.reviewState,
     this.ageDays,
+    this.createdAt,
     this.draft = false,
     this.url,
   });
@@ -33,6 +34,10 @@ class RepoPr {
   final String author;
   final String reviewState; // one of PrReviewState
   final int? ageDays;
+
+  /// When the PR was opened (UTC). Persisted so a cached PR's age can be
+  /// recomputed on read instead of freezing at its fetch-time value.
+  final DateTime? createdAt;
   final bool draft;
   final String? url;
 }
@@ -154,6 +159,7 @@ class RepoDetailService {
             pending,
           ),
           ageDays: _ageDays(pr['createdAt'], now),
+          createdAt: _parseDate(pr['createdAt']),
           draft: pr['isDraft'] == true,
           url: _str(pr, 'url'),
         ),
@@ -239,6 +245,7 @@ class RepoDetailService {
           author: author,
           reviewState: state,
           ageDays: _ageDays(pr['creationDate'], now),
+          createdAt: _parseDate(pr['creationDate']),
           draft: draft,
           url: url,
         ),

@@ -91,6 +91,7 @@ class RepoPulls extends Table {
   TextColumn get author => text()();
   TextColumn get reviewState => text()();
   IntColumn get ageDays => integer().nullable()();
+  IntColumn get createdAt => integer().nullable()();
   BoolColumn get draft => boolean()();
   TextColumn get url => text().nullable()();
 }
@@ -170,7 +171,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forExecutor(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -236,6 +237,31 @@ class AppDatabase extends _$AppDatabase {
       // `CREATE TABLE IF NOT EXISTS`, so no secondary index is needed.
       if (from < 5) {
         await m.createTable(syncState);
+      }
+      // v6 adds `created_at` to repo_pulls so a cached PR's age can be recomputed
+      // on read (Phase 3b). Ensure the table exists first (real upgrades have it
+      // from v4, but keep this step self-contained), then add the column with a
+      // single `ALTER TABLE ADD COLUMN`. This avoids a multi-statement
+      // drop+recreate (whose interleaving across isolates could crash on a
+      // half-recreated table) and keeps existing cached rows. A concurrent
+      // migrator — or a jump from <4, where `createTable` already built the
+      // current schema — may have already added it, so tolerate "duplicate
+      // column".
+      if (from < 6) {
+        await m.createTable(repoPulls);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_repo_pulls_repo_key '
+          'ON repo_pulls (repo_key)',
+        );
+        try {
+          await customStatement(
+            'ALTER TABLE repo_pulls ADD COLUMN created_at INTEGER',
+          );
+        } on Exception catch (e) {
+          if (!e.toString().toLowerCase().contains('duplicate column')) {
+            rethrow;
+          }
+        }
       }
     },
   );
