@@ -12,6 +12,8 @@ class StoredTokenCheck {
     required this.checkedAt,
     this.account,
     this.message,
+    this.rateLimitRemaining,
+    this.rateLimitResetAt,
   });
 
   final TokenHealth health;
@@ -19,11 +21,19 @@ class StoredTokenCheck {
   final String? account;
   final String? message;
 
+  /// The API rate-limit budget reported for this token on the last check
+  /// (GitHub `X-RateLimit-Remaining` / reset), or null if none was reported.
+  final int? rateLimitRemaining;
+  final DateTime? rateLimitResetAt;
+
   Map<String, dynamic> toJson() => {
     'health': health.name,
     'checkedAt': checkedAt.toUtc().millisecondsSinceEpoch,
     if (account != null) 'account': account,
     if (message != null) 'message': message,
+    if (rateLimitRemaining != null) 'rlRemaining': rateLimitRemaining,
+    if (rateLimitResetAt != null)
+      'rlResetAt': rateLimitResetAt!.toUtc().millisecondsSinceEpoch,
   };
 
   /// Parses a stored entry, or null if it is malformed (unknown health or a
@@ -50,11 +60,26 @@ class StoredTokenCheck {
     }
     final account = json['account'];
     final message = json['message'];
+    final rlRemaining = json['rlRemaining'];
+    final rlResetMillis = json['rlResetAt'];
+    DateTime? rlResetAt;
+    if (rlResetMillis is int) {
+      try {
+        rlResetAt = DateTime.fromMillisecondsSinceEpoch(
+          rlResetMillis,
+          isUtc: true,
+        );
+      } catch (_) {
+        rlResetAt = null;
+      }
+    }
     return StoredTokenCheck(
       health: health,
       checkedAt: checkedAt,
       account: account is String ? account : null,
       message: message is String ? message : null,
+      rateLimitRemaining: rlRemaining is int ? rlRemaining : null,
+      rateLimitResetAt: rlResetAt,
     );
   }
 }
@@ -90,6 +115,8 @@ class TokenHealthStore {
         checkedAt: now ?? DateTime.now(),
         account: check.account,
         message: check.message,
+        rateLimitRemaining: check.rateLimit?.remaining,
+        rateLimitResetAt: check.rateLimit?.resetAt,
       );
       await _writeTo(prefs, raw);
     });
