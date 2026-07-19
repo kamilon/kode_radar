@@ -86,24 +86,27 @@ class AppDatabase extends _$AppDatabase {
       // (repo_key, event_id) UNIQUE index the upsert relies on must be created
       // separately or existing (v1) installs would get duplicate rows.
       //
-      // Guard on the table's existence so a concurrent open from a second
-      // connection (e.g. the background-sync isolate) that also observed v1
-      // can't fail with "table already exists": SQLite serializes writers, so
-      // by the time the second migration's transaction runs, it sees the table
-      // the first one committed and skips the (non-idempotent) DDL.
+      // All statements are unconditionally idempotent (`IF NOT EXISTS`) so a
+      // concurrent open from a second connection (e.g. the background-sync
+      // isolate) that also observed v1 can't crash on "table/index already
+      // exists": drift runs `onUpgrade` in autocommit (no wrapping migration
+      // transaction), so the check-then-create couldn't otherwise be made race
+      // free. `createTable` already emits `CREATE TABLE IF NOT EXISTS`; the
+      // index DDL drift generates does not, so issue it directly.
       if (from < 2) {
-        final existing = await m.database
-            .customSelect(
-              "SELECT 1 FROM sqlite_master "
-              "WHERE type = 'table' AND name = 'activity_events'",
-            )
-            .get();
-        if (existing.isEmpty) {
-          await m.createTable(activityEvents);
-          await m.create(idxActivityEventsRepoKey);
-          await m.create(idxActivityEventsOccurredAt);
-          await m.create(idxActivityEventsRepoEvent);
-        }
+        await m.createTable(activityEvents);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_activity_events_repo_key '
+          'ON activity_events (repo_key)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_activity_events_occurred_at '
+          'ON activity_events (occurred_at)',
+        );
+        await customStatement(
+          'CREATE UNIQUE INDEX IF NOT EXISTS idx_activity_events_repo_event '
+          'ON activity_events (repo_key, event_id)',
+        );
       }
     },
   );

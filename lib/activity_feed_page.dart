@@ -98,6 +98,11 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
             _events = cached;
             _teams = teams;
             _lookbackDays = appPrefs.feedLookbackDays;
+            // The cached render carries no source-health signal, so clear any
+            // stale failed/truncated notice from a previous refresh while the
+            // new network refresh is still in flight.
+            _failedSources = 0;
+            _truncated = false;
             if (_teamId != null && !teams.any((t) => t.id == _teamId)) {
               _teamId = null;
             }

@@ -15,8 +15,8 @@ import 'repo_store.dart';
 ///
 /// Events are keyed by `(repoKey, eventId)`: re-fetching the same event upserts
 /// its (possibly updated) row instead of duplicating it. On [save] the cache is
-/// pruned to the lookback window and the [ActivityFeedService.maxEvents] cap so
-/// it stays bounded.
+/// pruned to the [maxRetention] horizon and the [ActivityFeedService.maxEvents]
+/// cap so it stays bounded; reads filter to the caller's display window.
 class ActivityEventStore {
   ActivityEventStore._();
 

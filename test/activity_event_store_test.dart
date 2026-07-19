@@ -221,6 +221,26 @@ void main() {
     },
   );
 
+  test(
+    'restrictToMonitored purges all rows when nothing is monitored',
+    () async {
+      await ActivityEventStore.save([
+        _event(id: 'a', repoKey: 'github:owner/one', occurredAt: now),
+        _event(id: 'b', repoKey: 'github:owner/two', occurredAt: now),
+      ], now: now);
+
+      // No monitored repos in prefs -> the cache should be fully purged.
+      SharedPreferences.setMockInitialValues({});
+      await ActivityEventStore.save(
+        const [],
+        now: now,
+        restrictToMonitored: true,
+      );
+
+      expect(await ActivityEventStore.cached(now: now), isEmpty);
+    },
+  );
+
   test('save trims the cache to maxEvents newest rows', () async {
     final many = [
       for (var i = 0; i < ActivityFeedService.maxEvents + 25; i++)
