@@ -13,8 +13,8 @@ import 'database/app_database.dart';
 /// [AttentionItem.id]. [save] merges intelligently: items for repos that
 /// returned an `error` this round (a transient/offline failure) are retained
 /// from the prior snapshot, while repos that were fetched successfully have
-/// their items replaced. Transient `error` items are never persisted; snoozed
-/// items are filtered on read.
+/// their items replaced. Transient `error` items are never persisted; snooze
+/// is applied by the page at display time (not here).
 class AttentionStore {
   AttentionStore._();
 
@@ -81,9 +81,9 @@ class AttentionStore {
   ///
   /// Callers should pass the FULL snapshot (do not pre-filter snoozed items):
   /// the cache is the source of truth for what each repo currently has, and
-  /// snooze is a display concern applied at read time by [cached]. Pre-filtering
-  /// would make a snoozed-away or dismissed item look like the repo went clean
-  /// and wrongly evict its cached data.
+  /// snooze is a display concern the page applies (see [AttentionInboxPage]).
+  /// Pre-filtering would make a snoozed-away or dismissed item look like the
+  /// repo went clean and wrongly evict its cached data.
   ///
   /// Repos that returned an `error` this round keep their previously-cached
   /// items (so a transient/offline failure doesn't drop their data); every other

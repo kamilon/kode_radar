@@ -216,11 +216,13 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         if (syncedOk) _lastSynced = DateTime.now();
         _refreshing = false;
       });
-      // Notify on the fresh, snooze-filtered set (error items are additionally
-      // excluded inside NotificationService).
+      // Notify on the fresh set, excluding both persisted and just-made local
+      // snoozes (an optimistic dismiss may not be reflected in SnoozeStore yet).
+      // Error items are additionally excluded inside NotificationService.
+      final effectiveSnoozed = {...freshSnoozed, ..._snoozedIds};
       unawaited(
         NotificationService.notifyNewAttention(
-          computed.where((i) => !freshSnoozed.contains(i.id)).toList(),
+          computed.where((i) => !effectiveSnoozed.contains(i.id)).toList(),
         ),
       );
     } catch (e) {
