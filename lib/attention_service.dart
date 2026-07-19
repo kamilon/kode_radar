@@ -49,6 +49,11 @@ class AttentionItem {
 class AttentionService {
   AttentionService._();
 
+  /// Category marking a per-repo fetch failure surfaced in the inbox. These are
+  /// not real attention items — they are never persisted to the cache and never
+  /// trigger notifications.
+  static const String errorCategory = 'error';
+
   /// A PR open longer than this many days (with no pending review/changes) is
   /// surfaced as an "old open PR".
   static const int oldOpenPrDays = 7;

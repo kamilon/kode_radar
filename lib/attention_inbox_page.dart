@@ -95,24 +95,35 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         }
       }
 
-      // Phase B: refresh from the network and persist the snapshot.
+      // Phase B: refresh from the network and persist the snapshot. Compute
+      // WITHOUT snooze filtering so `save` sees each repo's true success/failure
+      // (a snoozed-away item or a dismissed error marker must not make a repo
+      // look "clean" and wipe its last-known-good cache); snooze is applied only
+      // when rendering/notifying below.
       final computed = await AttentionService.computeAll(
         client: AppHttp.client,
-        snoozedIds: snoozed,
         selfGithubLogins: selfGithub,
         selfAdoNames: selfAdo,
       );
       if (!mounted || seq != _loadSeq) return;
       await AttentionStore.save(computed);
       if (!mounted || seq != _loadSeq) return;
+      // Re-read snoozes now (a dismiss may have happened during the fetch) so a
+      // just-dismissed item can't flicker back into the rendered snapshot.
+      final freshSnoozed = await SnoozeStore.snoozedIds();
+      if (!mounted || seq != _loadSeq) return;
       // Render the persisted snapshot (which keeps last-known-good items for any
       // repo that failed this round) plus this round's fresh error items, so an
       // offline/partial refresh never blanks the inbox yet still surfaces which
       // repos couldn't load.
-      final cachedReal = await AttentionStore.cached(snoozedIds: snoozed);
+      final cachedReal = await AttentionStore.cached(snoozedIds: freshSnoozed);
       if (!mounted || seq != _loadSeq) return;
       final errors = computed
-          .where((i) => i.category == AttentionStore.errorCategory)
+          .where(
+            (i) =>
+                i.category == AttentionStore.errorCategory &&
+                !freshSnoozed.contains(i.id),
+          )
           .toList();
       final merged = [...cachedReal, ...errors]
         ..sort((a, b) {
@@ -126,7 +137,13 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         _lastChecked = DateTime.now();
         _refreshing = false;
       });
-      unawaited(NotificationService.notifyNewAttention(computed));
+      // Notify on the fresh, snooze-filtered set (error items are additionally
+      // excluded inside NotificationService).
+      unawaited(
+        NotificationService.notifyNewAttention(
+          computed.where((i) => !freshSnoozed.contains(i.id)).toList(),
+        ),
+      );
     } catch (e) {
       debugPrint('AttentionInbox failed to load: $e');
       if (!mounted || seq != _loadSeq) return;
@@ -165,8 +182,16 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       ),
       body: _showSpinner
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(onRefresh: _load, child: _buildContent()),
+          : RefreshIndicator(onRefresh: _refresh, child: _buildContent()),
     );
+  }
+
+  /// Pull-to-refresh handler. Coalesces with an already-running load (e.g. the
+  /// initial/config-driven load that isn't owned by this RefreshIndicator) so a
+  /// pull can't kick off a second concurrent network fetch.
+  Future<void> _refresh() async {
+    if (_refreshing) return;
+    await _load();
   }
 
   void _toggleMine() {

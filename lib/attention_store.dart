@@ -19,7 +19,7 @@ class AttentionStore {
   AttentionStore._();
 
   /// Category marking a per-repo fetch failure (not a real attention item).
-  static const String errorCategory = 'error';
+  static const String errorCategory = AttentionService.errorCategory;
 
   static AppDatabase? _db;
 
