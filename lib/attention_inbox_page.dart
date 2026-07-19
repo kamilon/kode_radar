@@ -490,11 +490,14 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
           label: 'Undo',
           onPressed: () async {
             // Ensure the snooze write finished before undoing, but never let a
-            // persistence error prevent the undo.
+            // persistence error prevent the undo — both the wait and the
+            // unsnooze are best-effort so the UI undo always completes.
             try {
               await pending;
             } catch (_) {}
-            await SnoozeStore.unsnooze(item.id);
+            try {
+              await SnoozeStore.unsnooze(item.id);
+            } catch (_) {}
             if (!mounted) return;
             // Drop it from the local snooze set so it reappears from the cached
             // stream without a full network reload.
