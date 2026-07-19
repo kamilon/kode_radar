@@ -208,11 +208,11 @@ void main() {
     await upgraded.close();
   });
 
-  test('v5 -> v6 upgrade recreates repo_pulls with created_at', () async {
+  test('v5 -> v6 upgrade adds created_at to repo_pulls', () async {
     // Build a v5-era database by hand: repo_pulls WITHOUT created_at (plus the
     // sibling tables cached() reads), holding a stale row. Opening AppDatabase
-    // runs onUpgrade(5 -> 6), which drops & recreates repo_pulls with the new
-    // created_at column (clearing the stale row).
+    // runs onUpgrade(5 -> 6), which ADDs the created_at column (keeping the
+    // table); the stale row is later replaced by save().
     final native = sqlite3.openInMemory();
     native.execute(
       'CREATE TABLE repo_pulls (id INTEGER PRIMARY KEY AUTOINCREMENT, '
@@ -252,8 +252,8 @@ void main() {
       releasesSupported: true,
       now: created.add(const Duration(days: 5)),
     );
-    // Stale row dropped by the migration; new row's age recomputed from
-    // created_at.
+    // save() replaced the repo's rows (stale row gone); the new row's age is
+    // recomputed from the created_at added by the migration.
     expect(cached.pulls.map((p) => p.label).toList(), ['PR #1']);
     expect(cached.pulls.single.ageDays, 5);
 
