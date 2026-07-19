@@ -63,6 +63,12 @@ class NotificationService {
           .toList();
       final currentIds = attention.map((item) => item.id).toSet();
       final prefs = await SharedPreferences.getInstance();
+      // Freshen the cached prefs from disk: the seen baseline is now atomic in
+      // the DB, but the repo lists and notification settings are still read from
+      // SharedPreferences here, so a reused background isolate should still pick
+      // up foreground config changes (e.g. a repo added, or notifications
+      // disabled) before deciding.
+      await prefs.reload();
       // Mark every monitored repo "known" — including ones that currently have
       // zero attention items — so adding a repo silences only its existing
       // backlog while the first attention item that later appears in a
@@ -74,7 +80,12 @@ class NotificationService {
       );
       // The seen baseline lives in the DB (Phase 4): the foreground and the
       // background-sync isolate record it additively, so neither clobbers the
-      // other's snapshot (no `prefs.reload()` dance needed).
+      // other's snapshot. (The notification *decision* itself — read baseline,
+      // notify, then record — is still per-isolate, so a truly-simultaneous
+      // foreground+background run could each notify the same item once; that is
+      // rare because the background task runs while the app is suspended and not
+      // actively notifying, and the additive baseline prevents any re-notify on
+      // the following cycle.)
       final firstRun = !await NotificationSeenStore.isSeeded();
       final seen = await NotificationSeenStore.seenIds();
       final knownRepos = await NotificationSeenStore.knownRepos();

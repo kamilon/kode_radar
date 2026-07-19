@@ -84,11 +84,15 @@ class NotificationSeenStore {
       final db = _database;
       await db.transaction(() async {
         for (final id in currentIds) {
+          // OR REPLACE (not IGNORE) so a re-seen id is bumped to a fresh, newest
+          // autoincrement id — a continuously-current item then never falls into
+          // the oldest-pruned tail and can't be spuriously re-notified. Still
+          // additive across isolates (the id stays present).
           await db
               .into(db.notificationSeen)
               .insert(
                 NotificationSeenCompanion.insert(seenId: id),
-                mode: InsertMode.insertOrIgnore,
+                mode: InsertMode.insertOrReplace,
               );
         }
         await _pruneSeen(db);

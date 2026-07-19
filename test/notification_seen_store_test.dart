@@ -54,6 +54,20 @@ void main() {
     expect(seen.contains('id0'), isFalse);
   });
 
+  test('a re-seen id is bumped so it survives pruning', () async {
+    await NotificationSeenStore.recordBaseline({'keep'}, const {});
+    // Fill past the cap while ALSO re-seeing 'keep', which bumps it to newest.
+    final fresh = {
+      for (var i = 0; i <= NotificationSeenStore.maxSeenIds; i++) 'n$i',
+    };
+    await NotificationSeenStore.recordBaseline({...fresh, 'keep'}, const {});
+
+    final seen = await NotificationSeenStore.seenIds();
+    expect(seen.length, NotificationSeenStore.maxSeenIds);
+    // 'keep' was re-seen this round, so it wasn't evicted as "oldest".
+    expect(seen.contains('keep'), isTrue);
+  });
+
   test('imports a legacy SharedPreferences baseline once', () async {
     SharedPreferences.setMockInitialValues({
       'seen_attention': ['x', 'y'],
