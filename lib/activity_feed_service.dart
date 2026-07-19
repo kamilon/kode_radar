@@ -16,6 +16,7 @@ class ActivityFeedResult {
   const ActivityFeedResult({
     required this.events,
     this.failedSources = 0,
+    this.okSources = 0,
     this.truncated = false,
   });
 
@@ -23,6 +24,11 @@ class ActivityFeedResult {
 
   /// Number of source fetches that errored or returned a non-200 status.
   final int failedSources;
+
+  /// Number of per-repo source fetches that succeeded (returned data or an
+  /// empty-but-clean result). Zero when the whole fetch was offline/failed;
+  /// lets callers tell "genuinely quiet" from "nothing loaded" for provenance.
+  final int okSources;
 
   /// True when at least one history source returned a full page, so older
   /// in-window events may have been omitted.
@@ -539,6 +545,12 @@ class ActivityFeedService {
 
       final outcomes = await _runBounded(tasks, concurrency);
       final combined = _FetchOutcome.merge(outcomes);
+      // A repo source counts as "ok" if it fully succeeded or returned some
+      // events (i.e. it wasn't a total failure), so provenance can distinguish
+      // a fully-offline fetch from a quiet-but-successful one.
+      final okSources = outcomes
+          .where((o) => o.failedCount == 0 || o.events.isNotEmpty)
+          .length;
       // Apply person/repo scoping BEFORE the maxEvents cap so a quiet person or
       // team can't be evicted by unrelated high-volume repositories.
       var events = combined.events;
@@ -555,6 +567,7 @@ class ActivityFeedService {
       return ActivityFeedResult(
         events: mergeAndWindow(events, since),
         failedSources: combined.failedCount,
+        okSources: okSources,
         truncated: combined.truncated,
       );
     } finally {

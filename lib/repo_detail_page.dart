@@ -9,6 +9,7 @@ import 'activity_service.dart';
 import 'app_http.dart';
 import 'repo_detail_service.dart';
 import 'repo_detail_store.dart';
+import 'sync_state_store.dart';
 
 /// Per-repository drill-down: open pull requests (with review state), CI
 /// history, releases, and a recent-activity timeline, plus contributors.
@@ -32,6 +33,10 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
   /// still update the UI underneath.
   bool _refreshing = true;
   String? _error;
+
+  /// When this repo last refreshed successfully from the network (persisted), so
+  /// the header's "updated" label stays honest while showing stale cache.
+  DateTime? _lastSynced;
 
   // Guards against a stale in-flight load applying after a newer one.
   int _loadSeq = 0;
@@ -73,17 +78,27 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
             releasesSupported: _releasesSupported,
           ),
           ActivityEventStore.cached(repoKey: _repo.repoKey),
+          SyncStateStore.lastSuccess(SyncStateStore.repoScope(_repo.repoKey)),
         ]);
         if (!mounted || seq != _loadSeq) return;
         final cachedDetail = cachedResults[0] as RepoDetailData;
         final repoEvents = cachedResults[1] as List<ActivityEvent>;
-        if (cachedDetail.pulls.isNotEmpty ||
+        final lastSynced = cachedResults[2] as DateTime?;
+        final hasCache =
+            cachedDetail.pulls.isNotEmpty ||
             cachedDetail.ci.isNotEmpty ||
             cachedDetail.releases.isNotEmpty ||
-            repoEvents.isNotEmpty) {
+            repoEvents.isNotEmpty;
+        // Set the provenance label even when there's no cached content (a scope
+        // that synced successfully but had nothing to show), so its "updated"
+        // time survives a restart/offline open.
+        if (hasCache || lastSynced != null) {
           setState(() {
-            _data = cachedDetail;
-            _events = repoEvents;
+            if (hasCache) {
+              _data = cachedDetail;
+              _events = repoEvents;
+            }
+            _lastSynced = lastSynced;
           });
         }
       }
@@ -123,6 +138,21 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
       if (timeline.isEmpty && feed.failedSources > 0) {
         timeline = _events;
       }
+      // A successful sync = at least one *persisted* detail source (pulls / CI /
+      // releases) refreshed without failing. The timeline isn't part of this
+      // cache (it reuses the shared feed cache), so it doesn't gate provenance —
+      // otherwise the "updated" time could advance while the persisted tabs show
+      // stale data. Fully offline (every detail source failed) does not count.
+      final syncedOk =
+          !freshDetail.pullsFailed ||
+          !freshDetail.ciFailed ||
+          (_releasesSupported && !freshDetail.releasesFailed);
+      if (syncedOk) {
+        await SyncStateStore.markSuccess(
+          SyncStateStore.repoScope(_repo.repoKey),
+        );
+        if (!mounted || seq != _loadSeq) return;
+      }
       setState(() {
         _data = RepoDetailData(
           pulls: mergedDetail.pulls,
@@ -136,6 +166,7 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
         _events = timeline;
         _feedFailed = feed.failedSources;
         _feedTruncated = feed.truncated;
+        if (syncedOk) _lastSynced = DateTime.now();
         _refreshing = false;
       });
     } catch (e) {
@@ -240,6 +271,16 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (_lastSynced != null) ...[
+            const SizedBox(width: 8),
+            Text(
+              'Updated ${activityRelativeTime(_lastSynced!.toLocal())}',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ],
       ),
     );

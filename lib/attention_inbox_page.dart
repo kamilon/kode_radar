@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'app_http.dart';
@@ -9,8 +10,11 @@ import 'attention_store.dart';
 import 'config_revision.dart';
 import 'home_menu.dart';
 import 'identity_store.dart';
+import 'monitored_repos.dart';
 import 'notification_service.dart';
+import 'repo_store.dart';
 import 'snooze_store.dart';
+import 'sync_state_store.dart';
 
 /// Shows a ranked list of items that need the user's attention across all
 /// monitored repositories (PRs waiting on review, changes requested, stale PRs,
@@ -33,7 +37,10 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
   String? _categoryFilter;
   bool _identitySet = false;
   String? _error;
-  DateTime? _lastChecked;
+
+  /// When the inbox last refreshed successfully from the network (persisted), so
+  /// the "checked" label stays honest while showing stale cache offline.
+  DateTime? _lastSynced;
 
   // Guards against a stale in-flight load applying after a newer one.
   int _loadSeq = 0;
@@ -86,11 +93,18 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       // meaningful when we don't already have items on screen.
       if (_items.isEmpty) {
         final cachedItems = await AttentionStore.cached(snoozedIds: snoozed);
+        final lastSynced = await SyncStateStore.lastSuccess(
+          SyncStateStore.attentionScope,
+        );
         if (!mounted || seq != _loadSeq) return;
-        if (cachedItems.isNotEmpty) {
+        // Set the provenance label even when the cache is empty (a clean inbox
+        // that synced successfully), so its "checked" time survives a
+        // restart/offline open.
+        if (cachedItems.isNotEmpty || lastSynced != null) {
           setState(() {
-            _items = cachedItems;
+            if (cachedItems.isNotEmpty) _items = cachedItems;
             _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
+            _lastSynced = lastSynced;
           });
         }
       }
@@ -118,6 +132,25 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       // repos couldn't load.
       final cachedReal = await AttentionStore.cached(snoozedIds: freshSnoozed);
       if (!mounted || seq != _loadSeq) return;
+      // A successful sync = at least one monitored repo was fetched without an
+      // error (it had real items or was cleanly empty). Compare the number of
+      // errored repos (one error item each) to the monitored count so a
+      // persistently-failing repo alongside an empty (healthy) inbox doesn't
+      // freeze the "checked" label. Fully offline (every repo errored) = not ok.
+      final erroredRepos = computed
+          .where((i) => i.category == AttentionStore.errorCategory)
+          .length;
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted || seq != _loadSeq) return;
+      final monitoredCount = parseMonitoredRepos(
+        prefs.getStringList(RepoStore.githubKey) ?? const <String>[],
+        prefs.getStringList(RepoStore.adoKey) ?? const <String>[],
+      ).length;
+      final syncedOk = monitoredCount == 0 || erroredRepos < monitoredCount;
+      if (syncedOk) {
+        await SyncStateStore.markSuccess(SyncStateStore.attentionScope);
+        if (!mounted || seq != _loadSeq) return;
+      }
       final errors = computed
           .where(
             (i) =>
@@ -137,7 +170,7 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       setState(() {
         _items = merged;
         _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
-        _lastChecked = DateTime.now();
+        if (syncedOk) _lastSynced = DateTime.now();
         _refreshing = false;
       });
       // Notify on the fresh, snooze-filtered set (error items are additionally
@@ -321,9 +354,9 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         const SizedBox(height: 6),
         Center(
           child: Text(
-            _lastChecked == null
+            _lastSynced == null
                 ? 'Pull down to refresh.'
-                : 'Checked ${_relativeTime(_lastChecked!)} · pull down to refresh.',
+                : 'Updated ${_relativeTime(_lastSynced!)} · pull down to refresh.',
             style: TextStyle(color: Colors.grey[600], fontSize: 12),
           ),
         ),
@@ -339,7 +372,7 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Text(
-        '$label${_lastChecked == null ? '' : ' · checked ${_relativeTime(_lastChecked!)}'}',
+        '$label${_lastSynced == null ? '' : ' · updated ${_relativeTime(_lastSynced!)}'}',
         style: TextStyle(color: Colors.grey[600], fontSize: 12),
       ),
     );

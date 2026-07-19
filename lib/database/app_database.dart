@@ -120,6 +120,22 @@ class RepoReleases extends Table {
   TextColumn get url => text().nullable()();
 }
 
+/// Per-scope sync provenance (Phase 3): when a cache scope was last refreshed
+/// successfully from the network, so the UI can show an accurate "updated Xh
+/// ago" instead of "just now" when it's actually displaying stale cached data.
+/// `scope` is a stable key like `feed`, `attention`, or `repo:<repoKey>`.
+/// `etag`/`cursor` are reserved for later conditional-GET / pagination slices.
+@DataClassName('SyncStateRow')
+class SyncState extends Table {
+  TextColumn get scope => text()();
+  IntColumn get lastSuccessAt => integer().nullable()();
+  TextColumn get etag => text().nullable()();
+  TextColumn get cursor => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {scope};
+}
+
 /// Small key/value table for database-local bookkeeping (e.g. one-time
 /// migration markers that must commit atomically with the data they guard).
 @DataClassName('AppMetaRow')
@@ -143,6 +159,7 @@ class AppMeta extends Table {
     RepoPulls,
     RepoRuns,
     RepoReleases,
+    SyncState,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -153,7 +170,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forExecutor(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -214,6 +231,11 @@ class AppDatabase extends _$AppDatabase {
           'CREATE INDEX IF NOT EXISTS idx_repo_releases_repo_key '
           'ON repo_releases (repo_key)',
         );
+      }
+      // v5 adds the sync-provenance table (Phase 3). Its PK index is part of
+      // `CREATE TABLE IF NOT EXISTS`, so no secondary index is needed.
+      if (from < 5) {
+        await m.createTable(syncState);
       }
     },
   );
