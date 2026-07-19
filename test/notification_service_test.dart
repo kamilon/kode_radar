@@ -53,8 +53,8 @@ void main() {
     id: id,
     category: 'reviewRequested',
     severity: 3000,
-    title: id,
-    subtitle: '',
+    titleTemplate: id,
+    subtitleTemplate: '',
     repoDisplay: repo,
   );
 
@@ -117,8 +117,8 @@ void main() {
         id: 'error:r1',
         category: AttentionService.errorCategory,
         severity: 0,
-        title: 'Could not load',
-        subtitle: 'r1',
+        titleTemplate: 'Could not load',
+        subtitleTemplate: 'r1',
         repoDisplay: 'r1',
       );
       final pending = NotificationService.pendingIds(
