@@ -41,6 +41,17 @@ void backgroundSyncCallbackDispatcher() {
       return result.activityOk;
     } catch (e, st) {
       debugPrint('Background sync task failed: $e\n$st');
+      // The task ran but threw (e.g. init failed). Record a finished-failure so
+      // this is distinguishable from an OS kill/expiry, which leaves only the
+      // "started" marker. Best-effort.
+      try {
+        await BackgroundSyncStatusStore.recordFinished(
+          activityOk: false,
+          repoCount: 0,
+        );
+      } catch (e2, st2) {
+        debugPrint('Background sync: recordFinished (error) failed: $e2\n$st2');
+      }
       return false;
     }
   });
