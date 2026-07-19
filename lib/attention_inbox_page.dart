@@ -67,10 +67,34 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
 
   /// The rendered snapshot: the persisted stream items plus this round's error
   /// markers, minus locally snoozed/dismissed ids, ranked most-urgent first.
-  List<AttentionItem> get _items => [
-    ..._streamItems,
-    ..._errorItems,
-  ].where((i) => !_snoozedIds.contains(i.id)).toList()..sort(_compareItems);
+  ///
+  /// Memoized on the identity of its three inputs (each is always replaced, not
+  /// mutated in place, on change), so the multiple reads per build (via
+  /// [_showSpinner], [_mineFiltered], [_visibleItems], [_buildEmptyState]) reuse
+  /// one merged+sorted list instead of re-doing the O(n log n) work each time.
+  List<AttentionItem>? _itemsCache;
+  List<AttentionItem>? _itemsCacheFromStream;
+  List<AttentionItem>? _itemsCacheFromErrors;
+  Set<String>? _itemsCacheFromSnoozed;
+
+  List<AttentionItem> get _items {
+    final cached = _itemsCache;
+    if (cached != null &&
+        identical(_itemsCacheFromStream, _streamItems) &&
+        identical(_itemsCacheFromErrors, _errorItems) &&
+        identical(_itemsCacheFromSnoozed, _snoozedIds)) {
+      return cached;
+    }
+    final computed = [
+      ..._streamItems,
+      ..._errorItems,
+    ].where((i) => !_snoozedIds.contains(i.id)).toList()..sort(_compareItems);
+    _itemsCache = computed;
+    _itemsCacheFromStream = _streamItems;
+    _itemsCacheFromErrors = _errorItems;
+    _itemsCacheFromSnoozed = _snoozedIds;
+    return computed;
+  }
 
   /// Most-urgent-first ordering (severity desc, then repo, then id) matching
   /// [AttentionStore]'s persisted order so the error overlay slots in stably.
