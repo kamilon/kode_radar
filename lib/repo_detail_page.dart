@@ -3,10 +3,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'activity_event.dart';
 import 'activity_event_list.dart';
+import 'activity_event_store.dart';
 import 'activity_feed_service.dart';
 import 'activity_service.dart';
 import 'app_http.dart';
 import 'repo_detail_service.dart';
+import 'repo_detail_store.dart';
 
 /// Per-repository drill-down: open pull requests (with review state), CI
 /// history, releases, and a recent-activity timeline, plus contributors.
@@ -24,10 +26,28 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
   List<ActivityEvent> _events = const [];
   int _feedFailed = 0;
   bool _feedTruncated = false;
-  bool _loading = true;
+
+  /// A load (cache render + network refresh) is in flight. Gates the manual
+  /// Refresh action so overlapping fetches can't stack; cache-first renders
+  /// still update the UI underneath.
+  bool _refreshing = true;
   String? _error;
 
+  // Guards against a stale in-flight load applying after a newer one.
+  int _loadSeq = 0;
+
   RepoActivity get _repo => widget.repo;
+
+  /// True once anything (detail or timeline) is on screen.
+  bool get _hasContent =>
+      _events.isNotEmpty ||
+      _data.pulls.isNotEmpty ||
+      _data.ci.isNotEmpty ||
+      _data.releases.isNotEmpty;
+
+  /// Full-screen spinner only while a load is in flight and nothing is cached
+  /// to show yet.
+  bool get _showSpinner => _refreshing && !_hasContent && _error == null;
 
   @override
   void initState() {
@@ -36,11 +56,36 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
   }
 
   Future<void> _load() async {
+    final seq = ++_loadSeq;
     setState(() {
-      _loading = true;
+      _refreshing = true;
       _error = null;
     });
     try {
+      // Phase A: render cached detail + this repo's cached timeline events
+      // immediately so a cold start / offline open isn't a blank spinner.
+      if (!_hasContent) {
+        final cachedDetail = await RepoDetailStore.cached(
+          _repo.repoKey,
+          releasesSupported: _releasesSupported,
+        );
+        final cachedEvents = await ActivityEventStore.cached();
+        if (!mounted || seq != _loadSeq) return;
+        final repoEvents = cachedEvents
+            .where((e) => e.repoKey == _repo.repoKey)
+            .toList();
+        if (cachedDetail.pulls.isNotEmpty ||
+            cachedDetail.ci.isNotEmpty ||
+            cachedDetail.releases.isNotEmpty ||
+            repoEvents.isNotEmpty) {
+          setState(() {
+            _data = cachedDetail;
+            _events = repoEvents;
+          });
+        }
+      }
+
+      // Phase B: refresh from the network and persist the detail snapshot.
       final detailFuture = RepoDetailService.load(
         repoKey: _repo.repoKey,
         provider: _repo.provider,
@@ -51,25 +96,65 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
         onlyRepoKeys: {_repo.repoKey},
       );
       final results = await Future.wait([detailFuture, feedFuture]);
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
+      final freshDetail = results[0] as RepoDetailData;
+      final feed = results[1] as ActivityFeedResult;
+      await RepoDetailStore.save(_repo.repoKey, freshDetail);
+      if (!mounted || seq != _loadSeq) return;
+      // Render the persisted detail (which keeps last-known-good rows for any
+      // source that failed this round) but carry the fresh per-source failure
+      // flags so each tab still shows "couldn't load". For the timeline, prefer
+      // the fresh scoped fetch and fall back to the cache when it's empty
+      // (offline), so it never blanks.
+      final mergedDetail = await RepoDetailStore.cached(
+        _repo.repoKey,
+        releasesSupported: _releasesSupported,
+      );
+      if (!mounted || seq != _loadSeq) return;
+      List<ActivityEvent> timeline = feed.events;
+      if (timeline.isEmpty) {
+        final cachedEvents = await ActivityEventStore.cached();
+        if (!mounted || seq != _loadSeq) return;
+        timeline = cachedEvents
+            .where((e) => e.repoKey == _repo.repoKey)
+            .toList();
+      }
       setState(() {
-        _data = results[0] as RepoDetailData;
-        final feed = results[1] as ActivityFeedResult;
-        _events = feed.events;
+        _data = RepoDetailData(
+          pulls: mergedDetail.pulls,
+          ci: mergedDetail.ci,
+          releases: mergedDetail.releases,
+          releasesSupported: _releasesSupported,
+          pullsFailed: freshDetail.pullsFailed,
+          ciFailed: freshDetail.ciFailed,
+          releasesFailed: freshDetail.releasesFailed,
+        );
+        _events = timeline;
         _feedFailed = feed.failedSources;
         _feedTruncated = feed.truncated;
-        _loading = false;
+        _refreshing = false;
       });
     } catch (e) {
       debugPrint('RepoDetail failed to load: $e');
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
       setState(() {
-        _error =
-            'Something went wrong while loading this repository. '
-            'Pull to retry.';
-        _loading = false;
+        // Keep any cached content from Phase A; only show the error screen when
+        // there's nothing to show.
+        if (!_hasContent) {
+          _error =
+              'Something went wrong while loading this repository. '
+              'Pull to retry.';
+        }
+        _refreshing = false;
       });
     }
+  }
+
+  /// Pull-to-refresh handler: ignore the pull if a load is already in flight so
+  /// it can't start a second concurrent fetch.
+  Future<void> _refresh() async {
+    if (_refreshing) return;
+    await _load();
   }
 
   int get _tabCount => _releasesSupported ? 4 : 3;
@@ -101,12 +186,12 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
             IconButton(
               icon: const Icon(Icons.refresh),
               tooltip: 'Refresh',
-              onPressed: _loading ? null : _load,
+              onPressed: _refreshing ? null : _load,
             ),
           ],
           bottom: TabBar(isScrollable: true, tabs: tabs),
         ),
-        body: _loading
+        body: _showSpinner
             ? const Center(child: CircularProgressIndicator())
             : Column(
                 children: [
@@ -183,7 +268,7 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
       );
     }
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _refresh,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: pulls.length,
@@ -226,7 +311,7 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
       );
     }
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _refresh,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: ci.length,
@@ -266,7 +351,7 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
       );
     }
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _refresh,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: releases.length,
@@ -306,7 +391,7 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
       );
     }
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _refresh,
       child: ActivityEventList(events: _events),
     );
   }
@@ -384,7 +469,7 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
 
   Widget _centeredMessage(String message) {
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _refresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
@@ -402,7 +487,7 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
 
   Widget _errorList() {
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _refresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
