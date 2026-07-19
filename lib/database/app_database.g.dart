@@ -1317,6 +1317,569 @@ class ActivityEventsCompanion extends UpdateCompanion<ActivityEventRow> {
   }
 }
 
+class $AttentionItemsTable extends AttentionItems
+    with TableInfo<$AttentionItemsTable, AttentionItemRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AttentionItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _severityMeta = const VerificationMeta(
+    'severity',
+  );
+  @override
+  late final GeneratedColumn<int> severity = GeneratedColumn<int>(
+    'severity',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _subtitleMeta = const VerificationMeta(
+    'subtitle',
+  );
+  @override
+  late final GeneratedColumn<String> subtitle = GeneratedColumn<String>(
+    'subtitle',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _repoDisplayMeta = const VerificationMeta(
+    'repoDisplay',
+  );
+  @override
+  late final GeneratedColumn<String> repoDisplay = GeneratedColumn<String>(
+    'repo_display',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _urlMeta = const VerificationMeta('url');
+  @override
+  late final GeneratedColumn<String> url = GeneratedColumn<String>(
+    'url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ageDaysMeta = const VerificationMeta(
+    'ageDays',
+  );
+  @override
+  late final GeneratedColumn<int> ageDays = GeneratedColumn<int>(
+    'age_days',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isMineMeta = const VerificationMeta('isMine');
+  @override
+  late final GeneratedColumn<bool> isMine = GeneratedColumn<bool>(
+    'is_mine',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_mine" IN (0, 1))',
+    ),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    category,
+    severity,
+    title,
+    subtitle,
+    repoDisplay,
+    url,
+    ageDays,
+    isMine,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'attention_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AttentionItemRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_categoryMeta);
+    }
+    if (data.containsKey('severity')) {
+      context.handle(
+        _severityMeta,
+        severity.isAcceptableOrUnknown(data['severity']!, _severityMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_severityMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('subtitle')) {
+      context.handle(
+        _subtitleMeta,
+        subtitle.isAcceptableOrUnknown(data['subtitle']!, _subtitleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_subtitleMeta);
+    }
+    if (data.containsKey('repo_display')) {
+      context.handle(
+        _repoDisplayMeta,
+        repoDisplay.isAcceptableOrUnknown(
+          data['repo_display']!,
+          _repoDisplayMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_repoDisplayMeta);
+    }
+    if (data.containsKey('url')) {
+      context.handle(
+        _urlMeta,
+        url.isAcceptableOrUnknown(data['url']!, _urlMeta),
+      );
+    }
+    if (data.containsKey('age_days')) {
+      context.handle(
+        _ageDaysMeta,
+        ageDays.isAcceptableOrUnknown(data['age_days']!, _ageDaysMeta),
+      );
+    }
+    if (data.containsKey('is_mine')) {
+      context.handle(
+        _isMineMeta,
+        isMine.isAcceptableOrUnknown(data['is_mine']!, _isMineMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_isMineMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AttentionItemRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AttentionItemRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      severity: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}severity'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      subtitle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}subtitle'],
+      )!,
+      repoDisplay: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}repo_display'],
+      )!,
+      url: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}url'],
+      ),
+      ageDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}age_days'],
+      ),
+      isMine: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_mine'],
+      )!,
+    );
+  }
+
+  @override
+  $AttentionItemsTable createAlias(String alias) {
+    return $AttentionItemsTable(attachedDatabase, alias);
+  }
+}
+
+class AttentionItemRow extends DataClass
+    implements Insertable<AttentionItemRow> {
+  final String id;
+  final String category;
+  final int severity;
+  final String title;
+  final String subtitle;
+  final String repoDisplay;
+  final String? url;
+  final int? ageDays;
+  final bool isMine;
+  const AttentionItemRow({
+    required this.id,
+    required this.category,
+    required this.severity,
+    required this.title,
+    required this.subtitle,
+    required this.repoDisplay,
+    this.url,
+    this.ageDays,
+    required this.isMine,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['category'] = Variable<String>(category);
+    map['severity'] = Variable<int>(severity);
+    map['title'] = Variable<String>(title);
+    map['subtitle'] = Variable<String>(subtitle);
+    map['repo_display'] = Variable<String>(repoDisplay);
+    if (!nullToAbsent || url != null) {
+      map['url'] = Variable<String>(url);
+    }
+    if (!nullToAbsent || ageDays != null) {
+      map['age_days'] = Variable<int>(ageDays);
+    }
+    map['is_mine'] = Variable<bool>(isMine);
+    return map;
+  }
+
+  AttentionItemsCompanion toCompanion(bool nullToAbsent) {
+    return AttentionItemsCompanion(
+      id: Value(id),
+      category: Value(category),
+      severity: Value(severity),
+      title: Value(title),
+      subtitle: Value(subtitle),
+      repoDisplay: Value(repoDisplay),
+      url: url == null && nullToAbsent ? const Value.absent() : Value(url),
+      ageDays: ageDays == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ageDays),
+      isMine: Value(isMine),
+    );
+  }
+
+  factory AttentionItemRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AttentionItemRow(
+      id: serializer.fromJson<String>(json['id']),
+      category: serializer.fromJson<String>(json['category']),
+      severity: serializer.fromJson<int>(json['severity']),
+      title: serializer.fromJson<String>(json['title']),
+      subtitle: serializer.fromJson<String>(json['subtitle']),
+      repoDisplay: serializer.fromJson<String>(json['repoDisplay']),
+      url: serializer.fromJson<String?>(json['url']),
+      ageDays: serializer.fromJson<int?>(json['ageDays']),
+      isMine: serializer.fromJson<bool>(json['isMine']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'category': serializer.toJson<String>(category),
+      'severity': serializer.toJson<int>(severity),
+      'title': serializer.toJson<String>(title),
+      'subtitle': serializer.toJson<String>(subtitle),
+      'repoDisplay': serializer.toJson<String>(repoDisplay),
+      'url': serializer.toJson<String?>(url),
+      'ageDays': serializer.toJson<int?>(ageDays),
+      'isMine': serializer.toJson<bool>(isMine),
+    };
+  }
+
+  AttentionItemRow copyWith({
+    String? id,
+    String? category,
+    int? severity,
+    String? title,
+    String? subtitle,
+    String? repoDisplay,
+    Value<String?> url = const Value.absent(),
+    Value<int?> ageDays = const Value.absent(),
+    bool? isMine,
+  }) => AttentionItemRow(
+    id: id ?? this.id,
+    category: category ?? this.category,
+    severity: severity ?? this.severity,
+    title: title ?? this.title,
+    subtitle: subtitle ?? this.subtitle,
+    repoDisplay: repoDisplay ?? this.repoDisplay,
+    url: url.present ? url.value : this.url,
+    ageDays: ageDays.present ? ageDays.value : this.ageDays,
+    isMine: isMine ?? this.isMine,
+  );
+  AttentionItemRow copyWithCompanion(AttentionItemsCompanion data) {
+    return AttentionItemRow(
+      id: data.id.present ? data.id.value : this.id,
+      category: data.category.present ? data.category.value : this.category,
+      severity: data.severity.present ? data.severity.value : this.severity,
+      title: data.title.present ? data.title.value : this.title,
+      subtitle: data.subtitle.present ? data.subtitle.value : this.subtitle,
+      repoDisplay: data.repoDisplay.present
+          ? data.repoDisplay.value
+          : this.repoDisplay,
+      url: data.url.present ? data.url.value : this.url,
+      ageDays: data.ageDays.present ? data.ageDays.value : this.ageDays,
+      isMine: data.isMine.present ? data.isMine.value : this.isMine,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AttentionItemRow(')
+          ..write('id: $id, ')
+          ..write('category: $category, ')
+          ..write('severity: $severity, ')
+          ..write('title: $title, ')
+          ..write('subtitle: $subtitle, ')
+          ..write('repoDisplay: $repoDisplay, ')
+          ..write('url: $url, ')
+          ..write('ageDays: $ageDays, ')
+          ..write('isMine: $isMine')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    category,
+    severity,
+    title,
+    subtitle,
+    repoDisplay,
+    url,
+    ageDays,
+    isMine,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AttentionItemRow &&
+          other.id == this.id &&
+          other.category == this.category &&
+          other.severity == this.severity &&
+          other.title == this.title &&
+          other.subtitle == this.subtitle &&
+          other.repoDisplay == this.repoDisplay &&
+          other.url == this.url &&
+          other.ageDays == this.ageDays &&
+          other.isMine == this.isMine);
+}
+
+class AttentionItemsCompanion extends UpdateCompanion<AttentionItemRow> {
+  final Value<String> id;
+  final Value<String> category;
+  final Value<int> severity;
+  final Value<String> title;
+  final Value<String> subtitle;
+  final Value<String> repoDisplay;
+  final Value<String?> url;
+  final Value<int?> ageDays;
+  final Value<bool> isMine;
+  final Value<int> rowid;
+  const AttentionItemsCompanion({
+    this.id = const Value.absent(),
+    this.category = const Value.absent(),
+    this.severity = const Value.absent(),
+    this.title = const Value.absent(),
+    this.subtitle = const Value.absent(),
+    this.repoDisplay = const Value.absent(),
+    this.url = const Value.absent(),
+    this.ageDays = const Value.absent(),
+    this.isMine = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AttentionItemsCompanion.insert({
+    required String id,
+    required String category,
+    required int severity,
+    required String title,
+    required String subtitle,
+    required String repoDisplay,
+    this.url = const Value.absent(),
+    this.ageDays = const Value.absent(),
+    required bool isMine,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       category = Value(category),
+       severity = Value(severity),
+       title = Value(title),
+       subtitle = Value(subtitle),
+       repoDisplay = Value(repoDisplay),
+       isMine = Value(isMine);
+  static Insertable<AttentionItemRow> custom({
+    Expression<String>? id,
+    Expression<String>? category,
+    Expression<int>? severity,
+    Expression<String>? title,
+    Expression<String>? subtitle,
+    Expression<String>? repoDisplay,
+    Expression<String>? url,
+    Expression<int>? ageDays,
+    Expression<bool>? isMine,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (category != null) 'category': category,
+      if (severity != null) 'severity': severity,
+      if (title != null) 'title': title,
+      if (subtitle != null) 'subtitle': subtitle,
+      if (repoDisplay != null) 'repo_display': repoDisplay,
+      if (url != null) 'url': url,
+      if (ageDays != null) 'age_days': ageDays,
+      if (isMine != null) 'is_mine': isMine,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AttentionItemsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? category,
+    Value<int>? severity,
+    Value<String>? title,
+    Value<String>? subtitle,
+    Value<String>? repoDisplay,
+    Value<String?>? url,
+    Value<int?>? ageDays,
+    Value<bool>? isMine,
+    Value<int>? rowid,
+  }) {
+    return AttentionItemsCompanion(
+      id: id ?? this.id,
+      category: category ?? this.category,
+      severity: severity ?? this.severity,
+      title: title ?? this.title,
+      subtitle: subtitle ?? this.subtitle,
+      repoDisplay: repoDisplay ?? this.repoDisplay,
+      url: url ?? this.url,
+      ageDays: ageDays ?? this.ageDays,
+      isMine: isMine ?? this.isMine,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (severity.present) {
+      map['severity'] = Variable<int>(severity.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (subtitle.present) {
+      map['subtitle'] = Variable<String>(subtitle.value);
+    }
+    if (repoDisplay.present) {
+      map['repo_display'] = Variable<String>(repoDisplay.value);
+    }
+    if (url.present) {
+      map['url'] = Variable<String>(url.value);
+    }
+    if (ageDays.present) {
+      map['age_days'] = Variable<int>(ageDays.value);
+    }
+    if (isMine.present) {
+      map['is_mine'] = Variable<bool>(isMine.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AttentionItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('category: $category, ')
+          ..write('severity: $severity, ')
+          ..write('title: $title, ')
+          ..write('subtitle: $subtitle, ')
+          ..write('repoDisplay: $repoDisplay, ')
+          ..write('url: $url, ')
+          ..write('ageDays: $ageDays, ')
+          ..write('isMine: $isMine, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1325,6 +1888,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $AppMetaTable appMeta = $AppMetaTable(this);
   late final $ActivityEventsTable activityEvents = $ActivityEventsTable(this);
+  late final $AttentionItemsTable attentionItems = $AttentionItemsTable(this);
   late final Index idxMetricSnapshotsRepoKey = Index(
     'idx_metric_snapshots_repo_key',
     'CREATE INDEX idx_metric_snapshots_repo_key ON metric_snapshots (repo_key)',
@@ -1341,6 +1905,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_activity_events_repo_event',
     'CREATE UNIQUE INDEX idx_activity_events_repo_event ON activity_events (repo_key, event_id)',
   );
+  late final Index idxAttentionItemsRepoDisplay = Index(
+    'idx_attention_items_repo_display',
+    'CREATE INDEX idx_attention_items_repo_display ON attention_items (repo_display)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1349,10 +1917,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     metricSnapshots,
     appMeta,
     activityEvents,
+    attentionItems,
     idxMetricSnapshotsRepoKey,
     idxActivityEventsRepoKey,
     idxActivityEventsOccurredAt,
     idxActivityEventsRepoEvent,
+    idxAttentionItemsRepoDisplay,
   ];
 }
 
@@ -2051,6 +2621,290 @@ typedef $$ActivityEventsTableProcessedTableManager =
       ActivityEventRow,
       PrefetchHooks Function()
     >;
+typedef $$AttentionItemsTableCreateCompanionBuilder =
+    AttentionItemsCompanion Function({
+      required String id,
+      required String category,
+      required int severity,
+      required String title,
+      required String subtitle,
+      required String repoDisplay,
+      Value<String?> url,
+      Value<int?> ageDays,
+      required bool isMine,
+      Value<int> rowid,
+    });
+typedef $$AttentionItemsTableUpdateCompanionBuilder =
+    AttentionItemsCompanion Function({
+      Value<String> id,
+      Value<String> category,
+      Value<int> severity,
+      Value<String> title,
+      Value<String> subtitle,
+      Value<String> repoDisplay,
+      Value<String?> url,
+      Value<int?> ageDays,
+      Value<bool> isMine,
+      Value<int> rowid,
+    });
+
+class $$AttentionItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $AttentionItemsTable> {
+  $$AttentionItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get severity => $composableBuilder(
+    column: $table.severity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get subtitle => $composableBuilder(
+    column: $table.subtitle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get repoDisplay => $composableBuilder(
+    column: $table.repoDisplay,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ageDays => $composableBuilder(
+    column: $table.ageDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isMine => $composableBuilder(
+    column: $table.isMine,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AttentionItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AttentionItemsTable> {
+  $$AttentionItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get severity => $composableBuilder(
+    column: $table.severity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get subtitle => $composableBuilder(
+    column: $table.subtitle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get repoDisplay => $composableBuilder(
+    column: $table.repoDisplay,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ageDays => $composableBuilder(
+    column: $table.ageDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isMine => $composableBuilder(
+    column: $table.isMine,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AttentionItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AttentionItemsTable> {
+  $$AttentionItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<int> get severity =>
+      $composableBuilder(column: $table.severity, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get subtitle =>
+      $composableBuilder(column: $table.subtitle, builder: (column) => column);
+
+  GeneratedColumn<String> get repoDisplay => $composableBuilder(
+    column: $table.repoDisplay,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get url =>
+      $composableBuilder(column: $table.url, builder: (column) => column);
+
+  GeneratedColumn<int> get ageDays =>
+      $composableBuilder(column: $table.ageDays, builder: (column) => column);
+
+  GeneratedColumn<bool> get isMine =>
+      $composableBuilder(column: $table.isMine, builder: (column) => column);
+}
+
+class $$AttentionItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AttentionItemsTable,
+          AttentionItemRow,
+          $$AttentionItemsTableFilterComposer,
+          $$AttentionItemsTableOrderingComposer,
+          $$AttentionItemsTableAnnotationComposer,
+          $$AttentionItemsTableCreateCompanionBuilder,
+          $$AttentionItemsTableUpdateCompanionBuilder,
+          (
+            AttentionItemRow,
+            BaseReferences<
+              _$AppDatabase,
+              $AttentionItemsTable,
+              AttentionItemRow
+            >,
+          ),
+          AttentionItemRow,
+          PrefetchHooks Function()
+        > {
+  $$AttentionItemsTableTableManager(
+    _$AppDatabase db,
+    $AttentionItemsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AttentionItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AttentionItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AttentionItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<int> severity = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> subtitle = const Value.absent(),
+                Value<String> repoDisplay = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+                Value<int?> ageDays = const Value.absent(),
+                Value<bool> isMine = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AttentionItemsCompanion(
+                id: id,
+                category: category,
+                severity: severity,
+                title: title,
+                subtitle: subtitle,
+                repoDisplay: repoDisplay,
+                url: url,
+                ageDays: ageDays,
+                isMine: isMine,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String category,
+                required int severity,
+                required String title,
+                required String subtitle,
+                required String repoDisplay,
+                Value<String?> url = const Value.absent(),
+                Value<int?> ageDays = const Value.absent(),
+                required bool isMine,
+                Value<int> rowid = const Value.absent(),
+              }) => AttentionItemsCompanion.insert(
+                id: id,
+                category: category,
+                severity: severity,
+                title: title,
+                subtitle: subtitle,
+                repoDisplay: repoDisplay,
+                url: url,
+                ageDays: ageDays,
+                isMine: isMine,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AttentionItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AttentionItemsTable,
+      AttentionItemRow,
+      $$AttentionItemsTableFilterComposer,
+      $$AttentionItemsTableOrderingComposer,
+      $$AttentionItemsTableAnnotationComposer,
+      $$AttentionItemsTableCreateCompanionBuilder,
+      $$AttentionItemsTableUpdateCompanionBuilder,
+      (
+        AttentionItemRow,
+        BaseReferences<_$AppDatabase, $AttentionItemsTable, AttentionItemRow>,
+      ),
+      AttentionItemRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2061,4 +2915,6 @@ class $AppDatabaseManager {
       $$AppMetaTableTableManager(_db, _db.appMeta);
   $$ActivityEventsTableTableManager get activityEvents =>
       $$ActivityEventsTableTableManager(_db, _db.activityEvents);
+  $$AttentionItemsTableTableManager get attentionItems =>
+      $$AttentionItemsTableTableManager(_db, _db.attentionItems);
 }
