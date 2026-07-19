@@ -115,9 +115,11 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         if (!mounted) return;
         setState(() {
           _streamItems = items;
-          // A late cache emission should clear a stale error screen that a
-          // failed refresh set before the cache arrived.
-          if (items.isNotEmpty) _error = null;
+          // Any cache emission — even an empty one (a cleanly empty inbox) —
+          // is valid data, so clear a stale error screen a failed refresh set
+          // before the cache arrived. (The stream only emits [] on subscribe or
+          // after a successful save, never as the result of a failed refresh.)
+          _error = null;
         });
       },
       onError: (Object e) =>
@@ -229,8 +231,11 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       debugPrint('AttentionInbox failed to load: $e');
       if (!mounted || seq != _loadSeq) return;
       setState(() {
-        // Keep any cached items rendered by the stream rather than replacing
-        // them with an error state; only show the error when we have nothing.
+        // The refresh failed before producing fresh per-repo error markers, so
+        // drop any stale ones (they'd misrepresent the current state and inflate
+        // the category chip counts). The cached items from the stream stay
+        // rendered; only show the error banner when we have nothing at all.
+        _errorItems = const [];
         if (_items.isEmpty) {
           _error =
               'Something went wrong while loading your inbox. Pull down to try again.';
