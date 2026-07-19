@@ -76,6 +76,50 @@ class AttentionItems extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Cached per-repo detail (Phase 2c): the open pull requests, CI runs, and
+/// releases shown on the repo drill-down, so it renders instantly on cold start
+/// / offline. Each row carries its `repoKey`; the autoincrement `id` preserves
+/// the provider's list order. Generated row classes are suffixed `Row` to avoid
+/// colliding with the `RepoPr`/`RepoRun`/`RepoRelease` DTOs.
+@DataClassName('RepoPrRow')
+@TableIndex(name: 'idx_repo_pulls_repo_key', columns: {#repoKey})
+class RepoPulls extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get repoKey => text()();
+  TextColumn get label => text()();
+  TextColumn get title => text()();
+  TextColumn get author => text()();
+  TextColumn get reviewState => text()();
+  IntColumn get ageDays => integer().nullable()();
+  BoolColumn get draft => boolean()();
+  TextColumn get url => text().nullable()();
+}
+
+@DataClassName('RepoRunRow')
+@TableIndex(name: 'idx_repo_runs_repo_key', columns: {#repoKey})
+class RepoRuns extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get repoKey => text()();
+  TextColumn get name => text()();
+  TextColumn get status => text()();
+  TextColumn get conclusion => text()();
+  TextColumn get branch => text().nullable()();
+  IntColumn get finishedAt => integer().nullable()();
+  TextColumn get url => text().nullable()();
+}
+
+@DataClassName('RepoReleaseRow')
+@TableIndex(name: 'idx_repo_releases_repo_key', columns: {#repoKey})
+class RepoReleases extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get repoKey => text()();
+  TextColumn get tag => text()();
+  TextColumn get name => text().nullable()();
+  TextColumn get author => text().nullable()();
+  IntColumn get publishedAt => integer().nullable()();
+  TextColumn get url => text().nullable()();
+}
+
 /// Small key/value table for database-local bookkeeping (e.g. one-time
 /// migration markers that must commit atomically with the data they guard).
 @DataClassName('AppMetaRow')
@@ -91,7 +135,15 @@ class AppMeta extends Table {
 /// data that would not fit in `SharedPreferences` at scale. Configuration
 /// (tokens, repo lists, preferences) continues to live in `SharedPreferences`.
 @DriftDatabase(
-  tables: [MetricSnapshots, AppMeta, ActivityEvents, AttentionItems],
+  tables: [
+    MetricSnapshots,
+    AppMeta,
+    ActivityEvents,
+    AttentionItems,
+    RepoPulls,
+    RepoRuns,
+    RepoReleases,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -101,7 +153,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forExecutor(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -142,6 +194,25 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS idx_attention_items_repo_display '
           'ON attention_items (repo_display)',
+        );
+      }
+      // v4 adds the repo-detail cache (Phase 2c): pulls, CI runs, releases.
+      // Same idempotent-DDL reasoning as above.
+      if (from < 4) {
+        await m.createTable(repoPulls);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_repo_pulls_repo_key '
+          'ON repo_pulls (repo_key)',
+        );
+        await m.createTable(repoRuns);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_repo_runs_repo_key '
+          'ON repo_runs (repo_key)',
+        );
+        await m.createTable(repoReleases);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_repo_releases_repo_key '
+          'ON repo_releases (repo_key)',
         );
       }
     },

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'register_github_repo.dart';
 import 'register_ado_repo.dart';
 import 'activity_event_store.dart';
+import 'repo_detail_store.dart';
 import 'ignore_store.dart';
 import 'manage_ignored_page.dart';
 import 'metric_store.dart';
@@ -201,6 +202,7 @@ class _ManageReposPageState extends State<ManageReposPage> {
       if (!stillMonitored) {
         await MetricStore.removeRepo(repoKey);
         await ActivityEventStore.removeRepo(repoKey);
+        await RepoDetailStore.removeRepo(repoKey);
         await TeamStore.removeRepoFromAll(repoKey);
       }
     }

@@ -262,6 +262,24 @@ void main() {
     );
   });
 
+  test('cached(repoKey:) returns only that repo\'s events', () async {
+    await ActivityEventStore.save([
+      _event(id: '1', repoKey: 'github:a/a', occurredAt: now),
+      _event(id: '2', repoKey: 'github:b/b', occurredAt: now),
+      _event(
+        id: '3',
+        repoKey: 'github:a/a',
+        occurredAt: now.subtract(const Duration(hours: 1)),
+      ),
+    ], now: now);
+
+    final cached = await ActivityEventStore.cached(
+      repoKey: 'github:a/a',
+      now: now,
+    );
+    expect(cached.map((e) => e.id).toList(), ['1', '3']);
+  });
+
   test('removeRepo drops only the given repo', () async {
     await ActivityEventStore.save([
       _event(id: '1', repoKey: 'github:a/a', occurredAt: now),

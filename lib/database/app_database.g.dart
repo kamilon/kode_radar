@@ -1880,6 +1880,1497 @@ class AttentionItemsCompanion extends UpdateCompanion<AttentionItemRow> {
   }
 }
 
+class $RepoPullsTable extends RepoPulls
+    with TableInfo<$RepoPullsTable, RepoPrRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RepoPullsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _repoKeyMeta = const VerificationMeta(
+    'repoKey',
+  );
+  @override
+  late final GeneratedColumn<String> repoKey = GeneratedColumn<String>(
+    'repo_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _authorMeta = const VerificationMeta('author');
+  @override
+  late final GeneratedColumn<String> author = GeneratedColumn<String>(
+    'author',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _reviewStateMeta = const VerificationMeta(
+    'reviewState',
+  );
+  @override
+  late final GeneratedColumn<String> reviewState = GeneratedColumn<String>(
+    'review_state',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _ageDaysMeta = const VerificationMeta(
+    'ageDays',
+  );
+  @override
+  late final GeneratedColumn<int> ageDays = GeneratedColumn<int>(
+    'age_days',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _draftMeta = const VerificationMeta('draft');
+  @override
+  late final GeneratedColumn<bool> draft = GeneratedColumn<bool>(
+    'draft',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("draft" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _urlMeta = const VerificationMeta('url');
+  @override
+  late final GeneratedColumn<String> url = GeneratedColumn<String>(
+    'url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    repoKey,
+    label,
+    title,
+    author,
+    reviewState,
+    ageDays,
+    draft,
+    url,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'repo_pulls';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RepoPrRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('repo_key')) {
+      context.handle(
+        _repoKeyMeta,
+        repoKey.isAcceptableOrUnknown(data['repo_key']!, _repoKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_repoKeyMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('author')) {
+      context.handle(
+        _authorMeta,
+        author.isAcceptableOrUnknown(data['author']!, _authorMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_authorMeta);
+    }
+    if (data.containsKey('review_state')) {
+      context.handle(
+        _reviewStateMeta,
+        reviewState.isAcceptableOrUnknown(
+          data['review_state']!,
+          _reviewStateMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_reviewStateMeta);
+    }
+    if (data.containsKey('age_days')) {
+      context.handle(
+        _ageDaysMeta,
+        ageDays.isAcceptableOrUnknown(data['age_days']!, _ageDaysMeta),
+      );
+    }
+    if (data.containsKey('draft')) {
+      context.handle(
+        _draftMeta,
+        draft.isAcceptableOrUnknown(data['draft']!, _draftMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_draftMeta);
+    }
+    if (data.containsKey('url')) {
+      context.handle(
+        _urlMeta,
+        url.isAcceptableOrUnknown(data['url']!, _urlMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RepoPrRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RepoPrRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      repoKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}repo_key'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      author: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}author'],
+      )!,
+      reviewState: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}review_state'],
+      )!,
+      ageDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}age_days'],
+      ),
+      draft: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}draft'],
+      )!,
+      url: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}url'],
+      ),
+    );
+  }
+
+  @override
+  $RepoPullsTable createAlias(String alias) {
+    return $RepoPullsTable(attachedDatabase, alias);
+  }
+}
+
+class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
+  final int id;
+  final String repoKey;
+  final String label;
+  final String title;
+  final String author;
+  final String reviewState;
+  final int? ageDays;
+  final bool draft;
+  final String? url;
+  const RepoPrRow({
+    required this.id,
+    required this.repoKey,
+    required this.label,
+    required this.title,
+    required this.author,
+    required this.reviewState,
+    this.ageDays,
+    required this.draft,
+    this.url,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['repo_key'] = Variable<String>(repoKey);
+    map['label'] = Variable<String>(label);
+    map['title'] = Variable<String>(title);
+    map['author'] = Variable<String>(author);
+    map['review_state'] = Variable<String>(reviewState);
+    if (!nullToAbsent || ageDays != null) {
+      map['age_days'] = Variable<int>(ageDays);
+    }
+    map['draft'] = Variable<bool>(draft);
+    if (!nullToAbsent || url != null) {
+      map['url'] = Variable<String>(url);
+    }
+    return map;
+  }
+
+  RepoPullsCompanion toCompanion(bool nullToAbsent) {
+    return RepoPullsCompanion(
+      id: Value(id),
+      repoKey: Value(repoKey),
+      label: Value(label),
+      title: Value(title),
+      author: Value(author),
+      reviewState: Value(reviewState),
+      ageDays: ageDays == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ageDays),
+      draft: Value(draft),
+      url: url == null && nullToAbsent ? const Value.absent() : Value(url),
+    );
+  }
+
+  factory RepoPrRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RepoPrRow(
+      id: serializer.fromJson<int>(json['id']),
+      repoKey: serializer.fromJson<String>(json['repoKey']),
+      label: serializer.fromJson<String>(json['label']),
+      title: serializer.fromJson<String>(json['title']),
+      author: serializer.fromJson<String>(json['author']),
+      reviewState: serializer.fromJson<String>(json['reviewState']),
+      ageDays: serializer.fromJson<int?>(json['ageDays']),
+      draft: serializer.fromJson<bool>(json['draft']),
+      url: serializer.fromJson<String?>(json['url']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'repoKey': serializer.toJson<String>(repoKey),
+      'label': serializer.toJson<String>(label),
+      'title': serializer.toJson<String>(title),
+      'author': serializer.toJson<String>(author),
+      'reviewState': serializer.toJson<String>(reviewState),
+      'ageDays': serializer.toJson<int?>(ageDays),
+      'draft': serializer.toJson<bool>(draft),
+      'url': serializer.toJson<String?>(url),
+    };
+  }
+
+  RepoPrRow copyWith({
+    int? id,
+    String? repoKey,
+    String? label,
+    String? title,
+    String? author,
+    String? reviewState,
+    Value<int?> ageDays = const Value.absent(),
+    bool? draft,
+    Value<String?> url = const Value.absent(),
+  }) => RepoPrRow(
+    id: id ?? this.id,
+    repoKey: repoKey ?? this.repoKey,
+    label: label ?? this.label,
+    title: title ?? this.title,
+    author: author ?? this.author,
+    reviewState: reviewState ?? this.reviewState,
+    ageDays: ageDays.present ? ageDays.value : this.ageDays,
+    draft: draft ?? this.draft,
+    url: url.present ? url.value : this.url,
+  );
+  RepoPrRow copyWithCompanion(RepoPullsCompanion data) {
+    return RepoPrRow(
+      id: data.id.present ? data.id.value : this.id,
+      repoKey: data.repoKey.present ? data.repoKey.value : this.repoKey,
+      label: data.label.present ? data.label.value : this.label,
+      title: data.title.present ? data.title.value : this.title,
+      author: data.author.present ? data.author.value : this.author,
+      reviewState: data.reviewState.present
+          ? data.reviewState.value
+          : this.reviewState,
+      ageDays: data.ageDays.present ? data.ageDays.value : this.ageDays,
+      draft: data.draft.present ? data.draft.value : this.draft,
+      url: data.url.present ? data.url.value : this.url,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RepoPrRow(')
+          ..write('id: $id, ')
+          ..write('repoKey: $repoKey, ')
+          ..write('label: $label, ')
+          ..write('title: $title, ')
+          ..write('author: $author, ')
+          ..write('reviewState: $reviewState, ')
+          ..write('ageDays: $ageDays, ')
+          ..write('draft: $draft, ')
+          ..write('url: $url')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    repoKey,
+    label,
+    title,
+    author,
+    reviewState,
+    ageDays,
+    draft,
+    url,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RepoPrRow &&
+          other.id == this.id &&
+          other.repoKey == this.repoKey &&
+          other.label == this.label &&
+          other.title == this.title &&
+          other.author == this.author &&
+          other.reviewState == this.reviewState &&
+          other.ageDays == this.ageDays &&
+          other.draft == this.draft &&
+          other.url == this.url);
+}
+
+class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
+  final Value<int> id;
+  final Value<String> repoKey;
+  final Value<String> label;
+  final Value<String> title;
+  final Value<String> author;
+  final Value<String> reviewState;
+  final Value<int?> ageDays;
+  final Value<bool> draft;
+  final Value<String?> url;
+  const RepoPullsCompanion({
+    this.id = const Value.absent(),
+    this.repoKey = const Value.absent(),
+    this.label = const Value.absent(),
+    this.title = const Value.absent(),
+    this.author = const Value.absent(),
+    this.reviewState = const Value.absent(),
+    this.ageDays = const Value.absent(),
+    this.draft = const Value.absent(),
+    this.url = const Value.absent(),
+  });
+  RepoPullsCompanion.insert({
+    this.id = const Value.absent(),
+    required String repoKey,
+    required String label,
+    required String title,
+    required String author,
+    required String reviewState,
+    this.ageDays = const Value.absent(),
+    required bool draft,
+    this.url = const Value.absent(),
+  }) : repoKey = Value(repoKey),
+       label = Value(label),
+       title = Value(title),
+       author = Value(author),
+       reviewState = Value(reviewState),
+       draft = Value(draft);
+  static Insertable<RepoPrRow> custom({
+    Expression<int>? id,
+    Expression<String>? repoKey,
+    Expression<String>? label,
+    Expression<String>? title,
+    Expression<String>? author,
+    Expression<String>? reviewState,
+    Expression<int>? ageDays,
+    Expression<bool>? draft,
+    Expression<String>? url,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (repoKey != null) 'repo_key': repoKey,
+      if (label != null) 'label': label,
+      if (title != null) 'title': title,
+      if (author != null) 'author': author,
+      if (reviewState != null) 'review_state': reviewState,
+      if (ageDays != null) 'age_days': ageDays,
+      if (draft != null) 'draft': draft,
+      if (url != null) 'url': url,
+    });
+  }
+
+  RepoPullsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? repoKey,
+    Value<String>? label,
+    Value<String>? title,
+    Value<String>? author,
+    Value<String>? reviewState,
+    Value<int?>? ageDays,
+    Value<bool>? draft,
+    Value<String?>? url,
+  }) {
+    return RepoPullsCompanion(
+      id: id ?? this.id,
+      repoKey: repoKey ?? this.repoKey,
+      label: label ?? this.label,
+      title: title ?? this.title,
+      author: author ?? this.author,
+      reviewState: reviewState ?? this.reviewState,
+      ageDays: ageDays ?? this.ageDays,
+      draft: draft ?? this.draft,
+      url: url ?? this.url,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (repoKey.present) {
+      map['repo_key'] = Variable<String>(repoKey.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (author.present) {
+      map['author'] = Variable<String>(author.value);
+    }
+    if (reviewState.present) {
+      map['review_state'] = Variable<String>(reviewState.value);
+    }
+    if (ageDays.present) {
+      map['age_days'] = Variable<int>(ageDays.value);
+    }
+    if (draft.present) {
+      map['draft'] = Variable<bool>(draft.value);
+    }
+    if (url.present) {
+      map['url'] = Variable<String>(url.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RepoPullsCompanion(')
+          ..write('id: $id, ')
+          ..write('repoKey: $repoKey, ')
+          ..write('label: $label, ')
+          ..write('title: $title, ')
+          ..write('author: $author, ')
+          ..write('reviewState: $reviewState, ')
+          ..write('ageDays: $ageDays, ')
+          ..write('draft: $draft, ')
+          ..write('url: $url')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RepoRunsTable extends RepoRuns
+    with TableInfo<$RepoRunsTable, RepoRunRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RepoRunsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _repoKeyMeta = const VerificationMeta(
+    'repoKey',
+  );
+  @override
+  late final GeneratedColumn<String> repoKey = GeneratedColumn<String>(
+    'repo_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _conclusionMeta = const VerificationMeta(
+    'conclusion',
+  );
+  @override
+  late final GeneratedColumn<String> conclusion = GeneratedColumn<String>(
+    'conclusion',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _branchMeta = const VerificationMeta('branch');
+  @override
+  late final GeneratedColumn<String> branch = GeneratedColumn<String>(
+    'branch',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _finishedAtMeta = const VerificationMeta(
+    'finishedAt',
+  );
+  @override
+  late final GeneratedColumn<int> finishedAt = GeneratedColumn<int>(
+    'finished_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _urlMeta = const VerificationMeta('url');
+  @override
+  late final GeneratedColumn<String> url = GeneratedColumn<String>(
+    'url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    repoKey,
+    name,
+    status,
+    conclusion,
+    branch,
+    finishedAt,
+    url,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'repo_runs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RepoRunRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('repo_key')) {
+      context.handle(
+        _repoKeyMeta,
+        repoKey.isAcceptableOrUnknown(data['repo_key']!, _repoKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_repoKeyMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    if (data.containsKey('conclusion')) {
+      context.handle(
+        _conclusionMeta,
+        conclusion.isAcceptableOrUnknown(data['conclusion']!, _conclusionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_conclusionMeta);
+    }
+    if (data.containsKey('branch')) {
+      context.handle(
+        _branchMeta,
+        branch.isAcceptableOrUnknown(data['branch']!, _branchMeta),
+      );
+    }
+    if (data.containsKey('finished_at')) {
+      context.handle(
+        _finishedAtMeta,
+        finishedAt.isAcceptableOrUnknown(data['finished_at']!, _finishedAtMeta),
+      );
+    }
+    if (data.containsKey('url')) {
+      context.handle(
+        _urlMeta,
+        url.isAcceptableOrUnknown(data['url']!, _urlMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RepoRunRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RepoRunRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      repoKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}repo_key'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      conclusion: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conclusion'],
+      )!,
+      branch: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}branch'],
+      ),
+      finishedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}finished_at'],
+      ),
+      url: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}url'],
+      ),
+    );
+  }
+
+  @override
+  $RepoRunsTable createAlias(String alias) {
+    return $RepoRunsTable(attachedDatabase, alias);
+  }
+}
+
+class RepoRunRow extends DataClass implements Insertable<RepoRunRow> {
+  final int id;
+  final String repoKey;
+  final String name;
+  final String status;
+  final String conclusion;
+  final String? branch;
+  final int? finishedAt;
+  final String? url;
+  const RepoRunRow({
+    required this.id,
+    required this.repoKey,
+    required this.name,
+    required this.status,
+    required this.conclusion,
+    this.branch,
+    this.finishedAt,
+    this.url,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['repo_key'] = Variable<String>(repoKey);
+    map['name'] = Variable<String>(name);
+    map['status'] = Variable<String>(status);
+    map['conclusion'] = Variable<String>(conclusion);
+    if (!nullToAbsent || branch != null) {
+      map['branch'] = Variable<String>(branch);
+    }
+    if (!nullToAbsent || finishedAt != null) {
+      map['finished_at'] = Variable<int>(finishedAt);
+    }
+    if (!nullToAbsent || url != null) {
+      map['url'] = Variable<String>(url);
+    }
+    return map;
+  }
+
+  RepoRunsCompanion toCompanion(bool nullToAbsent) {
+    return RepoRunsCompanion(
+      id: Value(id),
+      repoKey: Value(repoKey),
+      name: Value(name),
+      status: Value(status),
+      conclusion: Value(conclusion),
+      branch: branch == null && nullToAbsent
+          ? const Value.absent()
+          : Value(branch),
+      finishedAt: finishedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(finishedAt),
+      url: url == null && nullToAbsent ? const Value.absent() : Value(url),
+    );
+  }
+
+  factory RepoRunRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RepoRunRow(
+      id: serializer.fromJson<int>(json['id']),
+      repoKey: serializer.fromJson<String>(json['repoKey']),
+      name: serializer.fromJson<String>(json['name']),
+      status: serializer.fromJson<String>(json['status']),
+      conclusion: serializer.fromJson<String>(json['conclusion']),
+      branch: serializer.fromJson<String?>(json['branch']),
+      finishedAt: serializer.fromJson<int?>(json['finishedAt']),
+      url: serializer.fromJson<String?>(json['url']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'repoKey': serializer.toJson<String>(repoKey),
+      'name': serializer.toJson<String>(name),
+      'status': serializer.toJson<String>(status),
+      'conclusion': serializer.toJson<String>(conclusion),
+      'branch': serializer.toJson<String?>(branch),
+      'finishedAt': serializer.toJson<int?>(finishedAt),
+      'url': serializer.toJson<String?>(url),
+    };
+  }
+
+  RepoRunRow copyWith({
+    int? id,
+    String? repoKey,
+    String? name,
+    String? status,
+    String? conclusion,
+    Value<String?> branch = const Value.absent(),
+    Value<int?> finishedAt = const Value.absent(),
+    Value<String?> url = const Value.absent(),
+  }) => RepoRunRow(
+    id: id ?? this.id,
+    repoKey: repoKey ?? this.repoKey,
+    name: name ?? this.name,
+    status: status ?? this.status,
+    conclusion: conclusion ?? this.conclusion,
+    branch: branch.present ? branch.value : this.branch,
+    finishedAt: finishedAt.present ? finishedAt.value : this.finishedAt,
+    url: url.present ? url.value : this.url,
+  );
+  RepoRunRow copyWithCompanion(RepoRunsCompanion data) {
+    return RepoRunRow(
+      id: data.id.present ? data.id.value : this.id,
+      repoKey: data.repoKey.present ? data.repoKey.value : this.repoKey,
+      name: data.name.present ? data.name.value : this.name,
+      status: data.status.present ? data.status.value : this.status,
+      conclusion: data.conclusion.present
+          ? data.conclusion.value
+          : this.conclusion,
+      branch: data.branch.present ? data.branch.value : this.branch,
+      finishedAt: data.finishedAt.present
+          ? data.finishedAt.value
+          : this.finishedAt,
+      url: data.url.present ? data.url.value : this.url,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RepoRunRow(')
+          ..write('id: $id, ')
+          ..write('repoKey: $repoKey, ')
+          ..write('name: $name, ')
+          ..write('status: $status, ')
+          ..write('conclusion: $conclusion, ')
+          ..write('branch: $branch, ')
+          ..write('finishedAt: $finishedAt, ')
+          ..write('url: $url')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    repoKey,
+    name,
+    status,
+    conclusion,
+    branch,
+    finishedAt,
+    url,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RepoRunRow &&
+          other.id == this.id &&
+          other.repoKey == this.repoKey &&
+          other.name == this.name &&
+          other.status == this.status &&
+          other.conclusion == this.conclusion &&
+          other.branch == this.branch &&
+          other.finishedAt == this.finishedAt &&
+          other.url == this.url);
+}
+
+class RepoRunsCompanion extends UpdateCompanion<RepoRunRow> {
+  final Value<int> id;
+  final Value<String> repoKey;
+  final Value<String> name;
+  final Value<String> status;
+  final Value<String> conclusion;
+  final Value<String?> branch;
+  final Value<int?> finishedAt;
+  final Value<String?> url;
+  const RepoRunsCompanion({
+    this.id = const Value.absent(),
+    this.repoKey = const Value.absent(),
+    this.name = const Value.absent(),
+    this.status = const Value.absent(),
+    this.conclusion = const Value.absent(),
+    this.branch = const Value.absent(),
+    this.finishedAt = const Value.absent(),
+    this.url = const Value.absent(),
+  });
+  RepoRunsCompanion.insert({
+    this.id = const Value.absent(),
+    required String repoKey,
+    required String name,
+    required String status,
+    required String conclusion,
+    this.branch = const Value.absent(),
+    this.finishedAt = const Value.absent(),
+    this.url = const Value.absent(),
+  }) : repoKey = Value(repoKey),
+       name = Value(name),
+       status = Value(status),
+       conclusion = Value(conclusion);
+  static Insertable<RepoRunRow> custom({
+    Expression<int>? id,
+    Expression<String>? repoKey,
+    Expression<String>? name,
+    Expression<String>? status,
+    Expression<String>? conclusion,
+    Expression<String>? branch,
+    Expression<int>? finishedAt,
+    Expression<String>? url,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (repoKey != null) 'repo_key': repoKey,
+      if (name != null) 'name': name,
+      if (status != null) 'status': status,
+      if (conclusion != null) 'conclusion': conclusion,
+      if (branch != null) 'branch': branch,
+      if (finishedAt != null) 'finished_at': finishedAt,
+      if (url != null) 'url': url,
+    });
+  }
+
+  RepoRunsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? repoKey,
+    Value<String>? name,
+    Value<String>? status,
+    Value<String>? conclusion,
+    Value<String?>? branch,
+    Value<int?>? finishedAt,
+    Value<String?>? url,
+  }) {
+    return RepoRunsCompanion(
+      id: id ?? this.id,
+      repoKey: repoKey ?? this.repoKey,
+      name: name ?? this.name,
+      status: status ?? this.status,
+      conclusion: conclusion ?? this.conclusion,
+      branch: branch ?? this.branch,
+      finishedAt: finishedAt ?? this.finishedAt,
+      url: url ?? this.url,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (repoKey.present) {
+      map['repo_key'] = Variable<String>(repoKey.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (conclusion.present) {
+      map['conclusion'] = Variable<String>(conclusion.value);
+    }
+    if (branch.present) {
+      map['branch'] = Variable<String>(branch.value);
+    }
+    if (finishedAt.present) {
+      map['finished_at'] = Variable<int>(finishedAt.value);
+    }
+    if (url.present) {
+      map['url'] = Variable<String>(url.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RepoRunsCompanion(')
+          ..write('id: $id, ')
+          ..write('repoKey: $repoKey, ')
+          ..write('name: $name, ')
+          ..write('status: $status, ')
+          ..write('conclusion: $conclusion, ')
+          ..write('branch: $branch, ')
+          ..write('finishedAt: $finishedAt, ')
+          ..write('url: $url')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RepoReleasesTable extends RepoReleases
+    with TableInfo<$RepoReleasesTable, RepoReleaseRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RepoReleasesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _repoKeyMeta = const VerificationMeta(
+    'repoKey',
+  );
+  @override
+  late final GeneratedColumn<String> repoKey = GeneratedColumn<String>(
+    'repo_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _tagMeta = const VerificationMeta('tag');
+  @override
+  late final GeneratedColumn<String> tag = GeneratedColumn<String>(
+    'tag',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _authorMeta = const VerificationMeta('author');
+  @override
+  late final GeneratedColumn<String> author = GeneratedColumn<String>(
+    'author',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _publishedAtMeta = const VerificationMeta(
+    'publishedAt',
+  );
+  @override
+  late final GeneratedColumn<int> publishedAt = GeneratedColumn<int>(
+    'published_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _urlMeta = const VerificationMeta('url');
+  @override
+  late final GeneratedColumn<String> url = GeneratedColumn<String>(
+    'url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    repoKey,
+    tag,
+    name,
+    author,
+    publishedAt,
+    url,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'repo_releases';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RepoReleaseRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('repo_key')) {
+      context.handle(
+        _repoKeyMeta,
+        repoKey.isAcceptableOrUnknown(data['repo_key']!, _repoKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_repoKeyMeta);
+    }
+    if (data.containsKey('tag')) {
+      context.handle(
+        _tagMeta,
+        tag.isAcceptableOrUnknown(data['tag']!, _tagMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tagMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    }
+    if (data.containsKey('author')) {
+      context.handle(
+        _authorMeta,
+        author.isAcceptableOrUnknown(data['author']!, _authorMeta),
+      );
+    }
+    if (data.containsKey('published_at')) {
+      context.handle(
+        _publishedAtMeta,
+        publishedAt.isAcceptableOrUnknown(
+          data['published_at']!,
+          _publishedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('url')) {
+      context.handle(
+        _urlMeta,
+        url.isAcceptableOrUnknown(data['url']!, _urlMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RepoReleaseRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RepoReleaseRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      repoKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}repo_key'],
+      )!,
+      tag: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tag'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      ),
+      author: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}author'],
+      ),
+      publishedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}published_at'],
+      ),
+      url: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}url'],
+      ),
+    );
+  }
+
+  @override
+  $RepoReleasesTable createAlias(String alias) {
+    return $RepoReleasesTable(attachedDatabase, alias);
+  }
+}
+
+class RepoReleaseRow extends DataClass implements Insertable<RepoReleaseRow> {
+  final int id;
+  final String repoKey;
+  final String tag;
+  final String? name;
+  final String? author;
+  final int? publishedAt;
+  final String? url;
+  const RepoReleaseRow({
+    required this.id,
+    required this.repoKey,
+    required this.tag,
+    this.name,
+    this.author,
+    this.publishedAt,
+    this.url,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['repo_key'] = Variable<String>(repoKey);
+    map['tag'] = Variable<String>(tag);
+    if (!nullToAbsent || name != null) {
+      map['name'] = Variable<String>(name);
+    }
+    if (!nullToAbsent || author != null) {
+      map['author'] = Variable<String>(author);
+    }
+    if (!nullToAbsent || publishedAt != null) {
+      map['published_at'] = Variable<int>(publishedAt);
+    }
+    if (!nullToAbsent || url != null) {
+      map['url'] = Variable<String>(url);
+    }
+    return map;
+  }
+
+  RepoReleasesCompanion toCompanion(bool nullToAbsent) {
+    return RepoReleasesCompanion(
+      id: Value(id),
+      repoKey: Value(repoKey),
+      tag: Value(tag),
+      name: name == null && nullToAbsent ? const Value.absent() : Value(name),
+      author: author == null && nullToAbsent
+          ? const Value.absent()
+          : Value(author),
+      publishedAt: publishedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(publishedAt),
+      url: url == null && nullToAbsent ? const Value.absent() : Value(url),
+    );
+  }
+
+  factory RepoReleaseRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RepoReleaseRow(
+      id: serializer.fromJson<int>(json['id']),
+      repoKey: serializer.fromJson<String>(json['repoKey']),
+      tag: serializer.fromJson<String>(json['tag']),
+      name: serializer.fromJson<String?>(json['name']),
+      author: serializer.fromJson<String?>(json['author']),
+      publishedAt: serializer.fromJson<int?>(json['publishedAt']),
+      url: serializer.fromJson<String?>(json['url']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'repoKey': serializer.toJson<String>(repoKey),
+      'tag': serializer.toJson<String>(tag),
+      'name': serializer.toJson<String?>(name),
+      'author': serializer.toJson<String?>(author),
+      'publishedAt': serializer.toJson<int?>(publishedAt),
+      'url': serializer.toJson<String?>(url),
+    };
+  }
+
+  RepoReleaseRow copyWith({
+    int? id,
+    String? repoKey,
+    String? tag,
+    Value<String?> name = const Value.absent(),
+    Value<String?> author = const Value.absent(),
+    Value<int?> publishedAt = const Value.absent(),
+    Value<String?> url = const Value.absent(),
+  }) => RepoReleaseRow(
+    id: id ?? this.id,
+    repoKey: repoKey ?? this.repoKey,
+    tag: tag ?? this.tag,
+    name: name.present ? name.value : this.name,
+    author: author.present ? author.value : this.author,
+    publishedAt: publishedAt.present ? publishedAt.value : this.publishedAt,
+    url: url.present ? url.value : this.url,
+  );
+  RepoReleaseRow copyWithCompanion(RepoReleasesCompanion data) {
+    return RepoReleaseRow(
+      id: data.id.present ? data.id.value : this.id,
+      repoKey: data.repoKey.present ? data.repoKey.value : this.repoKey,
+      tag: data.tag.present ? data.tag.value : this.tag,
+      name: data.name.present ? data.name.value : this.name,
+      author: data.author.present ? data.author.value : this.author,
+      publishedAt: data.publishedAt.present
+          ? data.publishedAt.value
+          : this.publishedAt,
+      url: data.url.present ? data.url.value : this.url,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RepoReleaseRow(')
+          ..write('id: $id, ')
+          ..write('repoKey: $repoKey, ')
+          ..write('tag: $tag, ')
+          ..write('name: $name, ')
+          ..write('author: $author, ')
+          ..write('publishedAt: $publishedAt, ')
+          ..write('url: $url')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, repoKey, tag, name, author, publishedAt, url);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RepoReleaseRow &&
+          other.id == this.id &&
+          other.repoKey == this.repoKey &&
+          other.tag == this.tag &&
+          other.name == this.name &&
+          other.author == this.author &&
+          other.publishedAt == this.publishedAt &&
+          other.url == this.url);
+}
+
+class RepoReleasesCompanion extends UpdateCompanion<RepoReleaseRow> {
+  final Value<int> id;
+  final Value<String> repoKey;
+  final Value<String> tag;
+  final Value<String?> name;
+  final Value<String?> author;
+  final Value<int?> publishedAt;
+  final Value<String?> url;
+  const RepoReleasesCompanion({
+    this.id = const Value.absent(),
+    this.repoKey = const Value.absent(),
+    this.tag = const Value.absent(),
+    this.name = const Value.absent(),
+    this.author = const Value.absent(),
+    this.publishedAt = const Value.absent(),
+    this.url = const Value.absent(),
+  });
+  RepoReleasesCompanion.insert({
+    this.id = const Value.absent(),
+    required String repoKey,
+    required String tag,
+    this.name = const Value.absent(),
+    this.author = const Value.absent(),
+    this.publishedAt = const Value.absent(),
+    this.url = const Value.absent(),
+  }) : repoKey = Value(repoKey),
+       tag = Value(tag);
+  static Insertable<RepoReleaseRow> custom({
+    Expression<int>? id,
+    Expression<String>? repoKey,
+    Expression<String>? tag,
+    Expression<String>? name,
+    Expression<String>? author,
+    Expression<int>? publishedAt,
+    Expression<String>? url,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (repoKey != null) 'repo_key': repoKey,
+      if (tag != null) 'tag': tag,
+      if (name != null) 'name': name,
+      if (author != null) 'author': author,
+      if (publishedAt != null) 'published_at': publishedAt,
+      if (url != null) 'url': url,
+    });
+  }
+
+  RepoReleasesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? repoKey,
+    Value<String>? tag,
+    Value<String?>? name,
+    Value<String?>? author,
+    Value<int?>? publishedAt,
+    Value<String?>? url,
+  }) {
+    return RepoReleasesCompanion(
+      id: id ?? this.id,
+      repoKey: repoKey ?? this.repoKey,
+      tag: tag ?? this.tag,
+      name: name ?? this.name,
+      author: author ?? this.author,
+      publishedAt: publishedAt ?? this.publishedAt,
+      url: url ?? this.url,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (repoKey.present) {
+      map['repo_key'] = Variable<String>(repoKey.value);
+    }
+    if (tag.present) {
+      map['tag'] = Variable<String>(tag.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (author.present) {
+      map['author'] = Variable<String>(author.value);
+    }
+    if (publishedAt.present) {
+      map['published_at'] = Variable<int>(publishedAt.value);
+    }
+    if (url.present) {
+      map['url'] = Variable<String>(url.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RepoReleasesCompanion(')
+          ..write('id: $id, ')
+          ..write('repoKey: $repoKey, ')
+          ..write('tag: $tag, ')
+          ..write('name: $name, ')
+          ..write('author: $author, ')
+          ..write('publishedAt: $publishedAt, ')
+          ..write('url: $url')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1889,6 +3380,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $AppMetaTable appMeta = $AppMetaTable(this);
   late final $ActivityEventsTable activityEvents = $ActivityEventsTable(this);
   late final $AttentionItemsTable attentionItems = $AttentionItemsTable(this);
+  late final $RepoPullsTable repoPulls = $RepoPullsTable(this);
+  late final $RepoRunsTable repoRuns = $RepoRunsTable(this);
+  late final $RepoReleasesTable repoReleases = $RepoReleasesTable(this);
   late final Index idxMetricSnapshotsRepoKey = Index(
     'idx_metric_snapshots_repo_key',
     'CREATE INDEX idx_metric_snapshots_repo_key ON metric_snapshots (repo_key)',
@@ -1909,6 +3403,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_attention_items_repo_display',
     'CREATE INDEX idx_attention_items_repo_display ON attention_items (repo_display)',
   );
+  late final Index idxRepoPullsRepoKey = Index(
+    'idx_repo_pulls_repo_key',
+    'CREATE INDEX idx_repo_pulls_repo_key ON repo_pulls (repo_key)',
+  );
+  late final Index idxRepoRunsRepoKey = Index(
+    'idx_repo_runs_repo_key',
+    'CREATE INDEX idx_repo_runs_repo_key ON repo_runs (repo_key)',
+  );
+  late final Index idxRepoReleasesRepoKey = Index(
+    'idx_repo_releases_repo_key',
+    'CREATE INDEX idx_repo_releases_repo_key ON repo_releases (repo_key)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1918,11 +3424,17 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     appMeta,
     activityEvents,
     attentionItems,
+    repoPulls,
+    repoRuns,
+    repoReleases,
     idxMetricSnapshotsRepoKey,
     idxActivityEventsRepoKey,
     idxActivityEventsOccurredAt,
     idxActivityEventsRepoEvent,
     idxAttentionItemsRepoDisplay,
+    idxRepoPullsRepoKey,
+    idxRepoRunsRepoKey,
+    idxRepoReleasesRepoKey,
   ];
 }
 
@@ -2905,6 +4417,761 @@ typedef $$AttentionItemsTableProcessedTableManager =
       AttentionItemRow,
       PrefetchHooks Function()
     >;
+typedef $$RepoPullsTableCreateCompanionBuilder =
+    RepoPullsCompanion Function({
+      Value<int> id,
+      required String repoKey,
+      required String label,
+      required String title,
+      required String author,
+      required String reviewState,
+      Value<int?> ageDays,
+      required bool draft,
+      Value<String?> url,
+    });
+typedef $$RepoPullsTableUpdateCompanionBuilder =
+    RepoPullsCompanion Function({
+      Value<int> id,
+      Value<String> repoKey,
+      Value<String> label,
+      Value<String> title,
+      Value<String> author,
+      Value<String> reviewState,
+      Value<int?> ageDays,
+      Value<bool> draft,
+      Value<String?> url,
+    });
+
+class $$RepoPullsTableFilterComposer
+    extends Composer<_$AppDatabase, $RepoPullsTable> {
+  $$RepoPullsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get repoKey => $composableBuilder(
+    column: $table.repoKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get author => $composableBuilder(
+    column: $table.author,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reviewState => $composableBuilder(
+    column: $table.reviewState,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ageDays => $composableBuilder(
+    column: $table.ageDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get draft => $composableBuilder(
+    column: $table.draft,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RepoPullsTableOrderingComposer
+    extends Composer<_$AppDatabase, $RepoPullsTable> {
+  $$RepoPullsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get repoKey => $composableBuilder(
+    column: $table.repoKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get author => $composableBuilder(
+    column: $table.author,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reviewState => $composableBuilder(
+    column: $table.reviewState,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ageDays => $composableBuilder(
+    column: $table.ageDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get draft => $composableBuilder(
+    column: $table.draft,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RepoPullsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $RepoPullsTable> {
+  $$RepoPullsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get repoKey =>
+      $composableBuilder(column: $table.repoKey, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get author =>
+      $composableBuilder(column: $table.author, builder: (column) => column);
+
+  GeneratedColumn<String> get reviewState => $composableBuilder(
+    column: $table.reviewState,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get ageDays =>
+      $composableBuilder(column: $table.ageDays, builder: (column) => column);
+
+  GeneratedColumn<bool> get draft =>
+      $composableBuilder(column: $table.draft, builder: (column) => column);
+
+  GeneratedColumn<String> get url =>
+      $composableBuilder(column: $table.url, builder: (column) => column);
+}
+
+class $$RepoPullsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $RepoPullsTable,
+          RepoPrRow,
+          $$RepoPullsTableFilterComposer,
+          $$RepoPullsTableOrderingComposer,
+          $$RepoPullsTableAnnotationComposer,
+          $$RepoPullsTableCreateCompanionBuilder,
+          $$RepoPullsTableUpdateCompanionBuilder,
+          (
+            RepoPrRow,
+            BaseReferences<_$AppDatabase, $RepoPullsTable, RepoPrRow>,
+          ),
+          RepoPrRow,
+          PrefetchHooks Function()
+        > {
+  $$RepoPullsTableTableManager(_$AppDatabase db, $RepoPullsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RepoPullsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RepoPullsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RepoPullsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> repoKey = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> author = const Value.absent(),
+                Value<String> reviewState = const Value.absent(),
+                Value<int?> ageDays = const Value.absent(),
+                Value<bool> draft = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+              }) => RepoPullsCompanion(
+                id: id,
+                repoKey: repoKey,
+                label: label,
+                title: title,
+                author: author,
+                reviewState: reviewState,
+                ageDays: ageDays,
+                draft: draft,
+                url: url,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String repoKey,
+                required String label,
+                required String title,
+                required String author,
+                required String reviewState,
+                Value<int?> ageDays = const Value.absent(),
+                required bool draft,
+                Value<String?> url = const Value.absent(),
+              }) => RepoPullsCompanion.insert(
+                id: id,
+                repoKey: repoKey,
+                label: label,
+                title: title,
+                author: author,
+                reviewState: reviewState,
+                ageDays: ageDays,
+                draft: draft,
+                url: url,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RepoPullsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $RepoPullsTable,
+      RepoPrRow,
+      $$RepoPullsTableFilterComposer,
+      $$RepoPullsTableOrderingComposer,
+      $$RepoPullsTableAnnotationComposer,
+      $$RepoPullsTableCreateCompanionBuilder,
+      $$RepoPullsTableUpdateCompanionBuilder,
+      (RepoPrRow, BaseReferences<_$AppDatabase, $RepoPullsTable, RepoPrRow>),
+      RepoPrRow,
+      PrefetchHooks Function()
+    >;
+typedef $$RepoRunsTableCreateCompanionBuilder =
+    RepoRunsCompanion Function({
+      Value<int> id,
+      required String repoKey,
+      required String name,
+      required String status,
+      required String conclusion,
+      Value<String?> branch,
+      Value<int?> finishedAt,
+      Value<String?> url,
+    });
+typedef $$RepoRunsTableUpdateCompanionBuilder =
+    RepoRunsCompanion Function({
+      Value<int> id,
+      Value<String> repoKey,
+      Value<String> name,
+      Value<String> status,
+      Value<String> conclusion,
+      Value<String?> branch,
+      Value<int?> finishedAt,
+      Value<String?> url,
+    });
+
+class $$RepoRunsTableFilterComposer
+    extends Composer<_$AppDatabase, $RepoRunsTable> {
+  $$RepoRunsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get repoKey => $composableBuilder(
+    column: $table.repoKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get conclusion => $composableBuilder(
+    column: $table.conclusion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get branch => $composableBuilder(
+    column: $table.branch,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get finishedAt => $composableBuilder(
+    column: $table.finishedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RepoRunsTableOrderingComposer
+    extends Composer<_$AppDatabase, $RepoRunsTable> {
+  $$RepoRunsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get repoKey => $composableBuilder(
+    column: $table.repoKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get conclusion => $composableBuilder(
+    column: $table.conclusion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get branch => $composableBuilder(
+    column: $table.branch,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get finishedAt => $composableBuilder(
+    column: $table.finishedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RepoRunsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $RepoRunsTable> {
+  $$RepoRunsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get repoKey =>
+      $composableBuilder(column: $table.repoKey, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get conclusion => $composableBuilder(
+    column: $table.conclusion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get branch =>
+      $composableBuilder(column: $table.branch, builder: (column) => column);
+
+  GeneratedColumn<int> get finishedAt => $composableBuilder(
+    column: $table.finishedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get url =>
+      $composableBuilder(column: $table.url, builder: (column) => column);
+}
+
+class $$RepoRunsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $RepoRunsTable,
+          RepoRunRow,
+          $$RepoRunsTableFilterComposer,
+          $$RepoRunsTableOrderingComposer,
+          $$RepoRunsTableAnnotationComposer,
+          $$RepoRunsTableCreateCompanionBuilder,
+          $$RepoRunsTableUpdateCompanionBuilder,
+          (
+            RepoRunRow,
+            BaseReferences<_$AppDatabase, $RepoRunsTable, RepoRunRow>,
+          ),
+          RepoRunRow,
+          PrefetchHooks Function()
+        > {
+  $$RepoRunsTableTableManager(_$AppDatabase db, $RepoRunsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RepoRunsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RepoRunsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RepoRunsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> repoKey = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String> conclusion = const Value.absent(),
+                Value<String?> branch = const Value.absent(),
+                Value<int?> finishedAt = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+              }) => RepoRunsCompanion(
+                id: id,
+                repoKey: repoKey,
+                name: name,
+                status: status,
+                conclusion: conclusion,
+                branch: branch,
+                finishedAt: finishedAt,
+                url: url,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String repoKey,
+                required String name,
+                required String status,
+                required String conclusion,
+                Value<String?> branch = const Value.absent(),
+                Value<int?> finishedAt = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+              }) => RepoRunsCompanion.insert(
+                id: id,
+                repoKey: repoKey,
+                name: name,
+                status: status,
+                conclusion: conclusion,
+                branch: branch,
+                finishedAt: finishedAt,
+                url: url,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RepoRunsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $RepoRunsTable,
+      RepoRunRow,
+      $$RepoRunsTableFilterComposer,
+      $$RepoRunsTableOrderingComposer,
+      $$RepoRunsTableAnnotationComposer,
+      $$RepoRunsTableCreateCompanionBuilder,
+      $$RepoRunsTableUpdateCompanionBuilder,
+      (RepoRunRow, BaseReferences<_$AppDatabase, $RepoRunsTable, RepoRunRow>),
+      RepoRunRow,
+      PrefetchHooks Function()
+    >;
+typedef $$RepoReleasesTableCreateCompanionBuilder =
+    RepoReleasesCompanion Function({
+      Value<int> id,
+      required String repoKey,
+      required String tag,
+      Value<String?> name,
+      Value<String?> author,
+      Value<int?> publishedAt,
+      Value<String?> url,
+    });
+typedef $$RepoReleasesTableUpdateCompanionBuilder =
+    RepoReleasesCompanion Function({
+      Value<int> id,
+      Value<String> repoKey,
+      Value<String> tag,
+      Value<String?> name,
+      Value<String?> author,
+      Value<int?> publishedAt,
+      Value<String?> url,
+    });
+
+class $$RepoReleasesTableFilterComposer
+    extends Composer<_$AppDatabase, $RepoReleasesTable> {
+  $$RepoReleasesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get repoKey => $composableBuilder(
+    column: $table.repoKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tag => $composableBuilder(
+    column: $table.tag,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get author => $composableBuilder(
+    column: $table.author,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get publishedAt => $composableBuilder(
+    column: $table.publishedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RepoReleasesTableOrderingComposer
+    extends Composer<_$AppDatabase, $RepoReleasesTable> {
+  $$RepoReleasesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get repoKey => $composableBuilder(
+    column: $table.repoKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tag => $composableBuilder(
+    column: $table.tag,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get author => $composableBuilder(
+    column: $table.author,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get publishedAt => $composableBuilder(
+    column: $table.publishedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RepoReleasesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $RepoReleasesTable> {
+  $$RepoReleasesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get repoKey =>
+      $composableBuilder(column: $table.repoKey, builder: (column) => column);
+
+  GeneratedColumn<String> get tag =>
+      $composableBuilder(column: $table.tag, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get author =>
+      $composableBuilder(column: $table.author, builder: (column) => column);
+
+  GeneratedColumn<int> get publishedAt => $composableBuilder(
+    column: $table.publishedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get url =>
+      $composableBuilder(column: $table.url, builder: (column) => column);
+}
+
+class $$RepoReleasesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $RepoReleasesTable,
+          RepoReleaseRow,
+          $$RepoReleasesTableFilterComposer,
+          $$RepoReleasesTableOrderingComposer,
+          $$RepoReleasesTableAnnotationComposer,
+          $$RepoReleasesTableCreateCompanionBuilder,
+          $$RepoReleasesTableUpdateCompanionBuilder,
+          (
+            RepoReleaseRow,
+            BaseReferences<_$AppDatabase, $RepoReleasesTable, RepoReleaseRow>,
+          ),
+          RepoReleaseRow,
+          PrefetchHooks Function()
+        > {
+  $$RepoReleasesTableTableManager(_$AppDatabase db, $RepoReleasesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RepoReleasesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RepoReleasesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RepoReleasesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> repoKey = const Value.absent(),
+                Value<String> tag = const Value.absent(),
+                Value<String?> name = const Value.absent(),
+                Value<String?> author = const Value.absent(),
+                Value<int?> publishedAt = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+              }) => RepoReleasesCompanion(
+                id: id,
+                repoKey: repoKey,
+                tag: tag,
+                name: name,
+                author: author,
+                publishedAt: publishedAt,
+                url: url,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String repoKey,
+                required String tag,
+                Value<String?> name = const Value.absent(),
+                Value<String?> author = const Value.absent(),
+                Value<int?> publishedAt = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+              }) => RepoReleasesCompanion.insert(
+                id: id,
+                repoKey: repoKey,
+                tag: tag,
+                name: name,
+                author: author,
+                publishedAt: publishedAt,
+                url: url,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RepoReleasesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $RepoReleasesTable,
+      RepoReleaseRow,
+      $$RepoReleasesTableFilterComposer,
+      $$RepoReleasesTableOrderingComposer,
+      $$RepoReleasesTableAnnotationComposer,
+      $$RepoReleasesTableCreateCompanionBuilder,
+      $$RepoReleasesTableUpdateCompanionBuilder,
+      (
+        RepoReleaseRow,
+        BaseReferences<_$AppDatabase, $RepoReleasesTable, RepoReleaseRow>,
+      ),
+      RepoReleaseRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2917,4 +5184,10 @@ class $AppDatabaseManager {
       $$ActivityEventsTableTableManager(_db, _db.activityEvents);
   $$AttentionItemsTableTableManager get attentionItems =>
       $$AttentionItemsTableTableManager(_db, _db.attentionItems);
+  $$RepoPullsTableTableManager get repoPulls =>
+      $$RepoPullsTableTableManager(_db, _db.repoPulls);
+  $$RepoRunsTableTableManager get repoRuns =>
+      $$RepoRunsTableTableManager(_db, _db.repoRuns);
+  $$RepoReleasesTableTableManager get repoReleases =>
+      $$RepoReleasesTableTableManager(_db, _db.repoReleases);
 }

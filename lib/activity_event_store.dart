@@ -54,19 +54,26 @@ class ActivityEventStore {
   /// Returns the cached events within [lookback] of [now] (default: now),
   /// newest first, capped at [ActivityFeedService.maxEvents] — matching the
   /// shape the feed would fetch from the network.
+  ///
+  /// When [repoKey] is given, only that repo's events are returned (and the cap
+  /// applies to that repo), so a single repo's cached timeline isn't hidden
+  /// behind the global newest-[ActivityFeedService.maxEvents] window.
   static Future<List<ActivityEvent>> cached({
     Duration lookback = ActivityFeedService.defaultLookback,
     DateTime? now,
+    String? repoKey,
   }) async {
     final since = (now ?? DateTime.now()).toUtc().subtract(lookback);
     final db = _database;
+    final query = db.select(db.activityEvents)
+      ..where(
+        (t) => t.occurredAt.isBiggerOrEqualValue(since.millisecondsSinceEpoch),
+      );
+    if (repoKey != null) {
+      query.where((t) => t.repoKey.equals(repoKey));
+    }
     final rows =
-        await (db.select(db.activityEvents)
-              ..where(
-                (t) => t.occurredAt.isBiggerOrEqualValue(
-                  since.millisecondsSinceEpoch,
-                ),
-              )
+        await (query
               ..orderBy([
                 (t) => OrderingTerm(
                   expression: t.occurredAt,
