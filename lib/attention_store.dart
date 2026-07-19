@@ -44,7 +44,7 @@ class AttentionStore {
 
   /// Returns the cached snapshot ranked most-urgent first (severity desc, then
   /// repo) — a one-shot read companion to [watch]. Snooze is applied by callers
-  /// at display time (see [AttentionInboxPage]), not here.
+  /// at display time (see `AttentionInboxPage`), not here.
   static Future<List<AttentionItem>> cached() async {
     final rows = await _selectRanked().get();
     return rows.map(_toItem).toList();
@@ -56,7 +56,7 @@ class AttentionStore {
   /// another in-isolate writer) persists new data.
   ///
   /// Unlike [cached] this does NOT apply a snooze filter: snooze is a display
-  /// concern the page layers on top (via [SnoozeStore]) while the cache stays
+  /// concern the page layers on top (via `SnoozeStore`) while the cache stays
   /// the source of truth for what each repo currently has.
   static Stream<List<AttentionItem>> watch() {
     return _selectRanked().watch().map((rows) => rows.map(_toItem).toList());
@@ -81,7 +81,7 @@ class AttentionStore {
   ///
   /// Callers should pass the FULL snapshot (do not pre-filter snoozed items):
   /// the cache is the source of truth for what each repo currently has, and
-  /// snooze is a display concern the page applies (see [AttentionInboxPage]).
+  /// snooze is a display concern the page applies (see `AttentionInboxPage`).
   /// Pre-filtering would make a snoozed-away or dismissed item look like the
   /// repo went clean and wrongly evict its cached data.
   ///
