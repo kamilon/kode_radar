@@ -112,7 +112,11 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
       );
       if (!mounted || seq != _loadSeq) return;
       List<ActivityEvent> timeline = feed.events;
-      if (timeline.isEmpty) {
+      // Fall back to cached events only when the fresh fetch came back empty
+      // BECAUSE a source failed (offline/partial) — not when the repo is
+      // genuinely quiet, so a now-empty repo doesn't keep showing a stale
+      // timeline.
+      if (timeline.isEmpty && feed.failedSources > 0) {
         final cachedEvents = await ActivityEventStore.cached();
         if (!mounted || seq != _loadSeq) return;
         timeline = cachedEvents
