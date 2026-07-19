@@ -27,7 +27,27 @@ class AttentionInboxPage extends StatefulWidget {
 }
 
 class _AttentionInboxPageState extends State<AttentionInboxPage> {
-  List<AttentionItem> _items = const [];
+  /// The persisted snapshot, driven by the reactive [AttentionStore.watch]
+  /// stream (instant cache on cold start; auto-updates when a refresh persists).
+  /// NOT snooze-filtered — snooze is applied at display time via [_snoozedIds].
+  List<AttentionItem> _streamItems = const [];
+  StreamSubscription<List<AttentionItem>>? _itemsSub;
+
+  /// This round's transient per-repo error markers. These are never persisted to
+  /// the store (so a failed repo doesn't look "clean" and wipe its cache), so
+  /// they're overlaid on the persisted snapshot here.
+  List<AttentionItem> _errorItems = const [];
+
+  /// Locally snoozed/dismissed ids applied at display time (mirrors
+  /// [SnoozeStore]), so a just-made dismiss is honored immediately and an undo
+  /// restores the item from the cache without a network reload.
+  Set<String> _snoozedIds = <String>{};
+
+  /// Bumped on every local snooze mutation (dismiss/undo). An in-flight [_load]
+  /// captures this before reading [SnoozeStore] and only applies the fetched set
+  /// if it hasn't changed since, so a concurrent dismiss/undo isn't clobbered by
+  /// a stale read.
+  int _snoozeGen = 0;
 
   /// A load (cache render + network refresh) is in flight. Gates the manual
   /// Refresh action so overlapping network fetches/DB writes can't stack on top
@@ -45,6 +65,47 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
   // Guards against a stale in-flight load applying after a newer one.
   int _loadSeq = 0;
 
+  /// The rendered snapshot: the persisted stream items plus this round's error
+  /// markers, minus locally snoozed/dismissed ids, ranked most-urgent first.
+  ///
+  /// Memoized on the identity of its three inputs (each is always replaced, not
+  /// mutated in place, on change), so the multiple reads per build (via
+  /// [_showSpinner], [_mineFiltered], [_visibleItems], [_buildEmptyState]) reuse
+  /// one merged+sorted list instead of re-doing the O(n log n) work each time.
+  List<AttentionItem>? _itemsCache;
+  List<AttentionItem>? _itemsCacheFromStream;
+  List<AttentionItem>? _itemsCacheFromErrors;
+  Set<String>? _itemsCacheFromSnoozed;
+
+  List<AttentionItem> get _items {
+    final cached = _itemsCache;
+    if (cached != null &&
+        identical(_itemsCacheFromStream, _streamItems) &&
+        identical(_itemsCacheFromErrors, _errorItems) &&
+        identical(_itemsCacheFromSnoozed, _snoozedIds)) {
+      return cached;
+    }
+    final computed = [
+      ..._streamItems,
+      ..._errorItems,
+    ].where((i) => !_snoozedIds.contains(i.id)).toList()..sort(_compareItems);
+    _itemsCache = computed;
+    _itemsCacheFromStream = _streamItems;
+    _itemsCacheFromErrors = _errorItems;
+    _itemsCacheFromSnoozed = _snoozedIds;
+    return computed;
+  }
+
+  /// Most-urgent-first ordering (severity desc, then repo, then id) matching
+  /// [AttentionStore]'s persisted order so the error overlay slots in stably.
+  static int _compareItems(AttentionItem a, AttentionItem b) {
+    final bySeverity = b.severity.compareTo(a.severity);
+    if (bySeverity != 0) return bySeverity;
+    final byRepo = a.repoDisplay.compareTo(b.repoDisplay);
+    if (byRepo != 0) return byRepo;
+    return a.id.compareTo(b.id);
+  }
+
   /// Show the full-screen spinner only when a load is in flight and there's
   /// nothing cached to render yet; once items are on screen, content stays
   /// visible while the network refresh continues underneath.
@@ -59,12 +120,35 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
 
   @override
   void dispose() {
+    _itemsSub?.cancel();
     configRevision.removeListener(_onConfigChanged);
     super.dispose();
   }
 
   void _onConfigChanged() {
     if (mounted) _load();
+  }
+
+  /// (Re)subscribes the reactive cache stream. The first emission renders the
+  /// cache instantly; later emissions (a refresh persisting, or a repo-delete
+  /// pruning) update the list automatically.
+  void _subscribe() {
+    _itemsSub?.cancel();
+    _itemsSub = AttentionStore.watch().listen(
+      (items) {
+        if (!mounted) return;
+        setState(() {
+          _streamItems = items;
+          // Any cache emission — even an empty one (a cleanly empty inbox) —
+          // is valid data, so clear a stale error screen a failed refresh set
+          // before the cache arrived. (The stream only emits [] on subscribe or
+          // after a successful save, never as the result of a failed refresh.)
+          _error = null;
+        });
+      },
+      onError: (Object e) =>
+          debugPrint('AttentionInbox watch stream error: $e'),
+    );
   }
 
   /// Items after the "Mine" toggle only — drives the per-category chip counts.
@@ -84,36 +168,36 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       _error = null;
     });
     try {
+      final snoozeGen = _snoozeGen;
       final snoozed = await SnoozeStore.snoozedIds();
       final selfGithub = await IdentityStore.selfGithubLogins();
       final selfAdo = await IdentityStore.selfAdoNames();
+      if (!mounted || seq != _loadSeq) return;
 
-      // Phase A: render the cached snapshot immediately so a cold start isn't a
-      // blank spinner while the network fetch runs (or if it's offline). Only
-      // meaningful when we don't already have items on screen.
-      if (_items.isEmpty) {
-        final cachedItems = await AttentionStore.cached(snoozedIds: snoozed);
-        final lastSynced = await SyncStateStore.lastSuccess(
-          SyncStateStore.attentionScope,
-        );
-        if (!mounted || seq != _loadSeq) return;
-        // Set the provenance label even when the cache is empty (a clean inbox
-        // that synced successfully), so its "checked" time survives a
-        // restart/offline open.
-        if (cachedItems.isNotEmpty || lastSynced != null) {
-          setState(() {
-            if (cachedItems.isNotEmpty) _items = cachedItems;
-            _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
-            _lastSynced = lastSynced;
-          });
-        }
-      }
+      // Apply the current snoozes and (re)subscribe the reactive cache stream so
+      // the persisted snapshot renders instantly (cold start / offline). Reading
+      // snoozes before subscribing avoids a flash of snoozed items on the first
+      // emission. Skip the assignment if a local dismiss/undo raced this read
+      // (the local set is already authoritative in that case).
+      setState(() {
+        if (_snoozeGen == snoozeGen) _snoozedIds = snoozed;
+        _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
+      });
+      _subscribe();
 
-      // Phase B: refresh from the network and persist the snapshot. Compute
-      // WITHOUT snooze filtering so `save` sees each repo's true success/failure
-      // (a snoozed-away item or a dismissed error marker must not make a repo
-      // look "clean" and wipe its last-known-good cache); snooze is applied only
-      // when rendering/notifying below.
+      // Provenance label (survives restart/offline), set even for a clean inbox.
+      final lastSynced = await SyncStateStore.lastSuccess(
+        SyncStateStore.attentionScope,
+      );
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _lastSynced = lastSynced);
+
+      // Refresh from the network and persist the snapshot. Compute WITHOUT
+      // snooze filtering so `save` sees each repo's true success/failure (a
+      // snoozed-away item or a dismissed error marker must not make a repo look
+      // "clean" and wipe its last-known-good cache); snooze is applied only when
+      // rendering/notifying below. Persisting triggers the watch stream, which
+      // updates `_streamItems`.
       final computed = await AttentionService.computeAll(
         client: AppHttp.client,
         selfGithubLogins: selfGithub,
@@ -124,13 +208,8 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
       if (!mounted || seq != _loadSeq) return;
       // Re-read snoozes now (a dismiss may have happened during the fetch) so a
       // just-dismissed item can't flicker back into the rendered snapshot.
+      final freshSnoozeGen = _snoozeGen;
       final freshSnoozed = await SnoozeStore.snoozedIds();
-      if (!mounted || seq != _loadSeq) return;
-      // Render the persisted snapshot (which keeps last-known-good items for any
-      // repo that failed this round) plus this round's fresh error items, so an
-      // offline/partial refresh never blanks the inbox yet still surfaces which
-      // repos couldn't load.
-      final cachedReal = await AttentionStore.cached(snoozedIds: freshSnoozed);
       if (!mounted || seq != _loadSeq) return;
       // A successful sync = at least one monitored repo was fetched without an
       // error (it had real items or was cleanly empty). Compare the number of
@@ -151,41 +230,36 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         await SyncStateStore.markSuccess(SyncStateStore.attentionScope);
         if (!mounted || seq != _loadSeq) return;
       }
+      // Overlay this round's error markers (never persisted) on the streamed
+      // snapshot; snooze filtering is applied by the `_items` getter.
       final errors = computed
-          .where(
-            (i) =>
-                i.category == AttentionStore.errorCategory &&
-                !freshSnoozed.contains(i.id),
-          )
+          .where((i) => i.category == AttentionStore.errorCategory)
           .toList();
-      final merged = [...cachedReal, ...errors]
-        ..sort((a, b) {
-          final bySeverity = b.severity.compareTo(a.severity);
-          if (bySeverity != 0) return bySeverity;
-          final byRepo = a.repoDisplay.compareTo(b.repoDisplay);
-          if (byRepo != 0) return byRepo;
-          // Stable final tie-breaker so ties don't reorder between renders.
-          return a.id.compareTo(b.id);
-        });
       setState(() {
-        _items = merged;
+        if (_snoozeGen == freshSnoozeGen) _snoozedIds = freshSnoozed;
+        _errorItems = errors;
         _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
         if (syncedOk) _lastSynced = DateTime.now();
         _refreshing = false;
       });
-      // Notify on the fresh, snooze-filtered set (error items are additionally
-      // excluded inside NotificationService).
+      // Notify on the fresh set, excluding both persisted and just-made local
+      // snoozes (an optimistic dismiss may not be reflected in SnoozeStore yet).
+      // Error items are additionally excluded inside NotificationService.
+      final effectiveSnoozed = {...freshSnoozed, ..._snoozedIds};
       unawaited(
         NotificationService.notifyNewAttention(
-          computed.where((i) => !freshSnoozed.contains(i.id)).toList(),
+          computed.where((i) => !effectiveSnoozed.contains(i.id)).toList(),
         ),
       );
     } catch (e) {
       debugPrint('AttentionInbox failed to load: $e');
       if (!mounted || seq != _loadSeq) return;
       setState(() {
-        // Keep any cached items rendered in Phase A rather than replacing them
-        // with an error state; only show the error when we have nothing.
+        // The refresh failed before producing fresh per-repo error markers, so
+        // drop any stale ones (they'd misrepresent the current state and inflate
+        // the category chip counts). The cached items from the stream stay
+        // rendered; only show the error banner when we have nothing at all.
+        _errorItems = const [];
         if (_items.isEmpty) {
           _error =
               'Something went wrong while loading your inbox. Pull down to try again.';
@@ -430,10 +504,11 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
 
   void _onDismissed(AttentionItem item, DismissDirection direction) {
     final dismissForever = direction == DismissDirection.endToStart;
-    // Remove synchronously so the dismissed widget is gone before the next
-    // build, then persist the snooze in the background.
+    // Add to the local snooze set so the item disappears before the next build
+    // (the `_items` getter filters it out), then persist the snooze.
     setState(() {
-      _items = _items.where((i) => i.id != item.id).toList();
+      _snoozedIds = {..._snoozedIds, item.id};
+      _snoozeGen++;
     });
     final pending = dismissForever
         ? SnoozeStore.snooze(item.id)
@@ -446,13 +521,21 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
           label: 'Undo',
           onPressed: () async {
             // Ensure the snooze write finished before undoing, but never let a
-            // persistence error prevent the undo/reload.
+            // persistence error prevent the undo — both the wait and the
+            // unsnooze are best-effort so the UI undo always completes.
             try {
               await pending;
             } catch (_) {}
-            await SnoozeStore.unsnooze(item.id);
+            try {
+              await SnoozeStore.unsnooze(item.id);
+            } catch (_) {}
             if (!mounted) return;
-            await _load();
+            // Drop it from the local snooze set so it reappears from the cached
+            // stream without a full network reload.
+            setState(() {
+              _snoozedIds = {..._snoozedIds}..remove(item.id);
+              _snoozeGen++;
+            });
           },
         ),
       ),
