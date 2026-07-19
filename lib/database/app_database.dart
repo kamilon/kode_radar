@@ -54,6 +54,12 @@ LazyDatabase _openConnection() {
     // should not be user-visible or included in document backups.
     final dir = await getApplicationSupportDirectory();
     final file = File(p.join(dir.path, 'kode_radar.sqlite'));
-    return NativeDatabase.createInBackground(file);
+    return NativeDatabase.createInBackground(
+      file,
+      // WAL lets the app and a background-sync isolate (which opens its own
+      // connection to this file) read/write concurrently without "database is
+      // locked" errors.
+      setup: (rawDb) => rawDb.execute('PRAGMA journal_mode=WAL;'),
+    );
   });
 }

@@ -27,7 +27,7 @@ Note: This project has been almost entirely AI generated. I don't recommend usin
 ## Prerequisites
 
 - Flutter SDK (compatible version for this project)
-- iOS deployment target 13.0 or later (required by the bundled Flutter SDK; iOS 12 is no longer supported)
+- iOS deployment target 14.0 or later (required by the `workmanager` background-sync plugin; iOS 13 is no longer supported)
 - Platform toolchains for the targets you are building (Android SDK/NDK, Xcode for iOS/macOS, CMake for Linux, Visual Studio for Windows)
 
 ### Linux-specific Dependencies

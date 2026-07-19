@@ -14,7 +14,9 @@ import 'theme_controller.dart';
 import 'auto_add_service.dart';
 import 'app_http.dart';
 import 'attention_service.dart';
+import 'background_sync.dart';
 import 'identity_store.dart';
+import 'preferences_store.dart';
 import 'snooze_store.dart';
 import 'notification_service.dart';
 import 'config_revision.dart';
@@ -34,6 +36,17 @@ void main() async {
   // Initialize local notifications (requests the runtime permission where
   // required). All notifications flow through NotificationService.
   await NotificationService.init();
+
+  // Register periodic background sync on mobile if the user hasn't disabled it
+  // (no-op on desktop, which keeps polling while running).
+  try {
+    final prefs = await PreferencesStore.load();
+    if (prefs.backgroundSyncEnabled) {
+      await BackgroundSync.enable();
+    }
+  } catch (e) {
+    debugPrint('Failed to register background sync: $e');
+  }
 
   if (_isDesktopPlatform) {
     await windowManager.ensureInitialized(); // Initialize window manager

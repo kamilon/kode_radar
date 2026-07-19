@@ -10,6 +10,7 @@ class AppPreferences {
     this.quietStartHour = 22,
     this.quietEndHour = 8,
     this.feedLookbackDays = 14,
+    this.backgroundSyncEnabled = true,
   });
 
   final bool notificationsEnabled;
@@ -23,12 +24,17 @@ class AppPreferences {
   /// Activity Feed lookback window, in days.
   final int feedLookbackDays;
 
+  /// Whether periodic background sync is registered (mobile only; best-effort
+  /// on iOS). Desktop keeps polling while running regardless.
+  final bool backgroundSyncEnabled;
+
   AppPreferences copyWith({
     bool? notificationsEnabled,
     bool? quietHoursEnabled,
     int? quietStartHour,
     int? quietEndHour,
     int? feedLookbackDays,
+    bool? backgroundSyncEnabled,
   }) {
     return AppPreferences(
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
@@ -36,6 +42,8 @@ class AppPreferences {
       quietStartHour: quietStartHour ?? this.quietStartHour,
       quietEndHour: quietEndHour ?? this.quietEndHour,
       feedLookbackDays: feedLookbackDays ?? this.feedLookbackDays,
+      backgroundSyncEnabled:
+          backgroundSyncEnabled ?? this.backgroundSyncEnabled,
     );
   }
 }
@@ -50,6 +58,7 @@ class PreferencesStore {
   static const String _quietStartHour = 'pref_quiet_start_hour';
   static const String _quietEndHour = 'pref_quiet_end_hour';
   static const String _feedLookbackDays = 'pref_feed_lookback_days';
+  static const String _backgroundSyncEnabled = 'pref_background_sync_enabled';
 
   /// Allowed lookback options shown in the UI.
   static const List<int> lookbackOptions = [7, 14, 30, 60];
@@ -79,7 +88,17 @@ class PreferencesStore {
       feedLookbackDays: _sanitizeLookback(
         prefs.getInt(_feedLookbackDays) ?? defaults.feedLookbackDays,
       ),
+      backgroundSyncEnabled:
+          prefs.getBool(_backgroundSyncEnabled) ??
+          defaults.backgroundSyncEnabled,
     );
+  }
+
+  static Future<void> setBackgroundSyncEnabled(bool value) {
+    return _runLocked(() async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_backgroundSyncEnabled, value);
+    });
   }
 
   static Future<void> setNotificationsEnabled(bool value) {

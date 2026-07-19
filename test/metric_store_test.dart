@@ -28,7 +28,9 @@ void main() {
     expect(MetricStore.shouldCapture(null, now), isTrue);
     expect(
       MetricStore.shouldCapture(
-        now.subtract(const Duration(hours: 23, minutes: 59)),
+        now.subtract(
+          MetricStore.minCaptureInterval - const Duration(minutes: 1),
+        ),
         now,
       ),
       isFalse,
@@ -41,7 +43,10 @@ void main() {
       isTrue,
     );
     expect(
-      MetricStore.shouldCapture(now.subtract(const Duration(hours: 25)), now),
+      MetricStore.shouldCapture(
+        now.subtract(MetricStore.minCaptureInterval + const Duration(hours: 1)),
+        now,
+      ),
       isTrue,
     );
   });
@@ -163,6 +168,18 @@ void main() {
     await MetricStore.removeRepo('  ');
 
     expect((await MetricStore.all()).keys, {'github:owner/one'});
+  });
+
+  test('capture(force: true) bypasses the interval dedup', () async {
+    final now = DateTime.utc(2026, 1, 1, 12);
+    await MetricStore.capture([_activity('github:owner/one')], now: now);
+    // Within minCaptureInterval — normally skipped, but force records it anyway.
+    await MetricStore.capture(
+      [_activity('github:owner/one')],
+      now: now.add(const Duration(minutes: 30)),
+      force: true,
+    );
+    expect(await MetricStore.historyFor('github:owner/one'), hasLength(2));
   });
 
   test(

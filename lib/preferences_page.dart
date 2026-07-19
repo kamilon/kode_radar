@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'background_sync.dart';
 import 'preferences_store.dart';
 
-/// Settings screen: notification enablement, quiet hours, and the Activity Feed
-/// lookback window.
+/// Settings screen: notification enablement, quiet hours, the Activity Feed
+/// lookback window, and background sync.
 class PreferencesPage extends StatefulWidget {
   const PreferencesPage({super.key});
 
@@ -118,6 +119,36 @@ class _PreferencesPageState extends State<PreferencesPage> {
                         ),
                     ],
                   ),
+                ),
+                const Divider(),
+                _sectionHeader('Sync'),
+                SwitchListTile(
+                  title: const Text('Background sync'),
+                  subtitle: Text(
+                    BackgroundSync.isSupported
+                        ? 'Refresh periodically in the background (best-effort '
+                              'on iOS). “Sync now” in the menu works anytime.'
+                        : 'This desktop app refreshes while it is running.',
+                  ),
+                  value: _prefs.backgroundSyncEnabled,
+                  onChanged: BackgroundSync.isSupported
+                      ? (value) async {
+                          await PreferencesStore.setBackgroundSyncEnabled(
+                            value,
+                          );
+                          if (value) {
+                            await BackgroundSync.enable();
+                          } else {
+                            await BackgroundSync.disable();
+                          }
+                          if (!mounted) return;
+                          setState(
+                            () => _prefs = _prefs.copyWith(
+                              backgroundSyncEnabled: value,
+                            ),
+                          );
+                        }
+                      : null,
                 ),
               ],
             ),

@@ -28,6 +28,15 @@
 	<true/>
 	<key>NSUserNotificationUsageDescription</key>
 	<string>We use notifications to alert you about new PRs and comments.</string>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.kamilon.koderadar.sync</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

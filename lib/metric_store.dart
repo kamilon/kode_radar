@@ -27,8 +27,16 @@ class MetricStore {
   /// the database (not `SharedPreferences`) so it commits atomically with the
   /// imported rows and a crash mid-import can't cause a re-import.
   static const String _importedFlag = 'metric_history_imported';
-  static const int maxPerRepo = 60;
-  static const Duration minCaptureInterval = Duration(hours: 24);
+
+  /// Retain more history now that capture is denser (see [minCaptureInterval]):
+  /// 180 snapshots ≈ 45 days at a 6h cadence, or longer when the app is opened
+  /// less often.
+  static const int maxPerRepo = 180;
+
+  /// Minimum spacing between captured snapshots per repo. Kept below a day so
+  /// opening the app (or a background sync) a few times across a day fills in
+  /// the trend/heatmap/stacked views instead of a single daily point.
+  static const Duration minCaptureInterval = Duration(hours: 6);
 
   static AppDatabase? _db;
   static Future<void>? _migration;
@@ -62,7 +70,8 @@ class MetricStore {
   static bool shouldCapture(DateTime? lastAt, DateTime now) =>
       lastAt == null || now.difference(lastAt) >= minCaptureInterval;
 
-  /// Appends one snapshot per repo in [activities] (deduped to ~1/day).
+  /// Appends one snapshot per repo in [activities] (deduped to at most one per
+  /// [minCaptureInterval]).
   ///
   /// When [restrictToMonitored] is true, the currently-persisted repo lists are
   /// read and any activity whose repo is no longer monitored is skipped. This
@@ -70,10 +79,15 @@ class MetricStore {
   /// removed a repo) would otherwise re-insert a just-pruned history key. It is
   /// safe in the normal case because `activities` is itself derived from the
   /// monitored repos.
+  ///
+  /// When [force] is true the per-repo interval dedup is bypassed so a manual
+  /// "Sync now" always records a fresh data point (still bounded by
+  /// [maxPerRepo]).
   static Future<void> capture(
     List<RepoActivity> activities, {
     DateTime? now,
     bool restrictToMonitored = false,
+    bool force = false,
   }) async {
     final capturedAt = (now ?? DateTime.now()).toUtc();
     await _ensureMigrated();
@@ -99,9 +113,11 @@ class MetricStore {
       final db = _database;
       await db.transaction(() async {
         for (final activity in pending) {
-          final lastAt = await _latestCapturedAt(db, activity.repoKey);
-          if (!shouldCapture(lastAt, capturedAt)) {
-            continue;
+          if (!force) {
+            final lastAt = await _latestCapturedAt(db, activity.repoKey);
+            if (!shouldCapture(lastAt, capturedAt)) {
+              continue;
+            }
           }
 
           await db
