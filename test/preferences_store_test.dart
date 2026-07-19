@@ -14,6 +14,14 @@ void main() {
     expect(prefs.notificationsEnabled, isTrue);
     expect(prefs.quietHoursEnabled, isFalse);
     expect(prefs.feedLookbackDays, 14);
+    expect(prefs.backgroundSyncEnabled, isTrue);
+  });
+
+  test('background sync setting round-trips through load()', () async {
+    await PreferencesStore.setBackgroundSyncEnabled(false);
+    expect((await PreferencesStore.load()).backgroundSyncEnabled, isFalse);
+    await PreferencesStore.setBackgroundSyncEnabled(true);
+    expect((await PreferencesStore.load()).backgroundSyncEnabled, isTrue);
   });
 
   test('setters round-trip through load()', () async {

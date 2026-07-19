@@ -153,10 +153,10 @@ class PulseView extends StatelessWidget {
   ) {
     final byDay = <DateTime, num>{};
     for (final snapshots in history.values) {
-      for (final s in snapshots) {
-        final at = s.at;
-        final day = DateTime.utc(at.year, at.month, at.day);
-        byDay[day] = (byDay[day] ?? 0) + s.activityScore;
+      // Collapse each repo to one snapshot per day so denser-than-daily capture
+      // doesn't inflate the cross-repo daily total.
+      for (final entry in latestSnapshotByDay(snapshots).entries) {
+        byDay[entry.key] = (byDay[entry.key] ?? 0) + entry.value.activityScore;
       }
     }
     final days = byDay.keys.toList()..sort();

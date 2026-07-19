@@ -27,8 +27,16 @@ class MetricStore {
   /// the database (not `SharedPreferences`) so it commits atomically with the
   /// imported rows and a crash mid-import can't cause a re-import.
   static const String _importedFlag = 'metric_history_imported';
-  static const int maxPerRepo = 60;
-  static const Duration minCaptureInterval = Duration(hours: 24);
+
+  /// Retain more history now that capture is denser (see [minCaptureInterval]):
+  /// 180 snapshots ≈ 45 days at a 6h cadence, or longer when the app is opened
+  /// less often.
+  static const int maxPerRepo = 180;
+
+  /// Minimum spacing between captured snapshots per repo. Kept below a day so
+  /// opening the app (or a background sync) a few times across a day fills in
+  /// the trend/heatmap/stacked views instead of a single daily point.
+  static const Duration minCaptureInterval = Duration(hours: 6);
 
   static AppDatabase? _db;
   static Future<void>? _migration;
@@ -62,7 +70,8 @@ class MetricStore {
   static bool shouldCapture(DateTime? lastAt, DateTime now) =>
       lastAt == null || now.difference(lastAt) >= minCaptureInterval;
 
-  /// Appends one snapshot per repo in [activities] (deduped to ~1/day).
+  /// Appends one snapshot per repo in [activities] (deduped to at most one per
+  /// [minCaptureInterval]).
   ///
   /// When [restrictToMonitored] is true, the currently-persisted repo lists are
   /// read and any activity whose repo is no longer monitored is skipped. This
@@ -70,10 +79,15 @@ class MetricStore {
   /// removed a repo) would otherwise re-insert a just-pruned history key. It is
   /// safe in the normal case because `activities` is itself derived from the
   /// monitored repos.
+  ///
+  /// When [force] is true the per-repo interval dedup is bypassed so a manual
+  /// "Sync now" always records a fresh data point (still bounded by
+  /// [maxPerRepo]).
   static Future<void> capture(
     List<RepoActivity> activities, {
     DateTime? now,
     bool restrictToMonitored = false,
+    bool force = false,
   }) async {
     final capturedAt = (now ?? DateTime.now()).toUtc();
     await _ensureMigrated();
@@ -99,9 +113,11 @@ class MetricStore {
       final db = _database;
       await db.transaction(() async {
         for (final activity in pending) {
-          final lastAt = await _latestCapturedAt(db, activity.repoKey);
-          if (!shouldCapture(lastAt, capturedAt)) {
-            continue;
+          if (!force) {
+            final lastAt = await _latestCapturedAt(db, activity.repoKey);
+            if (!shouldCapture(lastAt, capturedAt)) {
+              continue;
+            }
           }
 
           await db
@@ -238,8 +254,15 @@ class MetricStore {
   }
 
   /// Imports pre-database history from [storageKey] into the database exactly
-  /// once. Memoized so it runs at most once per process.
-  static Future<void> _ensureMigrated() => _migration ??= _migrate();
+  /// once. Memoized so it runs at most once per process; a failure clears the
+  /// memo so a later call can retry (and doesn't poison every future call).
+  static Future<void> _ensureMigrated() {
+    return _migration ??= _migrate().catchError((Object e, StackTrace st) {
+      _migration = null;
+      // Preserve the original stack so migration failures stay diagnosable.
+      Error.throwWithStackTrace(e, st);
+    });
+  }
 
   static Future<void> _migrate() async {
     final prefs = await SharedPreferences.getInstance();
@@ -275,8 +298,12 @@ class MetricStore {
       return;
     }
 
-    // Insert the rows and the completion marker atomically.
+    // Insert the rows and the completion marker atomically, re-checking the
+    // marker INSIDE the (serialized) transaction so a second isolate that
+    // migrated concurrently can't double-import.
+    var imported = false;
     await db.transaction(() async {
+      if (await _isImported(db)) return;
       for (final entry in legacy.entries) {
         for (final snapshot in entry.value) {
           await db
@@ -297,11 +324,12 @@ class MetricStore {
           .insertOnConflictUpdate(
             AppMetaCompanion.insert(key: _importedFlag, value: '1'),
           );
+      imported = true;
     });
 
     // Safe now that the marker is committed: a crash here just leaves a stale
     // key that the early `_isImported` branch clears on the next run.
-    await prefs.remove(storageKey);
+    if (imported) await prefs.remove(storageKey);
   }
 
   static Future<bool> _isImported(AppDatabase db) async {

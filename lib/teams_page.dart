@@ -79,9 +79,8 @@ class _TeamsPageState extends State<TeamsPage> {
     for (final key in team.repoKeys) {
       final snaps = history[key];
       if (snaps == null) continue;
-      for (final s in snaps) {
-        final day = DateTime.utc(s.at.year, s.at.month, s.at.day);
-        byDay[day] = (byDay[day] ?? 0) + s.activityScore;
+      for (final entry in latestSnapshotByDay(snaps).entries) {
+        byDay[entry.key] = (byDay[entry.key] ?? 0) + entry.value.activityScore;
       }
     }
     if (byDay.isEmpty) return const [];

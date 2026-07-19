@@ -10,6 +10,7 @@ import 'teams_page.dart';
 import 'preferences_page.dart';
 import 'theme_controller.dart';
 import 'config_revision.dart';
+import 'sync_service.dart';
 import 'views/insights_hub_page.dart';
 
 /// The shared "more" overflow menu shown on every home surface's app bar. It
@@ -25,6 +26,8 @@ class HomeMenuButton extends StatelessWidget {
       tooltip: 'More',
       onSelected: (value) => _onSelected(context, value),
       itemBuilder: (context) => const [
+        PopupMenuItem(value: 'sync', child: Text('Sync now')),
+        PopupMenuDivider(),
         PopupMenuItem(value: 'insights', child: Text('Insights (views)')),
         PopupMenuItem(value: 'work', child: Text('Assigned to you')),
         PopupMenuItem(value: 'people', child: Text('People')),
@@ -42,7 +45,9 @@ class HomeMenuButton extends StatelessWidget {
 
   void _onSelected(BuildContext context, String value) {
     final navigator = Navigator.of(context);
-    if (value == 'insights') {
+    if (value == 'sync') {
+      _syncNow(context);
+    } else if (value == 'insights') {
       navigator.push(
         MaterialPageRoute(builder: (_) => const InsightsHubPage()),
       );
@@ -71,6 +76,34 @@ class HomeMenuButton extends StatelessWidget {
   Future<void> _pushThenRefresh(NavigatorState navigator, Widget page) async {
     await navigator.push(MaterialPageRoute(builder: (_) => page));
     bumpConfigRevision();
+  }
+
+  /// Runs a full sync immediately (forcing a fresh trend snapshot), then
+  /// refreshes the surfaces. Reports the outcome via a SnackBar.
+  Future<void> _syncNow(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Syncing…'), duration: Duration(seconds: 2)),
+    );
+    try {
+      final result = await SyncService.runOnce(force: true);
+      if (!context.mounted) return;
+      bumpConfigRevision();
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            result.activityOk
+                ? 'Synced ${result.repoCount == 1 ? '1 repo' : '${result.repoCount} repos'}.'
+                : 'Sync failed — check your connection and tokens.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(const SnackBar(content: Text('Sync failed.')));
+    }
   }
 
   void _showAddRepoSheet(BuildContext context) {

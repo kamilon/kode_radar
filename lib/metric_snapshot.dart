@@ -48,3 +48,22 @@ class MetricSnapshot {
     }
   }
 }
+
+/// Collapses snapshots to the latest one per UTC day.
+///
+/// Aggregations built on top (daily sums/heatmaps) are then invariant to how
+/// often a day was captured — denser-than-daily sync must not inflate daily
+/// totals by counting several same-day snapshots of the same repo.
+Map<DateTime, MetricSnapshot> latestSnapshotByDay(
+  Iterable<MetricSnapshot> snapshots,
+) {
+  final byDay = <DateTime, MetricSnapshot>{};
+  for (final s in snapshots) {
+    final day = DateTime.utc(s.at.year, s.at.month, s.at.day);
+    final existing = byDay[day];
+    if (existing == null || s.at.isAfter(existing.at)) {
+      byDay[day] = s;
+    }
+  }
+  return byDay;
+}

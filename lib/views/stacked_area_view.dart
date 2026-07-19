@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../metric_snapshot.dart';
 import 'views_common.dart';
 
 /// A stacked-area chart of activity score over time, composed of the busiest
@@ -46,10 +47,10 @@ class StackedAreaView extends StatelessWidget {
       labels[key] = name.split('/').last;
       final map = <DateTime, double>{};
       var total = 0.0;
-      for (final s in snaps) {
-        final d = DateTime.utc(s.at.year, s.at.month, s.at.day);
-        map[d] = (map[d] ?? 0) + s.activityScore.toDouble();
-        total += s.activityScore.toDouble();
+      for (final entry in latestSnapshotByDay(snaps).entries) {
+        final v = entry.value.activityScore.toDouble();
+        map[entry.key] = v;
+        total += v;
       }
       byRepo[key] = map;
       totals[key] = total;

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'background_sync.dart';
 import 'preferences_store.dart';
 
-/// Settings screen: notification enablement, quiet hours, and the Activity Feed
-/// lookback window.
+/// Settings screen: notification enablement, quiet hours, the Activity Feed
+/// lookback window, and background sync.
 class PreferencesPage extends StatefulWidget {
   const PreferencesPage({super.key});
 
@@ -118,6 +119,49 @@ class _PreferencesPageState extends State<PreferencesPage> {
                         ),
                     ],
                   ),
+                ),
+                const Divider(),
+                _sectionHeader('Sync'),
+                SwitchListTile(
+                  title: const Text('Background sync'),
+                  subtitle: Text(
+                    BackgroundSync.isSupported
+                        ? 'Refresh periodically in the background (best-effort '
+                              'on iOS). “Sync now” in the menu works anytime.'
+                        : 'This desktop app refreshes while it is running.',
+                  ),
+                  value:
+                      _prefs.backgroundSyncEnabled &&
+                      BackgroundSync.isSupported,
+                  onChanged: BackgroundSync.isSupported
+                      ? (value) async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final ok = value
+                              ? await BackgroundSync.enable()
+                              : await BackgroundSync.disable();
+                          if (!ok) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  value
+                                      ? 'Could not enable background sync.'
+                                      : 'Could not disable background sync.',
+                                ),
+                              ),
+                            );
+                            return; // leave the switch and stored pref as-is
+                          }
+                          await PreferencesStore.setBackgroundSyncEnabled(
+                            value,
+                          );
+                          if (!mounted) return;
+                          setState(
+                            () => _prefs = _prefs.copyWith(
+                              backgroundSyncEnabled: value,
+                            ),
+                          );
+                        }
+                      : null,
                 ),
               ],
             ),
