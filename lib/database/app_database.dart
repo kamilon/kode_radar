@@ -137,6 +137,34 @@ class SyncState extends Table {
   Set<Column> get primaryKey => {scope};
 }
 
+/// The attention notification "seen" baseline (Phase 4), moved off
+/// `SharedPreferences` so the resident foreground and the background-sync
+/// isolate no longer read-modify-write the same blob and clobber each other.
+/// One row per already-notified attention id; inserts are additive
+/// (INSERT OR IGNORE on the unique `seenId`), so two isolates recording
+/// concurrently union rather than overwrite. The autoincrement `id` orders rows
+/// for oldest-first pruning.
+@DataClassName('NotificationSeenRow')
+@TableIndex(
+  name: 'idx_notification_seen_seen_id',
+  columns: {#seenId},
+  unique: true,
+)
+class NotificationSeen extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get seenId => text()();
+}
+
+/// Repos whose existing attention backlog has been seeded silently (Phase 4);
+/// keyed by `repoDisplay` so inserts are additive across isolates.
+@DataClassName('NotificationKnownRepoRow')
+class NotificationKnownRepos extends Table {
+  TextColumn get repoDisplay => text()();
+
+  @override
+  Set<Column> get primaryKey => {repoDisplay};
+}
+
 /// Small key/value table for database-local bookkeeping (e.g. one-time
 /// migration markers that must commit atomically with the data they guard).
 @DataClassName('AppMetaRow')
@@ -161,6 +189,8 @@ class AppMeta extends Table {
     RepoRuns,
     RepoReleases,
     SyncState,
+    NotificationSeen,
+    NotificationKnownRepos,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -171,7 +201,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forExecutor(super.executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -262,6 +292,17 @@ class AppDatabase extends _$AppDatabase {
             rethrow;
           }
         }
+      }
+      // v7 adds the notification "seen" baseline tables (Phase 4). Idempotent
+      // DDL as elsewhere; the known-repos PK index is part of `CREATE TABLE`, so
+      // only the seen unique index needs an explicit statement.
+      if (from < 7) {
+        await m.createTable(notificationSeen);
+        await customStatement(
+          'CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_seen_seen_id '
+          'ON notification_seen (seen_id)',
+        );
+        await m.createTable(notificationKnownRepos);
       }
     },
   );
