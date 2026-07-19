@@ -53,8 +53,8 @@ class SyncService {
           force: force,
         );
         return SyncResult(activityOk: true, repoCount: activities.length);
-      } catch (e) {
-        debugPrint('SyncService: activity/capture failed: $e');
+      } catch (e, st) {
+        debugPrint('SyncService: activity/capture failed: $e\n$st');
         return const SyncResult(activityOk: false, repoCount: 0);
       }
     }
@@ -74,8 +74,8 @@ class SyncService {
             ? await future
             : await future.timeout(deadline);
         await NotificationService.notifyNewAttention(items);
-      } catch (e) {
-        debugPrint('SyncService: attention failed: $e');
+      } catch (e, st) {
+        debugPrint('SyncService: attention failed: $e\n$st');
       }
     }
 

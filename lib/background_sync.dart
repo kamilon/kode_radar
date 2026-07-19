@@ -22,8 +22,8 @@ void backgroundSyncCallbackDispatcher() {
       final result = await SyncService.runOnce(background: true);
       // Report failure so the OS can retry/reschedule when nothing useful ran.
       return result.activityOk;
-    } catch (e) {
-      debugPrint('Background sync task failed: $e');
+    } catch (e, st) {
+      debugPrint('Background sync task failed: $e\n$st');
       return false;
     }
   });
