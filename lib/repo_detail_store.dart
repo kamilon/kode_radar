@@ -42,29 +42,35 @@ class RepoDetailStore {
   static Future<RepoDetailData> cached(
     String repoKey, {
     required bool releasesSupported,
-  }) async {
-    final db = _database;
-    final pulls =
-        await (db.select(db.repoPulls)
-              ..where((t) => t.repoKey.equals(repoKey))
-              ..orderBy([(t) => OrderingTerm(expression: t.id)]))
-            .get();
-    final runs =
-        await (db.select(db.repoRuns)
-              ..where((t) => t.repoKey.equals(repoKey))
-              ..orderBy([(t) => OrderingTerm(expression: t.id)]))
-            .get();
-    final releases =
-        await (db.select(db.repoReleases)
-              ..where((t) => t.repoKey.equals(repoKey))
-              ..orderBy([(t) => OrderingTerm(expression: t.id)]))
-            .get();
-    return RepoDetailData(
-      pulls: pulls.map(_toPr).toList(),
-      ci: runs.map(_toRun).toList(),
-      releases: releases.map(_toRelease).toList(),
-      releasesSupported: releasesSupported,
-    );
+  }) {
+    // Read all three tables under the same lock the mutators use, so a
+    // concurrent save/removeRepo can't interleave between the SELECTs and yield
+    // an inconsistent composite (e.g. pulls from before a save, runs from
+    // after).
+    return _runLocked(() async {
+      final db = _database;
+      final pulls =
+          await (db.select(db.repoPulls)
+                ..where((t) => t.repoKey.equals(repoKey))
+                ..orderBy([(t) => OrderingTerm(expression: t.id)]))
+              .get();
+      final runs =
+          await (db.select(db.repoRuns)
+                ..where((t) => t.repoKey.equals(repoKey))
+                ..orderBy([(t) => OrderingTerm(expression: t.id)]))
+              .get();
+      final releases =
+          await (db.select(db.repoReleases)
+                ..where((t) => t.repoKey.equals(repoKey))
+                ..orderBy([(t) => OrderingTerm(expression: t.id)]))
+              .get();
+      return RepoDetailData(
+        pulls: pulls.map(_toPr).toList(),
+        ci: runs.map(_toRun).toList(),
+        releases: releases.map(_toRelease).toList(),
+        releasesSupported: releasesSupported,
+      );
+    });
   }
 
   /// Persists [data] for [repoKey]. Each source (pulls / CI / releases) is

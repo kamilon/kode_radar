@@ -69,11 +69,10 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
           _repo.repoKey,
           releasesSupported: _releasesSupported,
         );
-        final cachedEvents = await ActivityEventStore.cached();
+        final repoEvents = await ActivityEventStore.cached(
+          repoKey: _repo.repoKey,
+        );
         if (!mounted || seq != _loadSeq) return;
-        final repoEvents = cachedEvents
-            .where((e) => e.repoKey == _repo.repoKey)
-            .toList();
         if (cachedDetail.pulls.isNotEmpty ||
             cachedDetail.ci.isNotEmpty ||
             cachedDetail.releases.isNotEmpty ||
@@ -112,16 +111,13 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
       );
       if (!mounted || seq != _loadSeq) return;
       List<ActivityEvent> timeline = feed.events;
-      // Fall back to cached events only when the fresh fetch came back empty
-      // BECAUSE a source failed (offline/partial) — not when the repo is
-      // genuinely quiet, so a now-empty repo doesn't keep showing a stale
-      // timeline.
+      // Fall back to the cached timeline only when the fresh fetch came back
+      // empty BECAUSE a source failed (offline/partial) — not when the repo is
+      // genuinely quiet, so a now-empty repo doesn't keep showing stale events.
+      // Reuse the events already on screen (loaded in Phase A, or a prior
+      // render) instead of re-querying the DB.
       if (timeline.isEmpty && feed.failedSources > 0) {
-        final cachedEvents = await ActivityEventStore.cached();
-        if (!mounted || seq != _loadSeq) return;
-        timeline = cachedEvents
-            .where((e) => e.repoKey == _repo.repoKey)
-            .toList();
+        timeline = _events;
       }
       setState(() {
         _data = RepoDetailData(
