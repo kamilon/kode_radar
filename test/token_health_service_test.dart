@@ -210,6 +210,27 @@ void main() {
     });
 
     test(
+      'a reset without a remaining count is not treated as a budget',
+      () async {
+        final token = await TokenStore.addToken(
+          provider: TokenStore.providerGithub,
+          label: 'GH',
+          scope: 'acme',
+          secret: 'ghp_secret',
+        );
+        final client = MockClient(
+          (_) async => http.Response(
+            jsonEncode({'login': 'alice'}),
+            200,
+            headers: {'x-ratelimit-reset': '1800000000'},
+          ),
+        );
+        final check = await TokenHealthService.check(token, client: client);
+        expect(check.rateLimit, isNull);
+      },
+    );
+
+    test(
       'a malformed rate-limit reset does not corrupt an otherwise valid check',
       () async {
         final token = await TokenStore.addToken(

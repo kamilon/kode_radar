@@ -221,8 +221,12 @@ class TokenHealthService {
   }
 
   /// The rate-limit budget from a response's headers, or null when the provider
-  /// reported no budget (e.g. Azure DevOps, which doesn't send `X-RateLimit-*`,
-  /// or a response carrying only `Retry-After`).
+  /// reported no usable budget — Azure DevOps (no `X-RateLimit-*`), a
+  /// `Retry-After`-only response, or a reset without a remaining count.
+  ///
+  /// Requires `remaining` because both storage and the UI are keyed off it
+  /// (GitHub always sends `X-RateLimit-Remaining` alongside `-Reset`), so a
+  /// reset-only status would persist a budget that could never be rendered.
   ///
   /// Best-effort: a malformed header (e.g. an out-of-range reset epoch that
   /// makes `parseRateLimit` throw) is swallowed so the budget is simply
@@ -230,9 +234,7 @@ class TokenHealthService {
   static RateLimitStatus? _rateLimitOf(http.Response response) {
     try {
       final status = parseRateLimit(response.headers);
-      return (status.remaining != null || status.resetAt != null)
-          ? status
-          : null;
+      return status.remaining != null ? status : null;
     } catch (_) {
       return null;
     }
