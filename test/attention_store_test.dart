@@ -80,14 +80,32 @@ void main() {
     expect(cached.map((e) => e.id).toList(), ['a', 'm', 'z']);
   });
 
-  test('cached filters out snoozed ids on read', () async {
+  test('watch emits the ranked cache and re-emits after a save', () async {
+    final emissions = <List<String>>[];
+    final sub = AttentionStore.watch().listen((items) {
+      emissions.add(items.map((e) => e.id).toList());
+    });
+    // Initial emission (empty cache).
+    await pumpEventQueue();
+    await AttentionStore.save([
+      _item(id: 'a', repoDisplay: 'owner/one', severity: 3000),
+      _item(id: 'b', repoDisplay: 'owner/two', severity: 5000),
+    ]);
+    await pumpEventQueue();
+    await sub.cancel();
+
+    expect(emissions.first, isEmpty);
+    // Ranked most-urgent first (severity desc): b (5000) before a (3000).
+    expect(emissions.last, ['b', 'a']);
+  });
+
+  test('watch is not snooze-filtered (the page applies snooze)', () async {
     await AttentionStore.save([
       _item(id: 'a', repoDisplay: 'owner/one'),
       _item(id: 'b', repoDisplay: 'owner/two'),
     ]);
-
-    final cached = await AttentionStore.cached(snoozedIds: {'a'});
-    expect(cached.map((e) => e.id).toList(), ['b']);
+    final items = await AttentionStore.watch().first;
+    expect(items.map((e) => e.id).toSet(), {'a', 'b'});
   });
 
   test('a successful refresh replaces a repo\'s items', () async {

@@ -43,24 +43,36 @@ class AttentionStore {
   }
 
   /// Returns the cached snapshot ranked most-urgent first (severity desc, then
-  /// repo), excluding any ids in [snoozedIds] so a just-made dismiss/snooze is
-  /// honored even before the next network refresh rewrites the cache.
-  static Future<List<AttentionItem>> cached({
-    Set<String> snoozedIds = const {},
-  }) async {
+  /// repo) — a one-shot read companion to [watch]. Snooze is applied by callers
+  /// at display time (see [AttentionInboxPage]), not here.
+  static Future<List<AttentionItem>> cached() async {
+    final rows = await _selectRanked().get();
+    return rows.map(_toItem).toList();
+  }
+
+  /// A reactive stream of the full ranked cached snapshot that re-emits whenever
+  /// the `attention_items` table changes — so a page bound to it renders the
+  /// cache instantly on cold start and updates automatically when a refresh (or
+  /// another in-isolate writer) persists new data.
+  ///
+  /// Unlike [cached] this does NOT apply a snooze filter: snooze is a display
+  /// concern the page layers on top (via [SnoozeStore]) while the cache stays
+  /// the source of truth for what each repo currently has.
+  static Stream<List<AttentionItem>> watch() {
+    return _selectRanked().watch().map((rows) => rows.map(_toItem).toList());
+  }
+
+  static SimpleSelectStatement<$AttentionItemsTable, AttentionItemRow>
+  _selectRanked() {
     final db = _database;
-    final rows =
-        await (db.select(db.attentionItems)..orderBy([
-              (t) =>
-                  OrderingTerm(expression: t.severity, mode: OrderingMode.desc),
-              (t) => OrderingTerm(expression: t.repoDisplay),
-              // Final tie-breaker so same-severity items in the same repo have a
-              // stable order (SQLite is otherwise free to reorder them, causing
-              // list jitter between cache and network renders).
-              (t) => OrderingTerm(expression: t.id),
-            ]))
-            .get();
-    return rows.where((r) => !snoozedIds.contains(r.id)).map(_toItem).toList();
+    return db.select(db.attentionItems)..orderBy([
+      (t) => OrderingTerm(expression: t.severity, mode: OrderingMode.desc),
+      (t) => OrderingTerm(expression: t.repoDisplay),
+      // Final tie-breaker so same-severity items in the same repo have a stable
+      // order (SQLite is otherwise free to reorder them, causing list jitter
+      // between cache and network renders).
+      (t) => OrderingTerm(expression: t.id),
+    ]);
   }
 
   /// Replaces the cached snapshot from a freshly-[computed] list (as returned by
