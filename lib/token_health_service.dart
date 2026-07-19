@@ -223,8 +223,18 @@ class TokenHealthService {
   /// The rate-limit budget from a response's headers, or null when the provider
   /// reported no budget (e.g. Azure DevOps, which doesn't send `X-RateLimit-*`,
   /// or a response carrying only `Retry-After`).
+  ///
+  /// Best-effort: a malformed header (e.g. an out-of-range reset epoch that
+  /// makes `parseRateLimit` throw) is swallowed so the budget is simply
+  /// omitted rather than corrupting the check's health/message.
   static RateLimitStatus? _rateLimitOf(http.Response response) {
-    final status = parseRateLimit(response.headers);
-    return (status.remaining != null || status.resetAt != null) ? status : null;
+    try {
+      final status = parseRateLimit(response.headers);
+      return (status.remaining != null || status.resetAt != null)
+          ? status
+          : null;
+    } catch (_) {
+      return null;
+    }
   }
 }

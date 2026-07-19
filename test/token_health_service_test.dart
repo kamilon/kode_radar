@@ -208,5 +208,36 @@ void main() {
       final check = await TokenHealthService.check(token, client: client);
       expect(check.rateLimit, isNull);
     });
+
+    test(
+      'a malformed rate-limit reset does not corrupt an otherwise valid check',
+      () async {
+        final token = await TokenStore.addToken(
+          provider: TokenStore.providerGithub,
+          label: 'GH',
+          scope: 'acme',
+          secret: 'ghp_secret',
+        );
+        // A reset epoch far past DateTime's supported range makes
+        // parseRateLimit throw; the check must still report the successful
+        // auth, sans budget. (9999999999999 s * 1000 ≈ 1e16 ms, beyond
+        // DateTime's ~8.64e15 ms limit, but within int64 so it doesn't wrap.)
+        final client = MockClient(
+          (_) async => http.Response(
+            jsonEncode({'login': 'alice'}),
+            200,
+            headers: {
+              'x-ratelimit-remaining': '10',
+              'x-ratelimit-reset': '9999999999999',
+            },
+          ),
+        );
+
+        final check = await TokenHealthService.check(token, client: client);
+        expect(check.health, TokenHealth.valid);
+        expect(check.account, 'alice');
+        expect(check.rateLimit, isNull);
+      },
+    );
   });
 }
