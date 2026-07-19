@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'background_sync.dart';
+import 'background_sync_status_store.dart';
 import 'preferences_store.dart';
 
 /// Settings screen: notification enablement, quiet hours, the Activity Feed
@@ -12,23 +15,52 @@ class PreferencesPage extends StatefulWidget {
   State<PreferencesPage> createState() => _PreferencesPageState();
 }
 
-class _PreferencesPageState extends State<PreferencesPage> {
+class _PreferencesPageState extends State<PreferencesPage>
+    with WidgetsBindingObserver {
   AppPreferences _prefs = const AppPreferences();
+  BackgroundSyncStatus? _bgStatus;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // A background run may have recorded a new status while we were backgrounded
+    // with Settings open; refresh it on resume so the tile isn't stale.
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshBackgroundStatus());
+    }
   }
 
   Future<void> _load() async {
     final prefs = await PreferencesStore.load();
+    final bgStatus = BackgroundSync.isSupported
+        ? await BackgroundSyncStatusStore.read()
+        : null;
     if (!mounted) return;
     setState(() {
       _prefs = prefs;
+      _bgStatus = bgStatus;
       _loading = false;
     });
+  }
+
+  Future<void> _refreshBackgroundStatus() async {
+    if (!BackgroundSync.isSupported) return;
+    final bgStatus = await BackgroundSyncStatusStore.read();
+    if (!mounted) return;
+    setState(() => _bgStatus = bgStatus);
   }
 
   @override
@@ -163,6 +195,13 @@ class _PreferencesPageState extends State<PreferencesPage> {
                         }
                       : null,
                 ),
+                if (BackgroundSync.isSupported)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.history, size: 20),
+                    title: const Text('Last background run'),
+                    subtitle: Text(_backgroundRunSubtitle()),
+                  ),
               ],
             ),
     );
@@ -203,6 +242,34 @@ class _PreferencesPageState extends State<PreferencesPage> {
     if (!_prefs.quietHoursEnabled) return 'Notifications are never silenced';
     return 'Silence ${_formatHour(_prefs.quietStartHour)} – '
         '${_formatHour(_prefs.quietEndHour)}';
+  }
+
+  /// Describes the most recent background run for the read-only status tile.
+  String _backgroundRunSubtitle() {
+    final status = _bgStatus;
+    if (status == null) return 'Hasn\'t run yet';
+    final when = _relativeTime(status.at);
+    if (!status.finished) return 'Started $when · didn\'t finish';
+    if (!status.activityOk) return 'Ran $when · activity refresh failed';
+    final repos = status.repoCount == 1
+        ? '1 repo'
+        : '${status.repoCount} repos';
+    return 'Ran $when · $repos';
+  }
+
+  static String _relativeTime(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.isNegative || diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) {
+      final m = diff.inMinutes;
+      return '$m minute${m == 1 ? '' : 's'} ago';
+    }
+    if (diff.inHours < 24) {
+      final h = diff.inHours;
+      return '$h hour${h == 1 ? '' : 's'} ago';
+    }
+    final d = diff.inDays;
+    return '$d day${d == 1 ? '' : 's'} ago';
   }
 
   String _formatHour(int hour) {
