@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:kode_radar/api_cache.dart';
 import 'package:kode_radar/token_health_service.dart';
 import 'package:kode_radar/token_health_store.dart';
 
@@ -110,5 +111,50 @@ void main() {
 
   test('all() returns empty on a fresh store', () async {
     expect(await TokenHealthStore.all(), isEmpty);
+  });
+
+  test('persists and reads back the rate-limit budget', () async {
+    final now = DateTime.utc(2026, 7, 15, 12);
+    final reset = DateTime.utc(2026, 7, 15, 12, 41);
+    await TokenHealthStore.record(
+      'tok-1',
+      const TokenCheck(
+        TokenHealth.valid,
+        account: 'octocat',
+      ).withRateLimit(RateLimitStatus(remaining: 4823, resetAt: reset)),
+      now: now,
+    );
+
+    final all = await TokenHealthStore.all();
+    expect(all['tok-1']!.rateLimitRemaining, 4823);
+    expect(all['tok-1']!.rateLimitResetAt, reset);
+  });
+
+  test('StoredTokenCheck JSON round-trips the rate-limit fields', () {
+    final reset = DateTime.utc(2026, 7, 15, 12, 41);
+    final original = StoredTokenCheck(
+      health: TokenHealth.valid,
+      checkedAt: DateTime.utc(2026, 7, 15, 12),
+      account: 'octocat',
+      rateLimitRemaining: 12,
+      rateLimitResetAt: reset,
+    );
+
+    final restored = StoredTokenCheck.fromJson(
+      jsonDecode(jsonEncode(original.toJson())),
+    );
+    expect(restored, isNotNull);
+    expect(restored!.rateLimitRemaining, 12);
+    expect(restored.rateLimitResetAt, reset);
+  });
+
+  test('a check without a rate-limit stores null budget fields', () async {
+    await TokenHealthStore.record(
+      'tok-1',
+      const TokenCheck(TokenHealth.valid, account: 'octocat'),
+    );
+    final all = await TokenHealthStore.all();
+    expect(all['tok-1']!.rateLimitRemaining, isNull);
+    expect(all['tok-1']!.rateLimitResetAt, isNull);
   });
 }

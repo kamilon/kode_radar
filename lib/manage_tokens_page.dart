@@ -155,6 +155,8 @@ class _ManageTokensPageState extends State<ManageTokensPage> {
         checkedAt: now,
         account: result.account,
         message: result.message,
+        rateLimitRemaining: result.rateLimit?.remaining,
+        rateLimitResetAt: result.rateLimit?.resetAt,
       );
     });
   }
@@ -328,16 +330,53 @@ class _ManageTokensPageState extends State<ManageTokensPage> {
     final suffix = stale
         ? ' · checked ${_relativeTime(check.checkedAt)} (may be out of date)'
         : ' · checked ${_relativeTime(check.checkedAt)}';
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text('$text$suffix', style: TextStyle(color: color)),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text('$text$suffix', style: TextStyle(color: color)),
+            ),
+          ],
         ),
+        if (check.rateLimitRemaining != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2, left: 22),
+            child: Text(
+              _rateLimitText(check),
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ),
       ],
     );
+  }
+
+  /// A one-line API rate-limit budget summary for a stored check, e.g.
+  /// "GitHub REST API: 4823 left · resets in 41m". Only GitHub reports this
+  /// budget; the count reflects the moment of the last check (see the
+  /// "checked …" note on the status line above it).
+  static String _rateLimitText(StoredTokenCheck check) {
+    final buffer = StringBuffer(
+      'GitHub REST API: ${check.rateLimitRemaining} left',
+    );
+    final reset = check.rateLimitResetAt;
+    if (reset != null) {
+      final until = reset.difference(DateTime.now());
+      if (until.inSeconds > 0) {
+        if (until.inMinutes < 1) {
+          buffer.write(' · resets in ${until.inSeconds}s');
+        } else if (until.inMinutes < 60) {
+          buffer.write(' · resets in ${until.inMinutes}m');
+        } else {
+          buffer.write(' · resets in ${until.inHours}h');
+        }
+      }
+    }
+    return buffer.toString();
   }
 
   static String _relativeTime(DateTime time) {

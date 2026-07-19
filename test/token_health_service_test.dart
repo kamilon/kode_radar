@@ -170,5 +170,43 @@ void main() {
       final check = await TokenHealthService.check(token, client: client);
       expect(check.health, TokenHealth.error);
     });
+
+    test('captures the rate-limit budget from response headers', () async {
+      final token = await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'GH',
+        scope: 'acme',
+        secret: 'ghp_secret',
+      );
+      final reset = DateTime.utc(2026, 7, 15, 12, 41);
+      final client = MockClient(
+        (_) async => http.Response(
+          jsonEncode({'login': 'alice'}),
+          200,
+          headers: {
+            'x-ratelimit-remaining': '4823',
+            'x-ratelimit-reset': '${reset.millisecondsSinceEpoch ~/ 1000}',
+          },
+        ),
+      );
+
+      final check = await TokenHealthService.check(token, client: client);
+      expect(check.rateLimit?.remaining, 4823);
+      expect(check.rateLimit?.resetAt, reset);
+    });
+
+    test('a response without rate-limit headers leaves it null', () async {
+      final token = await TokenStore.addToken(
+        provider: TokenStore.providerGithub,
+        label: 'GH',
+        scope: 'acme',
+        secret: 'ghp_secret',
+      );
+      final client = MockClient(
+        (_) async => http.Response(jsonEncode({'login': 'alice'}), 200),
+      );
+      final check = await TokenHealthService.check(token, client: client);
+      expect(check.rateLimit, isNull);
+    });
   });
 }

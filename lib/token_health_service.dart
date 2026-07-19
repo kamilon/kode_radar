@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'identity_service.dart';
+import 'api_cache.dart';
 import 'token_store.dart';
 
 /// The outcome of a token health check.
@@ -21,7 +22,7 @@ enum TokenHealth {
 
 /// The result of verifying a single token against its provider.
 class TokenCheck {
-  const TokenCheck(this.health, {this.account, this.message});
+  const TokenCheck(this.health, {this.account, this.message, this.rateLimit});
 
   final TokenHealth health;
 
@@ -32,7 +33,19 @@ class TokenCheck {
   /// A human-readable explanation when the token is not valid.
   final String? message;
 
+  /// The API rate-limit budget the provider reported for this token on the
+  /// check request (GitHub returns `X-RateLimit-*`), or null if none was seen.
+  final RateLimitStatus? rateLimit;
+
   bool get isValid => health == TokenHealth.valid;
+
+  /// Returns a copy carrying [rateLimit].
+  TokenCheck withRateLimit(RateLimitStatus? rateLimit) => TokenCheck(
+    health,
+    account: account,
+    message: message,
+    rateLimit: rateLimit,
+  );
 }
 
 /// Actively verifies whether a stored token still authenticates, reusing the
@@ -143,7 +156,10 @@ class TokenHealthService {
           ),
           {'Authorization': 'Basic ${base64Encode(utf8.encode(':$secret'))}'},
         );
-        return adoResult(response.statusCode, _tryDecode(response.body));
+        return adoResult(
+          response.statusCode,
+          _tryDecode(response.body),
+        ).withRateLimit(_rateLimitOf(response));
       }
       final response = await _send(
         httpClient,
@@ -153,7 +169,10 @@ class TokenHealthService {
           'Accept': 'application/vnd.github+json',
         },
       );
-      return githubResult(response.statusCode, _tryDecode(response.body));
+      return githubResult(
+        response.statusCode,
+        _tryDecode(response.body),
+      ).withRateLimit(_rateLimitOf(response));
     } on TimeoutException {
       return const TokenCheck(
         TokenHealth.error,
@@ -199,5 +218,13 @@ class TokenHealthService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// The rate-limit budget from a response's headers, or null when the provider
+  /// reported no budget (e.g. Azure DevOps, which doesn't send `X-RateLimit-*`,
+  /// or a response carrying only `Retry-After`).
+  static RateLimitStatus? _rateLimitOf(http.Response response) {
+    final status = parseRateLimit(response.headers);
+    return (status.remaining != null || status.resetAt != null) ? status : null;
   }
 }
