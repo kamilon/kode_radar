@@ -10,8 +10,10 @@ import 'database/app_database.dart';
 /// The resident foreground and the background-sync isolate both record the
 /// baseline; on `SharedPreferences` they read-modify-write the same blob and can
 /// clobber each other (last-writer-win). Here [recordBaseline] does additive
-/// `INSERT OR IGNORE`s inside one transaction, so concurrent isolates union
-/// their ids instead of overwriting — an atomic, race-free baseline.
+/// upserts inside one transaction (`INSERT OR REPLACE` for seen ids — so a
+/// re-seen id is bumped to newest and never wrongly pruned — and `INSERT OR
+/// IGNORE` for known repos), so concurrent isolates union rather than overwrite:
+/// an atomic, race-free baseline.
 ///
 /// The legacy `SharedPreferences` baseline is imported once, transparently, on
 /// first use (see [_ensureImported]).
@@ -109,24 +111,14 @@ class NotificationSeenStore {
     });
   }
 
-  /// Keeps only the newest [maxSeenIds] seen rows (by insertion order).
+  /// Keeps only the newest [maxSeenIds] seen rows (by insertion order). Deletes
+  /// via a subquery so no large `IN (...)` list is materialized.
   static Future<void> _pruneSeen(AppDatabase db) async {
-    final ids =
-        await (db.selectOnly(db.notificationSeen)
-              ..addColumns([db.notificationSeen.id])
-              ..orderBy([
-                OrderingTerm(
-                  expression: db.notificationSeen.id,
-                  mode: OrderingMode.desc,
-                ),
-              ]))
-            .map((row) => row.read(db.notificationSeen.id)!)
-            .get();
-    if (ids.length <= maxSeenIds) return;
-    final toDelete = ids.sublist(maxSeenIds);
-    await (db.delete(
-      db.notificationSeen,
-    )..where((t) => t.id.isIn(toDelete))).go();
+    await db.customStatement(
+      'DELETE FROM notification_seen WHERE id NOT IN '
+      '(SELECT id FROM notification_seen ORDER BY id DESC LIMIT ?)',
+      [maxSeenIds],
+    );
   }
 
   /// Imports the legacy `SharedPreferences` baseline into the DB exactly once.

@@ -141,9 +141,11 @@ class SyncState extends Table {
 /// `SharedPreferences` so the resident foreground and the background-sync
 /// isolate no longer read-modify-write the same blob and clobber each other.
 /// One row per already-notified attention id; inserts are additive
-/// (INSERT OR IGNORE on the unique `seenId`), so two isolates recording
-/// concurrently union rather than overwrite. The autoincrement `id` orders rows
-/// for oldest-first pruning.
+/// (`INSERT OR REPLACE` on the unique `seenId` — which keeps the id present but
+/// bumps it to a fresh, newest autoincrement `id`), so two isolates recording
+/// concurrently union rather than overwrite, and a still-current id is never
+/// pruned as "oldest". The autoincrement `id` orders rows for oldest-first
+/// pruning.
 @DataClassName('NotificationSeenRow')
 @TableIndex(
   name: 'idx_notification_seen_seen_id',
