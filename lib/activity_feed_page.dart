@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'activity_event.dart';
 import 'activity_event_list.dart';
+import 'activity_event_store.dart';
 import 'activity_feed_service.dart';
 import 'app_http.dart';
 import 'config_revision.dart';
@@ -26,7 +27,12 @@ class ActivityFeedPage extends StatefulWidget {
 class _ActivityFeedPageState extends State<ActivityFeedPage> {
   List<ActivityEvent> _events = const [];
   List<Team> _teams = const [];
-  bool _loading = true;
+
+  /// A load (cache render + network refresh) is in flight. Gates the manual
+  /// Refresh action so a user can't stack overlapping network fetches/DB writes
+  /// on top of an in-flight refresh; cache-first renders still update the UI
+  /// underneath it.
+  bool _refreshing = true;
   bool _mineOnly = false;
   bool _identitySet = false;
   int _failedSources = 0;
@@ -69,7 +75,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
   Future<void> _load() async {
     final seq = ++_loadSeq;
     setState(() {
-      _loading = true;
+      _refreshing = true;
       _error = null;
     });
     try {
@@ -84,17 +90,52 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
       final selfGithub = await IdentityStore.selfGithubLogins();
       final selfAdo = await IdentityStore.selfAdoNames();
       final appPrefs = await PreferencesStore.load();
+      final lookback = Duration(days: appPrefs.feedLookbackDays);
+
+      // Phase A: render the cached feed immediately so a cold start isn't a
+      // blank spinner while the network fetch runs (or if it's offline). Only
+      // meaningful when we don't already have events on screen.
+      if (_events.isEmpty) {
+        final cached = await ActivityEventStore.cached(lookback: lookback);
+        if (!mounted || seq != _loadSeq) return;
+        if (cached.isNotEmpty) {
+          setState(() {
+            _events = cached;
+            _teams = teams;
+            _lookbackDays = appPrefs.feedLookbackDays;
+            // The cached render carries no source-health signal, so clear any
+            // stale failed/truncated notice from a previous refresh while the
+            // new network refresh is still in flight.
+            _failedSources = 0;
+            _truncated = false;
+            if (_teamId != null && !teams.any((t) => t.id == _teamId)) {
+              _teamId = null;
+            }
+            _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
+          });
+        }
+      }
+
+      // Phase B: refresh from the network and persist the result to the cache.
       final result = await ActivityFeedService.computeAll(
         client: AppHttp.client,
         selfGithubLogins: selfGithub,
         selfAdoNames: selfAdo,
-        lookback: Duration(days: appPrefs.feedLookbackDays),
+        lookback: lookback,
       );
       if (!mounted || seq != _loadSeq) return;
-      // Advance the watermark to the newest event we actually loaded — a
-      // provider timestamp, so device-clock skew can't poison it, and only on
-      // a successful load so a failure/quick pop never consumes unseen items.
-      // markSeen never moves the marker backwards.
+      await ActivityEventStore.save(result.events, restrictToMonitored: true);
+      if (!mounted || seq != _loadSeq) return;
+      // Render the persisted cache (not `result.events` directly) so a fully
+      // offline load — where per-source failures yield an empty result rather
+      // than an exception — keeps showing cached events instead of blanking,
+      // and a partial failure shows the union of fresh + still-cached events.
+      final merged = await ActivityEventStore.cached(lookback: lookback);
+      if (!mounted || seq != _loadSeq) return;
+      // Advance the watermark to the newest event this network refresh
+      // returned — a provider timestamp, so device-clock skew can't poison it,
+      // and only on a successful load so a failure/quick pop never consumes
+      // unseen items. markSeen never moves the marker backwards.
       if (result.events.isNotEmpty) {
         await SeenStore.markSeen(
           SeenStore.feedKey,
@@ -103,7 +144,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
         if (!mounted || seq != _loadSeq) return;
       }
       setState(() {
-        _events = result.events;
+        _events = merged;
         _failedSources = result.failedSources;
         _truncated = result.truncated;
         _lookbackDays = appPrefs.feedLookbackDays;
@@ -114,15 +155,20 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
         }
         _identitySet = selfGithub.isNotEmpty || selfAdo.isNotEmpty;
         _lastChecked = DateTime.now();
-        _loading = false;
+        _refreshing = false;
       });
     } catch (e) {
       debugPrint('ActivityFeed failed to load: $e');
       if (!mounted || seq != _loadSeq) return;
       setState(() {
-        _error =
-            'Something went wrong while loading the feed. Pull down to try again.';
-        _loading = false;
+        // If we already rendered cached events (Phase A), keep them on screen
+        // rather than replacing them with an error state; the refresh simply
+        // didn't land this time. Only show the error when we have nothing.
+        if (_events.isEmpty) {
+          _error =
+              'Something went wrong while loading the feed. Pull down to try again.';
+        }
+        _refreshing = false;
       });
     }
   }
@@ -152,6 +198,11 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
     if (since == null) return 0;
     return _visibleEvents.where((e) => e.occurredAt.isAfter(since)).length;
   }
+
+  /// Show the full-screen spinner only when a load is in flight and there's
+  /// nothing cached to render yet; once cache (or fresh) events are on screen,
+  /// content stays visible while the network refresh continues underneath.
+  bool get _showSpinner => _refreshing && _events.isEmpty && _error == null;
 
   void _applyView(SavedView view) {
     setState(() {
@@ -288,19 +339,19 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
             tooltip: _mineOnly
                 ? 'Showing yours — tap for all'
                 : 'Show only mine',
-            onPressed: _loading
+            onPressed: _showSpinner
                 ? null
                 : () => setState(() => _mineOnly = !_mineOnly),
           ),
           IconButton(
             icon: const Icon(Icons.bookmarks_outlined),
             tooltip: 'Saved views',
-            onPressed: _loading ? null : _openSavedViews,
+            onPressed: _showSpinner ? null : _openSavedViews,
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
-            onPressed: _loading ? null : _load,
+            onPressed: _refreshing ? null : _load,
           ),
           const HomeMenuButton(),
         ],
@@ -309,14 +360,14 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
         children: [
           _buildFilterBar(),
           const Divider(height: 1),
-          if (!_loading && _error == null) sinceLastLookedBanner(_newCount),
-          if (!_loading && _error == null)
+          if (!_showSpinner && _error == null) sinceLastLookedBanner(_newCount),
+          if (!_showSpinner && _error == null)
             activitySourceNotice(
               failedSources: _failedSources,
               truncated: _truncated,
             ),
           Expanded(
-            child: _loading
+            child: _showSpinner
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(onRefresh: _load, child: _buildContent()),
           ),
@@ -330,7 +381,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
       FilterChip(
         label: const Text('All'),
         selected: _groups.isEmpty,
-        onSelected: _loading ? null : (_) => setState(_groups.clear),
+        onSelected: _showSpinner ? null : (_) => setState(_groups.clear),
       ),
       for (final group in ActivityType.groups)
         Padding(
@@ -338,7 +389,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
           child: FilterChip(
             label: Text(ActivityType.groupLabel(group)),
             selected: _groups.contains(group),
-            onSelected: _loading
+            onSelected: _showSpinner
                 ? null
                 : (selected) => setState(() {
                     if (selected) {
@@ -371,7 +422,7 @@ class _ActivityFeedPageState extends State<ActivityFeedPage> {
                     value: _teamId,
                     isDense: true,
                     hint: const Text('All teams'),
-                    onChanged: _loading
+                    onChanged: _showSpinner
                         ? null
                         : (value) => setState(() => _teamId = value),
                     items: [
