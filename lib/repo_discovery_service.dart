@@ -207,20 +207,28 @@ class RepoDiscoveryService {
       if (body is! List || body.isEmpty) break;
       all.addAll(parseGithubRepos(body));
       // Follow the server's rel="next" link; its absence means the last page.
-      next = _nextLink(response.headers['link']);
+      // A present-but-rejected next (untrusted host / unparseable) marks the
+      // result truncated so the UI warns that repos were omitted.
+      final link = _nextLink(response.headers['link']);
+      if (link.rejected) truncated = true;
+      next = link.url;
     }
     return RepoFetchResult(repos: all, truncated: truncated);
   }
 
-  /// Extracts the `rel="next"` URL from a GitHub `Link` response header, or null
-  /// when there is no next page (or no/blank header). The header looks like:
-  /// `<https://api.github.com/...&page=2>; rel="next", <...>; rel="last"`.
+  /// Extracts the `rel="next"` URL from a GitHub `Link` response header. Returns
+  /// `url == null` when there is no next page (or no/blank header). The header
+  /// looks like `<https://api.github.com/...&page=2>; rel="next", <...>`.
   ///
-  /// Only same-origin `https://api.github.com` URLs are returned; a next link to
-  /// any other host/scheme is rejected (returns null) so a hostile or proxying
-  /// response can't redirect the token-bearing request to another host.
-  static String? _nextLink(String? linkHeader) {
-    if (linkHeader == null || linkHeader.isEmpty) return null;
+  /// Only same-origin `https://api.github.com` URLs are followed; a next link to
+  /// any other host/scheme (or one that won't parse) is rejected — `url` is null
+  /// and `rejected` is true — so a hostile or proxying response can't redirect
+  /// the token-bearing request to another host, and the caller can surface that
+  /// pages were omitted.
+  static ({String? url, bool rejected}) _nextLink(String? linkHeader) {
+    if (linkHeader == null || linkHeader.isEmpty) {
+      return (url: null, rejected: false);
+    }
     for (final part in linkHeader.split(',')) {
       final segments = part.split(';');
       if (segments.length < 2) continue;
@@ -233,11 +241,11 @@ class RepoDiscoveryService {
       if (uri == null ||
           uri.scheme != 'https' ||
           uri.host != 'api.github.com') {
-        return null;
+        return (url: null, rejected: true);
       }
-      return url;
+      return (url: url, rejected: false);
     }
-    return null;
+    return (url: null, rejected: false);
   }
 
   static Future<RepoFetchResult> _fetchAdo(

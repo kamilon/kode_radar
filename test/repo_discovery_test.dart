@@ -193,8 +193,10 @@ void main() {
       client: client,
     );
 
-    // The cross-host next link is rejected, so only api.github.com is hit.
+    // The cross-host next link is rejected, so only api.github.com is hit, and
+    // the result is marked truncated (more pages existed but weren't followed).
     expect(hosts, ['api.github.com']);
     expect(result.repos.length, 1);
+    expect(result.truncated, isTrue);
   });
 }
