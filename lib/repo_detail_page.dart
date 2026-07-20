@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -23,7 +25,19 @@ class RepoDetailPage extends StatefulWidget {
 }
 
 class _RepoDetailPageState extends State<RepoDetailPage> {
-  RepoDetailData _data = const RepoDetailData();
+  /// The persisted detail composite, driven by the reactive
+  /// [RepoDetailStore.watch] stream (instant cache on cold start; auto-updates
+  /// when a refresh or repo-delete changes the cache). Its own failure flags are
+  /// always false (last-known-good); the fresh flags are overlaid via [_data].
+  RepoDetailData _streamDetail = const RepoDetailData();
+  StreamSubscription<RepoDetailData>? _detailSub;
+
+  /// This round's fresh per-source failure flags from the network refresh,
+  /// overlaid on the streamed cache so each tab can still show "couldn't load".
+  bool _pullsFailed = false;
+  bool _ciFailed = false;
+  bool _releasesFailed = false;
+
   List<ActivityEvent> _events = const [];
   int _feedFailed = 0;
   bool _feedTruncated = false;
@@ -43,12 +57,24 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
 
   RepoActivity get _repo => widget.repo;
 
+  /// The rendered detail: the streamed persisted composite plus this round's
+  /// fresh per-source failure flags.
+  RepoDetailData get _data => RepoDetailData(
+    pulls: _streamDetail.pulls,
+    ci: _streamDetail.ci,
+    releases: _streamDetail.releases,
+    releasesSupported: _releasesSupported,
+    pullsFailed: _pullsFailed,
+    ciFailed: _ciFailed,
+    releasesFailed: _releasesFailed,
+  );
+
   /// True once anything (detail or timeline) is on screen.
   bool get _hasContent =>
       _events.isNotEmpty ||
-      _data.pulls.isNotEmpty ||
-      _data.ci.isNotEmpty ||
-      _data.releases.isNotEmpty;
+      _streamDetail.pulls.isNotEmpty ||
+      _streamDetail.ci.isNotEmpty ||
+      _streamDetail.releases.isNotEmpty;
 
   /// Full-screen spinner only while a load is in flight and nothing is cached
   /// to show yet.
@@ -57,7 +83,42 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
   @override
   void initState() {
     super.initState();
+    _subscribe();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _detailSub?.cancel();
+    super.dispose();
+  }
+
+  /// Subscribes the reactive detail cache. The first emission renders the cache
+  /// instantly; later emissions (a refresh persisting, or a repo-delete pruning)
+  /// update the tabs automatically.
+  void _subscribe() {
+    _detailSub?.cancel();
+    _detailSub =
+        RepoDetailStore.watch(
+          _repo.repoKey,
+          releasesSupported: _releasesSupported,
+        ).listen(
+          (detail) {
+            if (!mounted) return;
+            setState(() {
+              _streamDetail = detail;
+              // A cache emission with content clears a stale error screen a
+              // failed refresh set before the cache arrived.
+              if (detail.pulls.isNotEmpty ||
+                  detail.ci.isNotEmpty ||
+                  detail.releases.isNotEmpty) {
+                _error = null;
+              }
+            });
+          },
+          onError: (Object e) =>
+              debugPrint('RepoDetail watch stream error: $e'),
+        );
   }
 
   Future<void> _load() async {
@@ -67,43 +128,30 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
       _error = null;
     });
     try {
-      // Phase A: render cached detail + this repo's cached timeline events
-      // immediately so a cold start / offline open isn't a blank spinner.
-      if (!_hasContent) {
-        // Run the two cache reads concurrently to cut cold-start latency; the
-        // seq/mounted guards below still apply.
+      // Phase A: render this repo's cached timeline events + provenance
+      // immediately so a cold start / offline open isn't a blank spinner. (The
+      // detail composite renders via the reactive stream's first emission.)
+      if (_events.isEmpty) {
         final cachedResults = await Future.wait([
-          RepoDetailStore.cached(
-            _repo.repoKey,
-            releasesSupported: _releasesSupported,
-          ),
           ActivityEventStore.cached(repoKey: _repo.repoKey),
           SyncStateStore.lastSuccess(SyncStateStore.repoScope(_repo.repoKey)),
         ]);
         if (!mounted || seq != _loadSeq) return;
-        final cachedDetail = cachedResults[0] as RepoDetailData;
-        final repoEvents = cachedResults[1] as List<ActivityEvent>;
-        final lastSynced = cachedResults[2] as DateTime?;
-        final hasCache =
-            cachedDetail.pulls.isNotEmpty ||
-            cachedDetail.ci.isNotEmpty ||
-            cachedDetail.releases.isNotEmpty ||
-            repoEvents.isNotEmpty;
-        // Set the provenance label even when there's no cached content (a scope
+        final repoEvents = cachedResults[0] as List<ActivityEvent>;
+        final lastSynced = cachedResults[1] as DateTime?;
+        // Set the provenance label even when there's no cached timeline (a scope
         // that synced successfully but had nothing to show), so its "updated"
         // time survives a restart/offline open.
-        if (hasCache || lastSynced != null) {
+        if (repoEvents.isNotEmpty || lastSynced != null) {
           setState(() {
-            if (hasCache) {
-              _data = cachedDetail;
-              _events = repoEvents;
-            }
+            if (repoEvents.isNotEmpty) _events = repoEvents;
             _lastSynced = lastSynced;
           });
         }
       }
 
-      // Phase B: refresh from the network and persist the detail snapshot.
+      // Phase B: refresh from the network and persist the detail snapshot. The
+      // save triggers the watch stream, which updates the rendered composite.
       final detailFuture = RepoDetailService.load(
         repoKey: _repo.repoKey,
         provider: _repo.provider,
@@ -118,16 +166,6 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
       final freshDetail = results[0] as RepoDetailData;
       final feed = results[1] as ActivityFeedResult;
       await RepoDetailStore.save(_repo.repoKey, freshDetail);
-      if (!mounted || seq != _loadSeq) return;
-      // Render the persisted detail (which keeps last-known-good rows for any
-      // source that failed this round) but carry the fresh per-source failure
-      // flags so each tab still shows "couldn't load". For the timeline, prefer
-      // the fresh scoped fetch and fall back to the cache when it's empty
-      // (offline), so it never blanks.
-      final mergedDetail = await RepoDetailStore.cached(
-        _repo.repoKey,
-        releasesSupported: _releasesSupported,
-      );
       if (!mounted || seq != _loadSeq) return;
       List<ActivityEvent> timeline = feed.events;
       // Fall back to the cached timeline only when the fresh fetch came back
@@ -153,16 +191,14 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
         );
         if (!mounted || seq != _loadSeq) return;
       }
+      // Overlay the fresh per-source failure flags on the streamed composite
+      // (which keeps last-known-good rows for any source that failed), and
+      // update the timeline. The persisted pulls/ci/releases come from the
+      // stream via the save above.
       setState(() {
-        _data = RepoDetailData(
-          pulls: mergedDetail.pulls,
-          ci: mergedDetail.ci,
-          releases: mergedDetail.releases,
-          releasesSupported: _releasesSupported,
-          pullsFailed: freshDetail.pullsFailed,
-          ciFailed: freshDetail.ciFailed,
-          releasesFailed: freshDetail.releasesFailed,
-        );
+        _pullsFailed = freshDetail.pullsFailed;
+        _ciFailed = freshDetail.ciFailed;
+        _releasesFailed = freshDetail.releasesFailed;
         _events = timeline;
         _feedFailed = feed.failedSources;
         _feedTruncated = feed.truncated;
@@ -173,8 +209,8 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
       debugPrint('RepoDetail failed to load: $e');
       if (!mounted || seq != _loadSeq) return;
       setState(() {
-        // Keep any cached content from Phase A; only show the error screen when
-        // there's nothing to show.
+        // Keep any cached content (timeline from Phase A, detail from the
+        // stream); only show the error screen when there's nothing to show.
         if (!_hasContent) {
           _error =
               'Something went wrong while loading this repository. '

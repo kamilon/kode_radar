@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
@@ -44,11 +46,78 @@ class RepoDetailStore {
     required bool releasesSupported,
     DateTime? now,
   }) {
-    final at = now ?? DateTime.now();
-    // Read all three tables under the same lock the mutators use, so a
-    // concurrent save/removeRepo can't interleave between the SELECTs and yield
-    // an inconsistent composite (e.g. pulls from before a save, runs from
-    // after).
+    return _read(
+      repoKey,
+      releasesSupported: releasesSupported,
+      now: now ?? DateTime.now(),
+    );
+  }
+
+  /// A reactive stream of the cached composite for [repoKey] that re-emits
+  /// whenever any of the three detail tables (pulls / CI / releases) change — so
+  /// a page bound to it renders the cache instantly on cold start and updates
+  /// automatically when a refresh (or a repo-delete prune) persists new data.
+  /// Each emission recomputes PR ages against the current time.
+  static Stream<RepoDetailData> watch(
+    String repoKey, {
+    required bool releasesSupported,
+  }) {
+    final db = _database;
+    late StreamController<RepoDetailData> controller;
+    StreamSubscription<Set<TableUpdate>>? updatesSub;
+
+    Future<void> emit() async {
+      try {
+        final data = await _read(
+          repoKey,
+          releasesSupported: releasesSupported,
+          now: DateTime.now(),
+        );
+        if (!controller.isClosed) controller.add(data);
+      } catch (e, st) {
+        if (!controller.isClosed) controller.addError(e, st);
+      }
+    }
+
+    controller = StreamController<RepoDetailData>(
+      onListen: () {
+        // Initial snapshot, then re-read on any change to the composite's
+        // tables. `onAllTables` fires when any of the three is written.
+        emit();
+        updatesSub = db
+            .tableUpdates(
+              TableUpdateQuery.onAllTables([
+                db.repoPulls,
+                db.repoRuns,
+                db.repoReleases,
+              ]),
+            )
+            .listen(
+              (_) => emit(),
+              onError: (Object e, StackTrace st) {
+                if (!controller.isClosed) controller.addError(e, st);
+              },
+              onDone: () {
+                if (!controller.isClosed) controller.close();
+              },
+            );
+      },
+      onCancel: () async {
+        await updatesSub?.cancel();
+      },
+    );
+    return controller.stream;
+  }
+
+  /// Reads the cached composite for [repoKey] at [now]. All three tables are
+  /// read under the same lock the mutators use, so a concurrent save/removeRepo
+  /// can't interleave between the SELECTs and yield an inconsistent composite
+  /// (e.g. pulls from before a save, runs from after).
+  static Future<RepoDetailData> _read(
+    String repoKey, {
+    required bool releasesSupported,
+    required DateTime now,
+  }) {
     return _runLocked(() async {
       final db = _database;
       final pulls =
@@ -67,7 +136,7 @@ class RepoDetailStore {
                 ..orderBy([(t) => OrderingTerm(expression: t.id)]))
               .get();
       return RepoDetailData(
-        pulls: pulls.map((row) => _toPr(row, at)).toList(),
+        pulls: pulls.map((row) => _toPr(row, now)).toList(),
         ci: runs.map(_toRun).toList(),
         releases: releases.map(_toRelease).toList(),
         releasesSupported: releasesSupported,
