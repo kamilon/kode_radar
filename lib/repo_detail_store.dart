@@ -54,9 +54,10 @@ class RepoDetailStore {
   }
 
   /// A reactive stream of the cached composite for [repoKey] that re-emits
-  /// whenever any of the three detail tables (pulls / CI / releases) change — so
-  /// a page bound to it renders the cache instantly on cold start and updates
-  /// automatically when a refresh (or a repo-delete prune) persists new data.
+  /// whenever this repo's pull-request or CI rows change — plus release rows for
+  /// providers that support releases ([releasesSupported]) — so a page bound to
+  /// it renders the cache instantly on cold start and updates automatically when
+  /// a refresh (or a repo-delete prune) persists new data.
   ///
   /// Each emission recomputes PR ages against the current time *at the moment of
   /// that emission*; ages don't tick forward between DB changes (a page that
@@ -96,7 +97,8 @@ class RepoDetailStore {
     controller = StreamController<RepoDetailData>(
       onListen: () {
         // Initial snapshot, then re-read on any change to the composite's
-        // tables. `onAllTables` fires when any of the three is written.
+        // tables. `onAllTables` fires when repo_pulls or repo_runs — and
+        // repo_releases when releases are supported — is written.
         emit();
         updatesSub = db
             .tableUpdates(
