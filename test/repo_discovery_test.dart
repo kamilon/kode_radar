@@ -103,29 +103,30 @@ void main() {
           },
       ];
       final client = MockClient((request) async {
-        if (request.url.path != '/user/repos') {
-          return http.Response('[]', 200);
+        if (request.url.path == '/user/repos') {
+          final page = request.url.queryParameters['page'];
+          if (page == null) {
+            // First page: a full page plus a Link header pointing to page 2.
+            return http.Response(
+              jsonEncode(reposPage('p1_', 100)),
+              200,
+              headers: {
+                'link':
+                    '<https://api.github.com/user/repos?per_page=100&page=2>; '
+                    'rel="next", '
+                    '<https://api.github.com/user/repos?per_page=100&page=2>; '
+                    'rel="last"',
+              },
+            );
+          }
+          if (page == '2') {
+            // Last page: no Link header, so paging stops here.
+            return http.Response(jsonEncode(reposPage('p2_', 5)), 200);
+          }
         }
-        final page = request.url.queryParameters['page'];
-        if (page == null) {
-          // First page: a full page plus a Link header pointing to page 2.
-          return http.Response(
-            jsonEncode(reposPage('p1_', 100)),
-            200,
-            headers: {
-              'link':
-                  '<https://api.github.com/user/repos?per_page=100&page=2>; '
-                  'rel="next", '
-                  '<https://api.github.com/user/repos?per_page=100&page=2>; '
-                  'rel="last"',
-            },
-          );
-        }
-        if (page == '2') {
-          // Last page: no Link header, so paging stops here.
-          return http.Response(jsonEncode(reposPage('p2_', 5)), 200);
-        }
-        return http.Response('[]', 200);
+        // Any other request means the pager hit the wrong endpoint or made an
+        // extra call — fail loudly rather than masking it with an empty page.
+        return fail('unexpected request: ${request.url}');
       });
 
       final result = await RepoDiscoveryService.fetch(
