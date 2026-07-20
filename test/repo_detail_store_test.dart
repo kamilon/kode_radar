@@ -211,19 +211,26 @@ void main() {
   });
 
   test('watch re-emits when CI or releases change', () async {
-    final ciCounts = <int>[];
+    final emissions = <({int ci, int releases})>[];
     final sub = RepoDetailStore.watch(repo, releasesSupported: true).listen((
       data,
     ) {
-      ciCounts.add(data.ci.length);
+      emissions.add((ci: data.ci.length, releases: data.releases.length));
     });
     await pumpEventQueue();
     await RepoDetailStore.save(repo, RepoDetailData(ci: [_run('build')]));
     await pumpEventQueue();
+    await RepoDetailStore.save(
+      repo,
+      RepoDetailData(releases: [_release('v1')]),
+    );
+    await pumpEventQueue();
     await sub.cancel();
 
-    expect(ciCounts.first, 0);
-    expect(ciCounts.last, 1);
+    // Initial empty, then a CI change, then a releases change each re-emit.
+    expect(emissions.first, (ci: 0, releases: 0));
+    expect(emissions.any((e) => e.ci == 1), isTrue);
+    expect(emissions.last.releases, 1);
   });
 
   test('v3 -> v4 upgrade creates working repo-detail tables', () async {

@@ -97,7 +97,7 @@ class RepoDetailStore {
               TableUpdateQuery.onAllTables([
                 db.repoPulls,
                 db.repoRuns,
-                db.repoReleases,
+                if (releasesSupported) db.repoReleases,
               ]),
             )
             .listen(
@@ -141,11 +141,14 @@ class RepoDetailStore {
                 ..where((t) => t.repoKey.equals(repoKey))
                 ..orderBy([(t) => OrderingTerm(expression: t.id)]))
               .get();
-      final releases =
-          await (db.select(db.repoReleases)
-                ..where((t) => t.repoKey.equals(repoKey))
-                ..orderBy([(t) => OrderingTerm(expression: t.id)]))
-              .get();
+      // Skip the releases query for providers that don't support releases
+      // (e.g. Azure DevOps) — nothing is ever persisted there for such repos.
+      final releases = releasesSupported
+          ? await (db.select(db.repoReleases)
+                  ..where((t) => t.repoKey.equals(repoKey))
+                  ..orderBy([(t) => OrderingTerm(expression: t.id)]))
+                .get()
+          : const <RepoReleaseRow>[];
       return RepoDetailData(
         pulls: pulls.map((row) => _toPr(row, now)).toList(),
         ci: runs.map(_toRun).toList(),
