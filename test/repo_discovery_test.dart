@@ -91,4 +91,113 @@ void main() {
       expect(result.repos.single.display, 'octocat/hello');
     },
   );
+
+  test(
+    'follows the Link header to page GitHub repos beyond one page',
+    () async {
+      List<Map<String, dynamic>> reposPage(String prefix, int count) => [
+        for (var i = 0; i < count; i++)
+          {
+            'name': '$prefix$i',
+            'owner': {'login': 'acme'},
+          },
+      ];
+      final client = MockClient((request) async {
+        if (request.url.path == '/user/repos') {
+          final page = request.url.queryParameters['page'];
+          if (page == null) {
+            // First page: a full page plus a Link header pointing to page 2.
+            return http.Response(
+              jsonEncode(reposPage('p1_', 100)),
+              200,
+              headers: {
+                'link':
+                    '<https://api.github.com/user/repos?per_page=100&page=2>; '
+                    'rel="next", '
+                    '<https://api.github.com/user/repos?per_page=100&page=2>; '
+                    'rel="last"',
+              },
+            );
+          }
+          if (page == '2') {
+            // Last page: no Link header, so paging stops here.
+            return http.Response(jsonEncode(reposPage('p2_', 5)), 200);
+          }
+        }
+        // Any other request means the pager hit the wrong endpoint or made an
+        // extra call — fail loudly rather than masking it with an empty page.
+        return fail('unexpected request: ${request.url}');
+      });
+
+      final result = await RepoDiscoveryService.fetch(
+        provider: TokenStore.providerGithub,
+        secret: 'ghp_secret',
+        org: '',
+        client: client,
+      );
+
+      // Both pages collected (100 + 5), and not marked truncated.
+      expect(result.repos.length, 105);
+      expect(result.truncated, isFalse);
+    },
+  );
+
+  test('stops after one page when there is no Link header', () async {
+    var requests = 0;
+    final client = MockClient((request) async {
+      requests++;
+      return http.Response(
+        jsonEncode([
+          {
+            'name': 'solo',
+            'owner': {'login': 'acme'},
+          },
+        ]),
+        200,
+      );
+    });
+
+    final result = await RepoDiscoveryService.fetch(
+      provider: TokenStore.providerGithub,
+      secret: 'ghp_secret',
+      org: '',
+      client: client,
+    );
+
+    expect(result.repos.length, 1);
+    expect(requests, 1);
+  });
+
+  test('does not follow a cross-host Link (no token leak)', () async {
+    final hosts = <String>[];
+    final client = MockClient((request) async {
+      hosts.add(request.url.host);
+      return http.Response(
+        jsonEncode([
+          {
+            'name': 'solo',
+            'owner': {'login': 'acme'},
+          },
+        ]),
+        200,
+        headers: {
+          // A hostile/proxying response pointing the next page at another host.
+          'link': '<https://evil.example.com/user/repos?page=2>; rel="next"',
+        },
+      );
+    });
+
+    final result = await RepoDiscoveryService.fetch(
+      provider: TokenStore.providerGithub,
+      secret: 'ghp_secret',
+      org: '',
+      client: client,
+    );
+
+    // The cross-host next link is rejected, so only api.github.com is hit, and
+    // the result is marked truncated (more pages existed but weren't followed).
+    expect(hosts, ['api.github.com']);
+    expect(result.repos.length, 1);
+    expect(result.truncated, isTrue);
+  });
 }

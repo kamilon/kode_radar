@@ -32,7 +32,7 @@ void main() {
 
       final client = MockClient((request) async {
         if (request.url.path == '/orgs/acme/repos' &&
-            request.url.queryParameters['page'] == '1') {
+            request.url.queryParameters['page'] == null) {
           return http.Response(
             jsonEncode([
               {
@@ -150,7 +150,7 @@ void main() {
 
     final client = MockClient((request) async {
       if (request.url.path == '/orgs/acme/repos' &&
-          request.url.queryParameters['page'] == '1') {
+          request.url.queryParameters['page'] == null) {
         return http.Response(
           jsonEncode([
             {
