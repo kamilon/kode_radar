@@ -74,6 +74,12 @@ class RepoDetailStore {
     late StreamController<RepoDetailData> controller;
     StreamSubscription<Set<TableUpdate>>? updatesSub;
 
+    // Concurrent emit() calls stay ordered because [_read] runs through the
+    // store's static [_runLocked] chain: reads execute in invocation order and
+    // each completes before the next starts, so their `controller.add`s fire in
+    // order. The initial emit() below is invoked before the update listener, so
+    // it's always queued first — a later table-change read can't overtake it and
+    // revert the stream to stale data.
     Future<void> emit() async {
       try {
         final data = await _read(
