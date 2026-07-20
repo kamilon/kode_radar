@@ -40,6 +40,10 @@ class RepoDiscoveryService {
 
   static const Duration _requestTimeout = Duration(seconds: 20);
 
+  /// Safety cap on paged GitHub requests (100 repos/page, so up to ~5000 repos)
+  /// so a pathologically large account can't spin forever.
+  static const int _maxRepoPages = 50;
+
   static String githubKey(String owner, String name) =>
       'github:${owner.toLowerCase()}/${name.toLowerCase()}';
 
@@ -169,9 +173,21 @@ class RepoDiscoveryService {
   }) async {
     final all = <DiscoveredRepo>[];
     var truncated = false;
-    // Cap pagination to avoid runaway requests.
-    for (var page = 1; page <= 10; page++) {
-      final uri = Uri.parse('$base?per_page=100&page=$page');
+    // Page by following GitHub's `Link` header (rel="next"), starting from the
+    // first page, with a generous safety cap. This fully pages accounts that
+    // have more repos than the old fixed 10-page (1000-repo) limit.
+    String? next = '$base?per_page=100';
+    final visited = <String>{};
+    var pages = 0;
+    while (next != null) {
+      // Stop (as truncated) at the safety cap or if a link repeats — the latter
+      // guards against a server returning a self-referential `next`.
+      if (pages >= _maxRepoPages || !visited.add(next)) {
+        truncated = true;
+        break;
+      }
+      pages++;
+      final uri = Uri.parse(next);
       final response = await client
           .get(
             uri,
@@ -181,7 +197,7 @@ class RepoDiscoveryService {
             },
           )
           .timeout(_requestTimeout);
-      if (response.statusCode == 404 && allow404 && page == 1) {
+      if (response.statusCode == 404 && allow404 && pages == 1) {
         return null;
       }
       if (response.statusCode != 200) {
@@ -190,11 +206,38 @@ class RepoDiscoveryService {
       final body = jsonDecode(response.body);
       if (body is! List || body.isEmpty) break;
       all.addAll(parseGithubRepos(body));
-      if (body.length < 100) break;
-      // A full final page means there may be more we did not fetch.
-      if (page == 10) truncated = true;
+      // Follow the server's rel="next" link; its absence means the last page.
+      next = _nextLink(response.headers['link']);
     }
     return RepoFetchResult(repos: all, truncated: truncated);
+  }
+
+  /// Extracts the `rel="next"` URL from a GitHub `Link` response header, or null
+  /// when there is no next page (or no/blank header). The header looks like:
+  /// `<https://api.github.com/...&page=2>; rel="next", <...>; rel="last"`.
+  ///
+  /// Only same-origin `https://api.github.com` URLs are returned; a next link to
+  /// any other host/scheme is rejected (returns null) so a hostile or proxying
+  /// response can't redirect the token-bearing request to another host.
+  static String? _nextLink(String? linkHeader) {
+    if (linkHeader == null || linkHeader.isEmpty) return null;
+    for (final part in linkHeader.split(',')) {
+      final segments = part.split(';');
+      if (segments.length < 2) continue;
+      final urlMatch = RegExp(r'<([^>]+)>').firstMatch(segments[0]);
+      if (urlMatch == null) continue;
+      final isNext = segments.skip(1).any((s) => s.contains('rel="next"'));
+      if (!isNext) continue;
+      final url = urlMatch.group(1)!;
+      final uri = Uri.tryParse(url);
+      if (uri == null ||
+          uri.scheme != 'https' ||
+          uri.host != 'api.github.com') {
+        return null;
+      }
+      return url;
+    }
+    return null;
   }
 
   static Future<RepoFetchResult> _fetchAdo(

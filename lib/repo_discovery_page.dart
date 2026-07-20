@@ -366,8 +366,9 @@ class _RepoDiscoveryPageState extends State<RepoDiscoveryPage> {
           if (_truncated) ...[
             const SizedBox(height: 12),
             Text(
-              'Showing the first 1000 repositories. Narrow the results by '
-              'organization to see the rest.',
+              'Some repositories were omitted because the account has a very '
+              'large number of them. Narrow the results by organization to see '
+              'the rest.',
               style: TextStyle(color: Colors.orange[800], fontSize: 12),
             ),
           ],
