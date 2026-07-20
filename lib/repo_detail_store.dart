@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
@@ -44,11 +46,97 @@ class RepoDetailStore {
     required bool releasesSupported,
     DateTime? now,
   }) {
-    final at = now ?? DateTime.now();
-    // Read all three tables under the same lock the mutators use, so a
-    // concurrent save/removeRepo can't interleave between the SELECTs and yield
-    // an inconsistent composite (e.g. pulls from before a save, runs from
-    // after).
+    return _read(
+      repoKey,
+      releasesSupported: releasesSupported,
+      now: now ?? DateTime.now(),
+    );
+  }
+
+  /// A reactive stream of the cached composite for [repoKey] that re-emits
+  /// whenever this repo's pull-request or CI rows change — plus release rows for
+  /// providers that support releases ([releasesSupported]) — so a page bound to
+  /// it renders the cache instantly on cold start and updates automatically when
+  /// a refresh (or a repo-delete prune) persists new data.
+  ///
+  /// Each emission recomputes PR ages against the current time *at the moment of
+  /// that emission*; ages don't tick forward between DB changes (a page that
+  /// needs a fresher age re-reads on its own load / cold start).
+  ///
+  /// drift's change notifications are table-granular, so this fires on a write
+  /// to any repo's rows in those tables (like the feed/attention `watch`
+  /// streams); the `WHERE repoKey` in [_read] keeps the emitted data correctly
+  /// scoped, and such cross-repo triggers are rare and cheap.
+  static Stream<RepoDetailData> watch(
+    String repoKey, {
+    required bool releasesSupported,
+  }) {
+    final db = _database;
+    late StreamController<RepoDetailData> controller;
+    StreamSubscription<Set<TableUpdate>>? updatesSub;
+
+    // Concurrent emit() calls stay ordered because [_read] runs through the
+    // store's static [_runLocked] chain: reads execute in invocation order and
+    // each completes before the next starts, so their `controller.add`s fire in
+    // order. The initial emit() below is invoked before the update listener, so
+    // it's always queued first — a later table-change read can't overtake it and
+    // revert the stream to stale data.
+    Future<void> emit() async {
+      try {
+        final data = await _read(
+          repoKey,
+          releasesSupported: releasesSupported,
+          now: DateTime.now(),
+        );
+        if (!controller.isClosed) controller.add(data);
+      } catch (e, st) {
+        if (!controller.isClosed) controller.addError(e, st);
+      }
+    }
+
+    controller = StreamController<RepoDetailData>(
+      onListen: () {
+        // Initial snapshot, then re-read on any change to the composite's
+        // tables. `onAllTables` fires when repo_pulls or repo_runs — and
+        // repo_releases when releases are supported — is written.
+        emit();
+        updatesSub = db
+            .tableUpdates(
+              TableUpdateQuery.onAllTables([
+                db.repoPulls,
+                db.repoRuns,
+                if (releasesSupported) db.repoReleases,
+              ]),
+            )
+            .listen(
+              (_) => emit(),
+              onError: (Object e, StackTrace st) {
+                if (!controller.isClosed) controller.addError(e, st);
+              },
+              onDone: () {
+                if (!controller.isClosed) controller.close();
+              },
+            );
+      },
+      onCancel: () async {
+        await updatesSub?.cancel();
+        // Close the controller so any emit() still in flight (guarded by
+        // isClosed) is dropped rather than buffered on a listener-less stream.
+        if (!controller.isClosed) await controller.close();
+      },
+    );
+    return controller.stream;
+  }
+
+  /// Reads the cached composite for [repoKey] at [now]. All three tables are
+  /// read under the same lock the mutators use, so a concurrent save/removeRepo
+  /// can't interleave between the SELECTs and yield an inconsistent composite
+  /// (e.g. pulls from before a save, runs from after).
+  static Future<RepoDetailData> _read(
+    String repoKey, {
+    required bool releasesSupported,
+    required DateTime now,
+  }) {
     return _runLocked(() async {
       final db = _database;
       final pulls =
@@ -61,13 +149,16 @@ class RepoDetailStore {
                 ..where((t) => t.repoKey.equals(repoKey))
                 ..orderBy([(t) => OrderingTerm(expression: t.id)]))
               .get();
-      final releases =
-          await (db.select(db.repoReleases)
-                ..where((t) => t.repoKey.equals(repoKey))
-                ..orderBy([(t) => OrderingTerm(expression: t.id)]))
-              .get();
+      // Skip the releases query for providers that don't support releases
+      // (e.g. Azure DevOps) — nothing is ever persisted there for such repos.
+      final releases = releasesSupported
+          ? await (db.select(db.repoReleases)
+                  ..where((t) => t.repoKey.equals(repoKey))
+                  ..orderBy([(t) => OrderingTerm(expression: t.id)]))
+                .get()
+          : const <RepoReleaseRow>[];
       return RepoDetailData(
-        pulls: pulls.map((row) => _toPr(row, at)).toList(),
+        pulls: pulls.map((row) => _toPr(row, now)).toList(),
         ci: runs.map(_toRun).toList(),
         releases: releases.map(_toRelease).toList(),
         releasesSupported: releasesSupported,

@@ -190,6 +190,49 @@ void main() {
     expect(cached.pulls.single.ageDays, 3);
   });
 
+  test('watch emits the composite and re-emits after a save', () async {
+    final emissions = <List<String>>[];
+    final sub = RepoDetailStore.watch(repo, releasesSupported: true).listen((
+      data,
+    ) {
+      emissions.add(data.pulls.map((p) => p.label).toList());
+    });
+    // Initial emission (empty cache).
+    await pumpEventQueue();
+    await RepoDetailStore.save(
+      repo,
+      RepoDetailData(pulls: [_pr('PR #1'), _pr('PR #2')]),
+    );
+    await pumpEventQueue();
+    await sub.cancel();
+
+    expect(emissions.first, isEmpty);
+    expect(emissions.last, ['PR #1', 'PR #2']);
+  });
+
+  test('watch re-emits when CI or releases change', () async {
+    final emissions = <({int ci, int releases})>[];
+    final sub = RepoDetailStore.watch(repo, releasesSupported: true).listen((
+      data,
+    ) {
+      emissions.add((ci: data.ci.length, releases: data.releases.length));
+    });
+    await pumpEventQueue();
+    await RepoDetailStore.save(repo, RepoDetailData(ci: [_run('build')]));
+    await pumpEventQueue();
+    await RepoDetailStore.save(
+      repo,
+      RepoDetailData(releases: [_release('v1')]),
+    );
+    await pumpEventQueue();
+    await sub.cancel();
+
+    // Initial empty, then a CI change, then a releases change each re-emit.
+    expect(emissions.first, (ci: 0, releases: 0));
+    expect(emissions.any((e) => e.ci == 1), isTrue);
+    expect(emissions.last.releases, 1);
+  });
+
   test('v3 -> v4 upgrade creates working repo-detail tables', () async {
     // Set user_version = 3 so opening AppDatabase runs onUpgrade(3 -> 4) rather
     // than onCreate; the other tables aren't materialized because the v4 step
