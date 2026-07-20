@@ -126,6 +126,14 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
     setState(() {
       _refreshing = true;
       _error = null;
+      // Clear the source-health indicators up front so a load that throws
+      // before producing fresh results can't leave stale "couldn't load"
+      // states (they're set fresh from this round's network result below).
+      _pullsFailed = false;
+      _ciFailed = false;
+      _releasesFailed = false;
+      _feedFailed = 0;
+      _feedTruncated = false;
     });
     try {
       // Phase A: render this repo's cached timeline events + provenance
