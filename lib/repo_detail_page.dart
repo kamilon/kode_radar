@@ -116,8 +116,8 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
               }
             });
           },
-          onError: (Object e) =>
-              debugPrint('RepoDetail watch stream error: $e'),
+          onError: (Object e, StackTrace st) =>
+              debugPrint('RepoDetail watch stream error: $e\n$st'),
         );
   }
 

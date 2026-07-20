@@ -57,7 +57,15 @@ class RepoDetailStore {
   /// whenever any of the three detail tables (pulls / CI / releases) change — so
   /// a page bound to it renders the cache instantly on cold start and updates
   /// automatically when a refresh (or a repo-delete prune) persists new data.
-  /// Each emission recomputes PR ages against the current time.
+  ///
+  /// Each emission recomputes PR ages against the current time *at the moment of
+  /// that emission*; ages don't tick forward between DB changes (a page that
+  /// needs a fresher age re-reads on its own load / cold start).
+  ///
+  /// drift's change notifications are table-granular, so this fires on a write
+  /// to any repo's rows in those tables (like the feed/attention `watch`
+  /// streams); the `WHERE repoKey` in [_read] keeps the emitted data correctly
+  /// scoped, and such cross-repo triggers are rare and cheap.
   static Stream<RepoDetailData> watch(
     String repoKey, {
     required bool releasesSupported,
@@ -104,6 +112,9 @@ class RepoDetailStore {
       },
       onCancel: () async {
         await updatesSub?.cancel();
+        // Close the controller so any emit() still in flight (guarded by
+        // isClosed) is dropped rather than buffered on a listener-less stream.
+        if (!controller.isClosed) await controller.close();
       },
     );
     return controller.stream;
