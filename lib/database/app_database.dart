@@ -95,6 +95,10 @@ class RepoPulls extends Table {
   IntColumn get createdAt => integer().nullable()();
   BoolColumn get draft => boolean()();
   TextColumn get url => text().nullable()();
+  TextColumn get mergeable => text().nullable()();
+  IntColumn get additions => integer().nullable()();
+  IntColumn get deletions => integer().nullable()();
+  IntColumn get changedFiles => integer().nullable()();
 }
 
 @DataClassName('RepoRunRow')
@@ -204,7 +208,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forExecutor(super.executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -323,6 +327,32 @@ class AppDatabase extends _$AppDatabase {
         } on Exception catch (e) {
           if (!e.toString().toLowerCase().contains('duplicate column')) {
             rethrow;
+          }
+        }
+      }
+      // v9 adds PR triage columns to repo_pulls (mergeable + diff size). Ensure
+      // the table exists, then add each column with an idempotent
+      // `ALTER TABLE ADD COLUMN`, tolerating "duplicate column" (concurrent
+      // migrator, or a jump from <4 where createTable already built the current
+      // schema).
+      if (from < 9) {
+        await m.createTable(repoPulls);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_repo_pulls_repo_key '
+          'ON repo_pulls (repo_key)',
+        );
+        for (final ddl in const [
+          'ALTER TABLE repo_pulls ADD COLUMN mergeable TEXT',
+          'ALTER TABLE repo_pulls ADD COLUMN additions INTEGER',
+          'ALTER TABLE repo_pulls ADD COLUMN deletions INTEGER',
+          'ALTER TABLE repo_pulls ADD COLUMN changed_files INTEGER',
+        ]) {
+          try {
+            await customStatement(ddl);
+          } on Exception catch (e) {
+            if (!e.toString().toLowerCase().contains('duplicate column')) {
+              rethrow;
+            }
           }
         }
       }

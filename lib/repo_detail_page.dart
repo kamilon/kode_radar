@@ -369,6 +369,7 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
 
   Widget _prTile(RepoPr pr) {
     final review = _reviewVisual(pr.reviewState);
+    final scheme = Theme.of(context).colorScheme;
     return ListTile(
       leading: Icon(review.icon, color: review.color),
       title: Row(
@@ -378,15 +379,40 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
             const SizedBox(width: 6),
             const _MiniChip(label: 'Draft'),
           ],
+          if (pr.mergeable == PrMergeable.conflicting) ...[
+            const SizedBox(width: 6),
+            _MiniChip(
+              label: 'Conflicts',
+              color: scheme.errorContainer,
+              textColor: scheme.onErrorContainer,
+            ),
+          ],
         ],
       ),
       subtitle: Text(
-        'by ${pr.author} · ${_ageText(pr.ageDays)} · ${review.label}',
+        _prSubtitle(pr, review.label),
         style: TextStyle(color: Colors.grey[600], fontSize: 12),
       ),
       trailing: pr.url != null ? const Icon(Icons.open_in_new, size: 16) : null,
       onTap: pr.url == null ? null : () => _open(pr.url!),
     );
+  }
+
+  /// The PR subtitle line, appending a `+adds −dels · N files` diff-size summary
+  /// when the provider reported it (GitHub does; Azure DevOps' list API
+  /// doesn't).
+  static String _prSubtitle(RepoPr pr, String reviewLabel) {
+    final buffer = StringBuffer(
+      'by ${pr.author} · ${_ageText(pr.ageDays)} · $reviewLabel',
+    );
+    if (pr.additions != null && pr.deletions != null) {
+      buffer.write(' · +${pr.additions} −${pr.deletions}');
+    }
+    final files = pr.changedFiles;
+    if (files != null) {
+      buffer.write(' · $files ${files == 1 ? 'file' : 'files'}');
+    }
+    return buffer.toString();
   }
 
   Widget _buildCiTab() {
@@ -544,7 +570,7 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
     }
   }
 
-  String _ageText(int? ageDays) {
+  static String _ageText(int? ageDays) {
     if (ageDays == null) return 'opened recently';
     if (ageDays <= 0) return 'opened today';
     if (ageDays == 1) return 'opened 1 day ago';
@@ -614,19 +640,21 @@ class _RepoDetailPageState extends State<RepoDetailPage> {
 }
 
 class _MiniChip extends StatelessWidget {
-  const _MiniChip({required this.label});
+  const _MiniChip({required this.label, this.color, this.textColor});
 
   final String label;
+  final Color? color;
+  final Color? textColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: color ?? Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(label, style: const TextStyle(fontSize: 10)),
+      child: Text(label, style: TextStyle(fontSize: 10, color: textColor)),
     );
   }
 }

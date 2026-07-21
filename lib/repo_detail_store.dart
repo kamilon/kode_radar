@@ -248,6 +248,10 @@ class RepoDetailStore {
       createdAt: createdAt,
       draft: row.draft,
       url: row.url,
+      mergeable: row.mergeable ?? PrMergeable.unknown,
+      additions: row.additions,
+      deletions: row.deletions,
+      changedFiles: row.changedFiles,
     );
   }
 
@@ -283,6 +287,10 @@ class RepoDetailStore {
         createdAt: Value(pr.createdAt?.toUtc().millisecondsSinceEpoch),
         draft: pr.draft,
         url: Value(pr.url),
+        mergeable: Value(pr.mergeable),
+        additions: Value(pr.additions),
+        deletions: Value(pr.deletions),
+        changedFiles: Value(pr.changedFiles),
       );
 
   static RepoRunsCompanion _runCompanion(String repoKey, RepoRun run) =>
