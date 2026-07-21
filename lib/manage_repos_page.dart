@@ -12,6 +12,7 @@ import 'ignore_store.dart';
 import 'manage_ignored_page.dart';
 import 'metric_store.dart';
 import 'monitored_repos.dart';
+import 'mute_store.dart';
 import 'repo_discovery_page.dart';
 import 'repo_discovery_service.dart';
 import 'repo_store.dart';
@@ -38,6 +39,7 @@ class _ManageReposPageState extends State<ManageReposPage> {
   List<Map<String, String>> _githubRepos = [];
   List<Map<String, String>> _adoRepos = [];
   Map<String, String> _tokenLabels = {};
+  Set<String> _mutedDisplays = {};
   bool _isLoading = true;
 
   @override
@@ -64,13 +66,38 @@ class _ManageReposPageState extends State<ManageReposPage> {
     final github = _parse(prefs.getStringList(_githubKey) ?? []);
     final ado = _parse(prefs.getStringList(_adoKey) ?? []);
     final tokens = await TokenStore.getTokens();
+    final muted = await MuteStore.mutedDisplays();
     if (!mounted) return;
     setState(() {
       _githubRepos = github;
       _adoRepos = ado;
       _tokenLabels = {for (final t in tokens) t.id: t.label};
+      _mutedDisplays = muted;
       _isLoading = false;
     });
+  }
+
+  Future<void> _toggleMute(String display) async {
+    final nowMuted = !_mutedDisplays.contains(display);
+    // Optimistically update so the icon flips immediately.
+    setState(() {
+      _mutedDisplays = {..._mutedDisplays};
+      if (nowMuted) {
+        _mutedDisplays.add(display);
+      } else {
+        _mutedDisplays.remove(display);
+      }
+    });
+    await MuteStore.setMuted(display, nowMuted);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          nowMuted ? 'Muted notifications for $display' : 'Unmuted $display',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _deleteRepoAt(String storageKey, int index) async {
@@ -206,6 +233,7 @@ class _ManageReposPageState extends State<ManageReposPage> {
         await RepoDetailStore.removeRepo(repoKey);
         await SyncStateStore.remove(SyncStateStore.repoScope(repoKey));
         await TeamStore.removeRepoFromAll(repoKey);
+        await MuteStore.remove(label);
       }
     }
     if (!mounted) return;
@@ -221,6 +249,7 @@ class _ManageReposPageState extends State<ManageReposPage> {
   }
 
   Future<void> _editGithub(int index, Map<String, String> repo) async {
+    final oldDisplay = _githubLabel(repo);
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -233,9 +262,15 @@ class _ManageReposPageState extends State<ManageReposPage> {
       ),
     );
     await _loadRepos();
+    if (!mounted) return;
+    await _migrateMuteAfterEdit(
+      oldDisplay,
+      index < _githubRepos.length ? _githubLabel(_githubRepos[index]) : null,
+    );
   }
 
   Future<void> _editAdo(int index, Map<String, String> repo) async {
+    final oldDisplay = _adoLabel(repo);
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -249,6 +284,32 @@ class _ManageReposPageState extends State<ManageReposPage> {
       ),
     );
     await _loadRepos();
+    if (!mounted) return;
+    await _migrateMuteAfterEdit(
+      oldDisplay,
+      index < _adoRepos.length ? _adoLabel(_adoRepos[index]) : null,
+    );
+  }
+
+  /// Moves any mute from a repo's old display to its new one after an edit that
+  /// changed its identity, so the mute isn't silently lost / left orphaned.
+  Future<void> _migrateMuteAfterEdit(
+    String oldDisplay,
+    String? newDisplay,
+  ) async {
+    if (newDisplay == null ||
+        newDisplay == oldDisplay ||
+        !_mutedDisplays.contains(oldDisplay)) {
+      return;
+    }
+    await MuteStore.setMuted(oldDisplay, false);
+    await MuteStore.setMuted(newDisplay, true);
+    if (!mounted) return;
+    setState(() {
+      _mutedDisplays = {..._mutedDisplays}
+        ..remove(oldDisplay)
+        ..add(newDisplay);
+    });
   }
 
   Future<void> _addRepo() async {
@@ -395,6 +456,8 @@ class _ManageReposPageState extends State<ManageReposPage> {
               icon: Icons.code,
               label: label,
               subtitle: _repoSubtitle('GitHub', repo),
+              muted: _mutedDisplays.contains(label),
+              onToggleMute: invalid ? null : () => _toggleMute(label),
               onEdit: invalid ? null : () => _editGithub(index, repo),
               onDelete: () => _handleDelete(
                 _githubKey,
@@ -418,6 +481,8 @@ class _ManageReposPageState extends State<ManageReposPage> {
               icon: Icons.account_tree,
               label: label,
               subtitle: _repoSubtitle('Azure DevOps', repo),
+              muted: _mutedDisplays.contains(label),
+              onToggleMute: invalid ? null : () => _toggleMute(label),
               onEdit: invalid ? null : () => _editAdo(index, repo),
               onDelete: () => _handleDelete(
                 _adoKey,
@@ -465,6 +530,8 @@ class _ManageReposPageState extends State<ManageReposPage> {
     required IconData icon,
     required String label,
     required String subtitle,
+    required bool muted,
+    required VoidCallback? onToggleMute,
     required VoidCallback? onEdit,
     required VoidCallback onDelete,
   }) {
@@ -475,6 +542,15 @@ class _ManageReposPageState extends State<ManageReposPage> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (onToggleMute != null)
+            IconButton(
+              icon: Icon(
+                muted ? Icons.notifications_off : Icons.notifications_none,
+              ),
+              color: muted ? Colors.orange : null,
+              tooltip: muted ? 'Unmute notifications' : 'Mute notifications',
+              onPressed: onToggleMute,
+            ),
           if (onEdit != null)
             IconButton(
               icon: const Icon(Icons.edit),
