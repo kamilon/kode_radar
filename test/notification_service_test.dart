@@ -239,6 +239,13 @@ void main() {
         NotificationService.isTrustedPrUrl('https://dev.azure.com/org/proj'),
         isFalse,
       );
+      // Missing the leading /{org}/{project} segments (regex fully anchored).
+      expect(
+        NotificationService.isTrustedPrUrl(
+          'https://dev.azure.com/_git/repo/pullrequest/1',
+        ),
+        isFalse,
+      );
     });
   });
 }

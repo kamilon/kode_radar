@@ -176,7 +176,9 @@ class NotificationService {
     }
     // Azure DevOps: /{org}/{project}/_git/{repo}/pullrequest/{id}
     if (uri.host == 'dev.azure.com') {
-      return RegExp(r'/_git/[^/]+/pullrequest/\d+/?$').hasMatch(path);
+      return RegExp(
+        r'^/[^/]+/[^/]+/_git/[^/]+/pullrequest/\d+/?$',
+      ).hasMatch(path);
     }
     return false;
   }

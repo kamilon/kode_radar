@@ -246,8 +246,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _openNotificationUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      debugPrint('Notification URL not parseable: $url');
+      return;
+    }
     try {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) debugPrint('launchUrl returned false for: $url');
     } catch (e) {
       debugPrint('Failed to open notification URL: $e');
     }
