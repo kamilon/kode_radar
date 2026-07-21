@@ -18,6 +18,17 @@ class NotificationService {
   static const String _channelDescription =
       'Notifications for new Attention Inbox items';
 
+  /// Payload marking a summary notification whose tap should open the Attention
+  /// Inbox (used when there isn't a single obvious item to deep-link to).
+  static const String attentionPayload = 'attention';
+
+  /// The payload of the most recently tapped notification, for the app shell to
+  /// route (open the inbox, or launch a single item's URL). The shell resets it
+  /// to null once consumed.
+  static final ValueNotifier<String?> tappedPayload = ValueNotifier<String?>(
+    null,
+  );
+
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
@@ -138,6 +149,53 @@ class NotificationService {
   static Set<String> diffNew(Set<String> seen, Iterable<String> current) =>
       current.toSet().difference(seen);
 
+  /// The payload for a summary notification. When exactly one new item is being
+  /// notified and it has a trusted PR URL, the payload is that URL so a tap can
+  /// open that PR directly; otherwise it is [attentionPayload], so a tap opens
+  /// the Attention Inbox (the right target for a multi-item summary).
+  @visibleForTesting
+  static String payloadFor(List<AttentionItem> newItems) {
+    if (newItems.length == 1 && isTrustedPrUrl(newItems.single.url)) {
+      return newItems.single.url!;
+    }
+    return attentionPayload;
+  }
+
+  /// Whether [url] is a PR URL we're willing to open from a notification tap:
+  /// `https` on a known provider host. This rejects a forged payload (e.g. an
+  /// Android intent crafted with an arbitrary URL) even though our own payloads
+  /// are always provider URLs.
+  static bool isTrustedPrUrl(String? url) {
+    if (url == null) return false;
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.scheme != 'https') return false;
+    return uri.host == 'github.com' || uri.host == 'dev.azure.com';
+  }
+
+  static void _onNotificationResponse(NotificationResponse response) {
+    tappedPayload.value = response.payload;
+  }
+
+  static bool _launchPayloadTaken = false;
+
+  /// The payload of the notification that launched the app from a terminated
+  /// state (cold start), or null. Returns it at most once per process, so a
+  /// shell rebuild can't re-open the same launch URL; live taps arrive via
+  /// [tappedPayload].
+  static Future<String?> takeLaunchPayload() async {
+    if (_launchPayloadTaken || !_isSupportedPlatform) return null;
+    _launchPayloadTaken = true;
+    try {
+      final details = await _plugin.getNotificationAppLaunchDetails();
+      if (details?.didNotificationLaunchApp ?? false) {
+        return details!.notificationResponse?.payload;
+      }
+    } catch (e) {
+      debugPrint('Failed to read notification launch details: $e');
+    }
+    return null;
+  }
+
   /// The ids to notify about: ids new since [seen], minus ids that belong to a
   /// repo appearing for the first time (a newly added repo's existing backlog
   /// is seeded silently rather than replayed). Returns nothing on the first run.
@@ -214,7 +272,10 @@ class NotificationService {
         iOS: DarwinInitializationSettings(),
         macOS: DarwinInitializationSettings(),
       );
-      await _plugin.initialize(settings: settings);
+      await _plugin.initialize(
+        settings: settings,
+        onDidReceiveNotificationResponse: _onNotificationResponse,
+      );
       // Android 13+ (API 33+) requires the runtime POST_NOTIFICATIONS grant.
       await _plugin
           .resolvePlatformSpecificImplementation<
@@ -246,6 +307,7 @@ class NotificationService {
         title: _summaryTitle(newItems.length),
         body: _summaryBody(newItems),
         notificationDetails: details,
+        payload: payloadFor(newItems),
       );
     } catch (e) {
       debugPrint('Failed to show attention notification: $e');

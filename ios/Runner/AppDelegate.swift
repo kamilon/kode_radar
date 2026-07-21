@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import UserNotifications
 import workmanager_apple
 
 @main
@@ -8,6 +9,13 @@ import workmanager_apple
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    // Receive notification taps so flutter_local_notifications can forward the
+    // tapped payload (and launch details) to Dart. The iOS plugin registers as
+    // an application delegate but does not set the UNUserNotificationCenter
+    // delegate itself, so we must — otherwise taps are never delivered.
+    if #available(iOS 10.0, *) {
+      UNUserNotificationCenter.current().delegate = self as UNUserNotificationCenterDelegate
+    }
     // Make plugins available to the background isolate that workmanager spins up
     // for BGTaskScheduler work.
     WorkmanagerPlugin.setPluginRegistrantCallback { registry in

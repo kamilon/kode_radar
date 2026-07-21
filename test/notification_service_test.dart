@@ -130,4 +130,97 @@ void main() {
       expect(pending, isEmpty);
     });
   });
+
+  group('payloadFor', () {
+    AttentionItem itemWithUrl(String id, String? url) => AttentionItem(
+      id: id,
+      category: 'reviewRequested',
+      severity: 3000,
+      titleTemplate: id,
+      subtitleTemplate: '',
+      repoDisplay: 'owner/repo',
+      url: url,
+    );
+
+    test('a single item with a trusted https PR URL deep-links to it', () {
+      expect(
+        NotificationService.payloadFor([
+          itemWithUrl('a', 'https://github.com/owner/repo/pull/1'),
+        ]),
+        'https://github.com/owner/repo/pull/1',
+      );
+    });
+
+    test('a single item without a URL opens the inbox', () {
+      expect(
+        NotificationService.payloadFor([itemWithUrl('a', null)]),
+        NotificationService.attentionPayload,
+      );
+    });
+
+    test('a single item with a non-https URL opens the inbox', () {
+      expect(
+        NotificationService.payloadFor([
+          itemWithUrl('a', 'http://github.com/owner/repo/pull/1'),
+        ]),
+        NotificationService.attentionPayload,
+      );
+    });
+
+    test('a single item on an untrusted host opens the inbox', () {
+      expect(
+        NotificationService.payloadFor([
+          itemWithUrl('a', 'https://evil.example.com/owner/repo/pull/1'),
+        ]),
+        NotificationService.attentionPayload,
+      );
+    });
+
+    test('multiple items open the inbox', () {
+      expect(
+        NotificationService.payloadFor([
+          itemWithUrl('a', 'https://github.com/owner/repo/pull/1'),
+          itemWithUrl('b', 'https://github.com/owner/repo/pull/2'),
+        ]),
+        NotificationService.attentionPayload,
+      );
+    });
+
+    test('an empty list opens the inbox', () {
+      expect(
+        NotificationService.payloadFor(const []),
+        NotificationService.attentionPayload,
+      );
+    });
+  });
+
+  group('isTrustedPrUrl', () {
+    test('accepts https github.com and dev.azure.com', () {
+      expect(
+        NotificationService.isTrustedPrUrl(
+          'https://github.com/owner/repo/pull/1',
+        ),
+        isTrue,
+      );
+      expect(
+        NotificationService.isTrustedPrUrl(
+          'https://dev.azure.com/org/proj/_git/repo/pullrequest/2',
+        ),
+        isTrue,
+      );
+    });
+
+    test('rejects null, non-https, and other hosts', () {
+      expect(NotificationService.isTrustedPrUrl(null), isFalse);
+      expect(
+        NotificationService.isTrustedPrUrl('http://github.com/x'),
+        isFalse,
+      );
+      expect(
+        NotificationService.isTrustedPrUrl('https://evil.example.com/x'),
+        isFalse,
+      );
+      expect(NotificationService.isTrustedPrUrl('not a url'), isFalse);
+    });
+  });
 }
