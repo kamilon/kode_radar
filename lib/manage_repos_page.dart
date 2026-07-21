@@ -88,7 +88,30 @@ class _ManageReposPageState extends State<ManageReposPage> {
         _mutedDisplays.remove(display);
       }
     });
-    await MuteStore.setMuted(display, nowMuted);
+    try {
+      await MuteStore.setMuted(display, nowMuted);
+    } catch (_) {
+      // Persistence failed: roll the optimistic flip back so the icon reflects
+      // the stored state, and surface the failure instead of a false success.
+      if (!mounted) return;
+      setState(() {
+        _mutedDisplays = {..._mutedDisplays};
+        if (nowMuted) {
+          _mutedDisplays.remove(display);
+        } else {
+          _mutedDisplays.add(display);
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            nowMuted ? 'Could not mute $display' : 'Could not unmute $display',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -223,8 +246,9 @@ class _ManageReposPageState extends State<ManageReposPage> {
     // trend history or team assignments as a stale, otherwise-unbounded key.
     // Skip pruning when a duplicate entry still resolves to the same canonical
     // key, so shared data isn't removed out from under the surviving entry.
+    final remaining = await listMonitoredRepos();
     if (repoKey != null) {
-      final stillMonitored = (await listMonitoredRepos()).any(
+      final stillMonitored = remaining.any(
         (monitored) => monitored.repoKey == repoKey,
       );
       if (!stillMonitored) {
@@ -233,8 +257,14 @@ class _ManageReposPageState extends State<ManageReposPage> {
         await RepoDetailStore.removeRepo(repoKey);
         await SyncStateStore.remove(SyncStateStore.repoScope(repoKey));
         await TeamStore.removeRepoFromAll(repoKey);
-        await MuteStore.remove(label);
       }
+    }
+    // Mutes are keyed by display label, not repoKey, so prune independently:
+    // drop the deleted label's mute only when no surviving entry still shows
+    // that exact display (a same-key duplicate with different casing keeps its
+    // own mute, and doesn't strand the deleted display's mute).
+    if (!remaining.any((monitored) => monitored.displayName == label)) {
+      await MuteStore.remove(label);
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
