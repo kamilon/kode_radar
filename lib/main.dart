@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:tray_manager/tray_manager.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'radar_page.dart';
@@ -187,6 +188,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this); // Observe app lifecycle.
+    // Route notification taps: a live tap updates tappedPayload, and a cold
+    // start (app launched by tapping a notification) is read once here.
+    NotificationService.tappedPayload.addListener(_onNotificationTap);
+    unawaited(_handleLaunchNotification());
     final initialState = WidgetsBinding.instance.lifecycleState;
     if (initialState != null && _lifecyclePolicy.isBackground(initialState)) {
       // Launched directly into the background. Record the state; on desktop keep
@@ -208,8 +213,53 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    NotificationService.tappedPayload.removeListener(_onNotificationTap);
     _cancelPollingTimers(); // Stop all polling when the widget is disposed.
     super.dispose();
+  }
+
+  /// Handles a live notification tap (while the app is running): consume the
+  /// payload and route it.
+  void _onNotificationTap() {
+    final payload = NotificationService.tappedPayload.value;
+    if (payload == null) return;
+    NotificationService.tappedPayload.value = null; // consume once
+    _routeNotificationPayload(payload);
+  }
+
+  /// Handles the cold-start case: if a notification launched the app, route its
+  /// payload once.
+  Future<void> _handleLaunchNotification() async {
+    final payload = await NotificationService.takeLaunchPayload();
+    if (!mounted || payload == null) return;
+    _routeNotificationPayload(payload);
+  }
+
+  void _routeNotificationPayload(String payload) {
+    // Always land on the Attention Inbox for in-app context; if the payload is
+    // a trusted PR URL, also open that PR directly.
+    _onSelectTab(0);
+    if (payload == NotificationService.attentionPayload) return;
+    if (NotificationService.isTrustedPrUrl(payload)) {
+      unawaited(_openNotificationUrl(payload));
+    }
+  }
+
+  Future<void> _openNotificationUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      debugPrint('Notification URL not parseable: $url');
+      return;
+    }
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) debugPrint('launchUrl returned false for: $url');
+    } catch (e) {
+      debugPrint('Failed to open notification URL: $e');
+    }
   }
 
   void _cancelPollingTimers() {
