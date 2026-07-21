@@ -14,7 +14,7 @@ import workmanager_apple
     // an application delegate but does not set the UNUserNotificationCenter
     // delegate itself, so we must — otherwise taps are never delivered.
     if #available(iOS 10.0, *) {
-      UNUserNotificationCenter.current().delegate = self as UNUserNotificationCenterDelegate
+      UNUserNotificationCenter.current().delegate = self
     }
     // Make plugins available to the background isolate that workmanager spins up
     // for BGTaskScheduler work.

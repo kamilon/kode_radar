@@ -162,14 +162,23 @@ class NotificationService {
   }
 
   /// Whether [url] is a PR URL we're willing to open from a notification tap:
-  /// `https` on a known provider host. This rejects a forged payload (e.g. an
-  /// Android intent crafted with an arbitrary URL) even though our own payloads
-  /// are always provider URLs.
+  /// `https` on a known provider host **and** matching that provider's PR path
+  /// shape. This rejects a forged payload (e.g. an Android intent crafted with
+  /// an arbitrary URL) from opening some other page on a trusted host.
   static bool isTrustedPrUrl(String? url) {
     if (url == null) return false;
     final uri = Uri.tryParse(url);
     if (uri == null || uri.scheme != 'https') return false;
-    return uri.host == 'github.com' || uri.host == 'dev.azure.com';
+    final path = uri.path;
+    // GitHub: /{owner}/{repo}/pull/{number}
+    if (uri.host == 'github.com') {
+      return RegExp(r'^/[^/]+/[^/]+/pull/\d+/?$').hasMatch(path);
+    }
+    // Azure DevOps: /{org}/{project}/_git/{repo}/pullrequest/{id}
+    if (uri.host == 'dev.azure.com') {
+      return RegExp(r'/_git/[^/]+/pullrequest/\d+/?$').hasMatch(path);
+    }
+    return false;
   }
 
   static void _onNotificationResponse(NotificationResponse response) {

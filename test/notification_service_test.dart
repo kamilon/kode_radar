@@ -195,7 +195,7 @@ void main() {
   });
 
   group('isTrustedPrUrl', () {
-    test('accepts https github.com and dev.azure.com', () {
+    test('accepts well-formed github.com and dev.azure.com PR URLs', () {
       expect(
         NotificationService.isTrustedPrUrl(
           'https://github.com/owner/repo/pull/1',
@@ -213,7 +213,7 @@ void main() {
     test('rejects null, non-https, and other hosts', () {
       expect(NotificationService.isTrustedPrUrl(null), isFalse);
       expect(
-        NotificationService.isTrustedPrUrl('http://github.com/x'),
+        NotificationService.isTrustedPrUrl('http://github.com/o/r/pull/1'),
         isFalse,
       );
       expect(
@@ -221,6 +221,24 @@ void main() {
         isFalse,
       );
       expect(NotificationService.isTrustedPrUrl('not a url'), isFalse);
+    });
+
+    test('rejects non-PR paths on a trusted host', () {
+      // A forged payload can't open arbitrary pages on github.com/dev.azure.com.
+      expect(
+        NotificationService.isTrustedPrUrl(
+          'https://github.com/owner/repo/issues/1',
+        ),
+        isFalse,
+      );
+      expect(
+        NotificationService.isTrustedPrUrl('https://github.com/settings'),
+        isFalse,
+      );
+      expect(
+        NotificationService.isTrustedPrUrl('https://dev.azure.com/org/proj'),
+        isFalse,
+      );
     });
   });
 }
