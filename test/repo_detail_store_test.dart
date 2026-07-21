@@ -9,6 +9,10 @@ RepoPr _pr(
   String label, {
   String reviewState = 'waiting',
   DateTime? createdAt,
+  String mergeable = PrMergeable.unknown,
+  int? additions,
+  int? deletions,
+  int? changedFiles,
 }) => RepoPr(
   label: label,
   title: 'title $label',
@@ -17,6 +21,10 @@ RepoPr _pr(
   ageDays: 3,
   createdAt: createdAt,
   url: 'https://example.com/$label',
+  mergeable: mergeable,
+  additions: additions,
+  deletions: deletions,
+  changedFiles: changedFiles,
 );
 
 RepoRun _run(String name, {String conclusion = 'success'}) => RepoRun(
@@ -299,6 +307,70 @@ void main() {
     // recomputed from the created_at added by the migration.
     expect(cached.pulls.map((p) => p.label).toList(), ['PR #1']);
     expect(cached.pulls.single.ageDays, 5);
+
+    await upgraded.close();
+  });
+
+  test('save/cached round-trips PR triage signals', () async {
+    await RepoDetailStore.save(
+      repo,
+      RepoDetailData(
+        pulls: [
+          _pr(
+            'PR #1',
+            mergeable: PrMergeable.conflicting,
+            additions: 120,
+            deletions: 30,
+            changedFiles: 4,
+          ),
+        ],
+      ),
+    );
+    final cached = await RepoDetailStore.cached(repo, releasesSupported: true);
+    final pr = cached.pulls.single;
+    expect(pr.mergeable, PrMergeable.conflicting);
+    expect(pr.additions, 120);
+    expect(pr.deletions, 30);
+    expect(pr.changedFiles, 4);
+  });
+
+  test('v8 -> v9 upgrade adds the PR triage columns', () async {
+    // Build a v8-era database: repo_pulls WITHOUT the triage columns (plus the
+    // sibling tables cached() reads). Opening AppDatabase runs onUpgrade(8 -> 9),
+    // which ADDs mergeable/additions/deletions/changed_files.
+    final native = sqlite3.openInMemory();
+    native.execute(
+      'CREATE TABLE repo_pulls (id INTEGER PRIMARY KEY AUTOINCREMENT, '
+      'repo_key TEXT NOT NULL, label TEXT NOT NULL, title TEXT NOT NULL, '
+      'author TEXT NOT NULL, review_state TEXT NOT NULL, age_days INTEGER, '
+      'created_at INTEGER, draft INTEGER NOT NULL, url TEXT)',
+    );
+    native.execute(
+      'CREATE TABLE repo_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, '
+      'repo_key TEXT NOT NULL, name TEXT NOT NULL, status TEXT NOT NULL, '
+      'conclusion TEXT NOT NULL, branch TEXT, finished_at INTEGER, url TEXT)',
+    );
+    native.execute(
+      'CREATE TABLE repo_releases (id INTEGER PRIMARY KEY AUTOINCREMENT, '
+      'repo_key TEXT NOT NULL, tag TEXT NOT NULL, name TEXT, author TEXT, '
+      'published_at INTEGER, url TEXT)',
+    );
+    native.execute('PRAGMA user_version = 8;');
+
+    final upgraded = AppDatabase.forExecutor(
+      NativeDatabase.opened(native, closeUnderlyingOnClose: true),
+    );
+    RepoDetailStore.debugUseDatabase(upgraded);
+
+    await RepoDetailStore.save(
+      repo,
+      RepoDetailData(
+        pulls: [_pr('PR #1', mergeable: PrMergeable.conflicting, additions: 5)],
+      ),
+    );
+    final cached = await RepoDetailStore.cached(repo, releasesSupported: true);
+    expect(cached.pulls.single.mergeable, PrMergeable.conflicting);
+    expect(cached.pulls.single.additions, 5);
 
     await upgraded.close();
   });

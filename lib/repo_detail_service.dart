@@ -16,6 +16,13 @@ abstract final class PrReviewState {
   static const String none = 'none';
 }
 
+/// Whether a PR can be merged cleanly (a triage signal).
+abstract final class PrMergeable {
+  static const String mergeable = 'mergeable';
+  static const String conflicting = 'conflicting';
+  static const String unknown = 'unknown';
+}
+
 /// An open pull request shown on the repo detail screen.
 class RepoPr {
   const RepoPr({
@@ -27,6 +34,10 @@ class RepoPr {
     this.createdAt,
     this.draft = false,
     this.url,
+    this.mergeable = PrMergeable.unknown,
+    this.additions,
+    this.deletions,
+    this.changedFiles,
   });
 
   final String label; // e.g. "PR #7"
@@ -40,6 +51,16 @@ class RepoPr {
   final DateTime? createdAt;
   final bool draft;
   final String? url;
+
+  /// Whether the PR merges cleanly (one of [PrMergeable]). GitHub reports this
+  /// directly; Azure DevOps maps from `mergeStatus`. Defaults to `unknown`.
+  final String mergeable;
+
+  /// Diff size, when the provider reports it (GitHub does; ADO's list API does
+  /// not, so these stay null there).
+  final int? additions;
+  final int? deletions;
+  final int? changedFiles;
 }
 
 /// A CI run/build for the repo.
@@ -130,7 +151,8 @@ class RepoDetailService {
       r'query($owner:String!,$name:String!){'
       r'repository(owner:$owner,name:$name){'
       r'pullRequests(states:OPEN,first:50,orderBy:{field:UPDATED_AT,direction:DESC}){'
-      r'nodes{number title url isDraft createdAt '
+      r'nodes{number title url isDraft createdAt mergeable '
+      r'additions deletions changedFiles '
       r'author{login} reviewDecision reviewRequests(first:1){totalCount}}'
       r'}}}';
 
@@ -162,6 +184,10 @@ class RepoDetailService {
           createdAt: _parseDate(pr['createdAt']),
           draft: pr['isDraft'] == true,
           url: _str(pr, 'url'),
+          mergeable: _mergeableFromGithub(_str(pr, 'mergeable')),
+          additions: _int(pr['additions']),
+          deletions: _int(pr['deletions']),
+          changedFiles: _int(pr['changedFiles']),
         ),
       );
     }
@@ -248,6 +274,7 @@ class RepoDetailService {
           createdAt: _parseDate(pr['creationDate']),
           draft: draft,
           url: url,
+          mergeable: _mergeableFromAdo(_str(pr, 'mergeStatus')),
         ),
       );
     }
@@ -629,6 +656,37 @@ class RepoDetailService {
   static String? _str(Map map, String key) {
     final value = map[key];
     return value is String ? value : null;
+  }
+
+  static int? _int(dynamic value) => value is int ? value : null;
+
+  /// Normalizes GitHub GraphQL `mergeable` (MERGEABLE / CONFLICTING / UNKNOWN)
+  /// to a [PrMergeable] value.
+  static String _mergeableFromGithub(String? value) {
+    switch (value) {
+      case 'MERGEABLE':
+        return PrMergeable.mergeable;
+      case 'CONFLICTING':
+        return PrMergeable.conflicting;
+      default:
+        return PrMergeable.unknown;
+    }
+  }
+
+  /// Normalizes an Azure DevOps `mergeStatus` to a [PrMergeable] value. Only
+  /// `conflicts` is a real merge conflict; `failure`/`rejectedByPolicy` are
+  /// policy/other blocks (not git conflicts) and everything else
+  /// (queued/notSet/succeeded-not-yet) is treated as `unknown` so the
+  /// "Conflicts" chip means exactly that.
+  static String _mergeableFromAdo(String? value) {
+    switch (value) {
+      case 'succeeded':
+        return PrMergeable.mergeable;
+      case 'conflicts':
+        return PrMergeable.conflicting;
+      default:
+        return PrMergeable.unknown;
+    }
   }
 
   static Map<String, dynamic>? _decode(String raw) {

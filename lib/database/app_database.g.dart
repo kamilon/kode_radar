@@ -2040,6 +2040,50 @@ class $RepoPullsTable extends RepoPulls
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _mergeableMeta = const VerificationMeta(
+    'mergeable',
+  );
+  @override
+  late final GeneratedColumn<String> mergeable = GeneratedColumn<String>(
+    'mergeable',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _additionsMeta = const VerificationMeta(
+    'additions',
+  );
+  @override
+  late final GeneratedColumn<int> additions = GeneratedColumn<int>(
+    'additions',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletionsMeta = const VerificationMeta(
+    'deletions',
+  );
+  @override
+  late final GeneratedColumn<int> deletions = GeneratedColumn<int>(
+    'deletions',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _changedFilesMeta = const VerificationMeta(
+    'changedFiles',
+  );
+  @override
+  late final GeneratedColumn<int> changedFiles = GeneratedColumn<int>(
+    'changed_files',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2052,6 +2096,10 @@ class $RepoPullsTable extends RepoPulls
     createdAt,
     draft,
     url,
+    mergeable,
+    additions,
+    deletions,
+    changedFiles,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2137,6 +2185,33 @@ class $RepoPullsTable extends RepoPulls
         url.isAcceptableOrUnknown(data['url']!, _urlMeta),
       );
     }
+    if (data.containsKey('mergeable')) {
+      context.handle(
+        _mergeableMeta,
+        mergeable.isAcceptableOrUnknown(data['mergeable']!, _mergeableMeta),
+      );
+    }
+    if (data.containsKey('additions')) {
+      context.handle(
+        _additionsMeta,
+        additions.isAcceptableOrUnknown(data['additions']!, _additionsMeta),
+      );
+    }
+    if (data.containsKey('deletions')) {
+      context.handle(
+        _deletionsMeta,
+        deletions.isAcceptableOrUnknown(data['deletions']!, _deletionsMeta),
+      );
+    }
+    if (data.containsKey('changed_files')) {
+      context.handle(
+        _changedFilesMeta,
+        changedFiles.isAcceptableOrUnknown(
+          data['changed_files']!,
+          _changedFilesMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2186,6 +2261,22 @@ class $RepoPullsTable extends RepoPulls
         DriftSqlType.string,
         data['${effectivePrefix}url'],
       ),
+      mergeable: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mergeable'],
+      ),
+      additions: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}additions'],
+      ),
+      deletions: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deletions'],
+      ),
+      changedFiles: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}changed_files'],
+      ),
     );
   }
 
@@ -2206,6 +2297,10 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
   final int? createdAt;
   final bool draft;
   final String? url;
+  final String? mergeable;
+  final int? additions;
+  final int? deletions;
+  final int? changedFiles;
   const RepoPrRow({
     required this.id,
     required this.repoKey,
@@ -2217,6 +2312,10 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
     this.createdAt,
     required this.draft,
     this.url,
+    this.mergeable,
+    this.additions,
+    this.deletions,
+    this.changedFiles,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2237,6 +2336,18 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
     if (!nullToAbsent || url != null) {
       map['url'] = Variable<String>(url);
     }
+    if (!nullToAbsent || mergeable != null) {
+      map['mergeable'] = Variable<String>(mergeable);
+    }
+    if (!nullToAbsent || additions != null) {
+      map['additions'] = Variable<int>(additions);
+    }
+    if (!nullToAbsent || deletions != null) {
+      map['deletions'] = Variable<int>(deletions);
+    }
+    if (!nullToAbsent || changedFiles != null) {
+      map['changed_files'] = Variable<int>(changedFiles);
+    }
     return map;
   }
 
@@ -2256,6 +2367,18 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
           : Value(createdAt),
       draft: Value(draft),
       url: url == null && nullToAbsent ? const Value.absent() : Value(url),
+      mergeable: mergeable == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mergeable),
+      additions: additions == null && nullToAbsent
+          ? const Value.absent()
+          : Value(additions),
+      deletions: deletions == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletions),
+      changedFiles: changedFiles == null && nullToAbsent
+          ? const Value.absent()
+          : Value(changedFiles),
     );
   }
 
@@ -2275,6 +2398,10 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
       createdAt: serializer.fromJson<int?>(json['createdAt']),
       draft: serializer.fromJson<bool>(json['draft']),
       url: serializer.fromJson<String?>(json['url']),
+      mergeable: serializer.fromJson<String?>(json['mergeable']),
+      additions: serializer.fromJson<int?>(json['additions']),
+      deletions: serializer.fromJson<int?>(json['deletions']),
+      changedFiles: serializer.fromJson<int?>(json['changedFiles']),
     );
   }
   @override
@@ -2291,6 +2418,10 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
       'createdAt': serializer.toJson<int?>(createdAt),
       'draft': serializer.toJson<bool>(draft),
       'url': serializer.toJson<String?>(url),
+      'mergeable': serializer.toJson<String?>(mergeable),
+      'additions': serializer.toJson<int?>(additions),
+      'deletions': serializer.toJson<int?>(deletions),
+      'changedFiles': serializer.toJson<int?>(changedFiles),
     };
   }
 
@@ -2305,6 +2436,10 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
     Value<int?> createdAt = const Value.absent(),
     bool? draft,
     Value<String?> url = const Value.absent(),
+    Value<String?> mergeable = const Value.absent(),
+    Value<int?> additions = const Value.absent(),
+    Value<int?> deletions = const Value.absent(),
+    Value<int?> changedFiles = const Value.absent(),
   }) => RepoPrRow(
     id: id ?? this.id,
     repoKey: repoKey ?? this.repoKey,
@@ -2316,6 +2451,10 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
     createdAt: createdAt.present ? createdAt.value : this.createdAt,
     draft: draft ?? this.draft,
     url: url.present ? url.value : this.url,
+    mergeable: mergeable.present ? mergeable.value : this.mergeable,
+    additions: additions.present ? additions.value : this.additions,
+    deletions: deletions.present ? deletions.value : this.deletions,
+    changedFiles: changedFiles.present ? changedFiles.value : this.changedFiles,
   );
   RepoPrRow copyWithCompanion(RepoPullsCompanion data) {
     return RepoPrRow(
@@ -2331,6 +2470,12 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       draft: data.draft.present ? data.draft.value : this.draft,
       url: data.url.present ? data.url.value : this.url,
+      mergeable: data.mergeable.present ? data.mergeable.value : this.mergeable,
+      additions: data.additions.present ? data.additions.value : this.additions,
+      deletions: data.deletions.present ? data.deletions.value : this.deletions,
+      changedFiles: data.changedFiles.present
+          ? data.changedFiles.value
+          : this.changedFiles,
     );
   }
 
@@ -2346,7 +2491,11 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
           ..write('ageDays: $ageDays, ')
           ..write('createdAt: $createdAt, ')
           ..write('draft: $draft, ')
-          ..write('url: $url')
+          ..write('url: $url, ')
+          ..write('mergeable: $mergeable, ')
+          ..write('additions: $additions, ')
+          ..write('deletions: $deletions, ')
+          ..write('changedFiles: $changedFiles')
           ..write(')'))
         .toString();
   }
@@ -2363,6 +2512,10 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
     createdAt,
     draft,
     url,
+    mergeable,
+    additions,
+    deletions,
+    changedFiles,
   );
   @override
   bool operator ==(Object other) =>
@@ -2377,7 +2530,11 @@ class RepoPrRow extends DataClass implements Insertable<RepoPrRow> {
           other.ageDays == this.ageDays &&
           other.createdAt == this.createdAt &&
           other.draft == this.draft &&
-          other.url == this.url);
+          other.url == this.url &&
+          other.mergeable == this.mergeable &&
+          other.additions == this.additions &&
+          other.deletions == this.deletions &&
+          other.changedFiles == this.changedFiles);
 }
 
 class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
@@ -2391,6 +2548,10 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
   final Value<int?> createdAt;
   final Value<bool> draft;
   final Value<String?> url;
+  final Value<String?> mergeable;
+  final Value<int?> additions;
+  final Value<int?> deletions;
+  final Value<int?> changedFiles;
   const RepoPullsCompanion({
     this.id = const Value.absent(),
     this.repoKey = const Value.absent(),
@@ -2402,6 +2563,10 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
     this.createdAt = const Value.absent(),
     this.draft = const Value.absent(),
     this.url = const Value.absent(),
+    this.mergeable = const Value.absent(),
+    this.additions = const Value.absent(),
+    this.deletions = const Value.absent(),
+    this.changedFiles = const Value.absent(),
   });
   RepoPullsCompanion.insert({
     this.id = const Value.absent(),
@@ -2414,6 +2579,10 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
     this.createdAt = const Value.absent(),
     required bool draft,
     this.url = const Value.absent(),
+    this.mergeable = const Value.absent(),
+    this.additions = const Value.absent(),
+    this.deletions = const Value.absent(),
+    this.changedFiles = const Value.absent(),
   }) : repoKey = Value(repoKey),
        label = Value(label),
        title = Value(title),
@@ -2431,6 +2600,10 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
     Expression<int>? createdAt,
     Expression<bool>? draft,
     Expression<String>? url,
+    Expression<String>? mergeable,
+    Expression<int>? additions,
+    Expression<int>? deletions,
+    Expression<int>? changedFiles,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2443,6 +2616,10 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
       if (createdAt != null) 'created_at': createdAt,
       if (draft != null) 'draft': draft,
       if (url != null) 'url': url,
+      if (mergeable != null) 'mergeable': mergeable,
+      if (additions != null) 'additions': additions,
+      if (deletions != null) 'deletions': deletions,
+      if (changedFiles != null) 'changed_files': changedFiles,
     });
   }
 
@@ -2457,6 +2634,10 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
     Value<int?>? createdAt,
     Value<bool>? draft,
     Value<String?>? url,
+    Value<String?>? mergeable,
+    Value<int?>? additions,
+    Value<int?>? deletions,
+    Value<int?>? changedFiles,
   }) {
     return RepoPullsCompanion(
       id: id ?? this.id,
@@ -2469,6 +2650,10 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
       createdAt: createdAt ?? this.createdAt,
       draft: draft ?? this.draft,
       url: url ?? this.url,
+      mergeable: mergeable ?? this.mergeable,
+      additions: additions ?? this.additions,
+      deletions: deletions ?? this.deletions,
+      changedFiles: changedFiles ?? this.changedFiles,
     );
   }
 
@@ -2505,6 +2690,18 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
     if (url.present) {
       map['url'] = Variable<String>(url.value);
     }
+    if (mergeable.present) {
+      map['mergeable'] = Variable<String>(mergeable.value);
+    }
+    if (additions.present) {
+      map['additions'] = Variable<int>(additions.value);
+    }
+    if (deletions.present) {
+      map['deletions'] = Variable<int>(deletions.value);
+    }
+    if (changedFiles.present) {
+      map['changed_files'] = Variable<int>(changedFiles.value);
+    }
     return map;
   }
 
@@ -2520,7 +2717,11 @@ class RepoPullsCompanion extends UpdateCompanion<RepoPrRow> {
           ..write('ageDays: $ageDays, ')
           ..write('createdAt: $createdAt, ')
           ..write('draft: $draft, ')
-          ..write('url: $url')
+          ..write('url: $url, ')
+          ..write('mergeable: $mergeable, ')
+          ..write('additions: $additions, ')
+          ..write('deletions: $deletions, ')
+          ..write('changedFiles: $changedFiles')
           ..write(')'))
         .toString();
   }
@@ -5252,6 +5453,10 @@ typedef $$RepoPullsTableCreateCompanionBuilder =
       Value<int?> createdAt,
       required bool draft,
       Value<String?> url,
+      Value<String?> mergeable,
+      Value<int?> additions,
+      Value<int?> deletions,
+      Value<int?> changedFiles,
     });
 typedef $$RepoPullsTableUpdateCompanionBuilder =
     RepoPullsCompanion Function({
@@ -5265,6 +5470,10 @@ typedef $$RepoPullsTableUpdateCompanionBuilder =
       Value<int?> createdAt,
       Value<bool> draft,
       Value<String?> url,
+      Value<String?> mergeable,
+      Value<int?> additions,
+      Value<int?> deletions,
+      Value<int?> changedFiles,
     });
 
 class $$RepoPullsTableFilterComposer
@@ -5323,6 +5532,26 @@ class $$RepoPullsTableFilterComposer
 
   ColumnFilters<String> get url => $composableBuilder(
     column: $table.url,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mergeable => $composableBuilder(
+    column: $table.mergeable,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get additions => $composableBuilder(
+    column: $table.additions,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletions => $composableBuilder(
+    column: $table.deletions,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get changedFiles => $composableBuilder(
+    column: $table.changedFiles,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -5385,6 +5614,26 @@ class $$RepoPullsTableOrderingComposer
     column: $table.url,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get mergeable => $composableBuilder(
+    column: $table.mergeable,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get additions => $composableBuilder(
+    column: $table.additions,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletions => $composableBuilder(
+    column: $table.deletions,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get changedFiles => $composableBuilder(
+    column: $table.changedFiles,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$RepoPullsTableAnnotationComposer
@@ -5427,6 +5676,20 @@ class $$RepoPullsTableAnnotationComposer
 
   GeneratedColumn<String> get url =>
       $composableBuilder(column: $table.url, builder: (column) => column);
+
+  GeneratedColumn<String> get mergeable =>
+      $composableBuilder(column: $table.mergeable, builder: (column) => column);
+
+  GeneratedColumn<int> get additions =>
+      $composableBuilder(column: $table.additions, builder: (column) => column);
+
+  GeneratedColumn<int> get deletions =>
+      $composableBuilder(column: $table.deletions, builder: (column) => column);
+
+  GeneratedColumn<int> get changedFiles => $composableBuilder(
+    column: $table.changedFiles,
+    builder: (column) => column,
+  );
 }
 
 class $$RepoPullsTableTableManager
@@ -5470,6 +5733,10 @@ class $$RepoPullsTableTableManager
                 Value<int?> createdAt = const Value.absent(),
                 Value<bool> draft = const Value.absent(),
                 Value<String?> url = const Value.absent(),
+                Value<String?> mergeable = const Value.absent(),
+                Value<int?> additions = const Value.absent(),
+                Value<int?> deletions = const Value.absent(),
+                Value<int?> changedFiles = const Value.absent(),
               }) => RepoPullsCompanion(
                 id: id,
                 repoKey: repoKey,
@@ -5481,6 +5748,10 @@ class $$RepoPullsTableTableManager
                 createdAt: createdAt,
                 draft: draft,
                 url: url,
+                mergeable: mergeable,
+                additions: additions,
+                deletions: deletions,
+                changedFiles: changedFiles,
               ),
           createCompanionCallback:
               ({
@@ -5494,6 +5765,10 @@ class $$RepoPullsTableTableManager
                 Value<int?> createdAt = const Value.absent(),
                 required bool draft,
                 Value<String?> url = const Value.absent(),
+                Value<String?> mergeable = const Value.absent(),
+                Value<int?> additions = const Value.absent(),
+                Value<int?> deletions = const Value.absent(),
+                Value<int?> changedFiles = const Value.absent(),
               }) => RepoPullsCompanion.insert(
                 id: id,
                 repoKey: repoKey,
@@ -5505,6 +5780,10 @@ class $$RepoPullsTableTableManager
                 createdAt: createdAt,
                 draft: draft,
                 url: url,
+                mergeable: mergeable,
+                additions: additions,
+                deletions: deletions,
+                changedFiles: changedFiles,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

@@ -68,6 +68,43 @@ void main() {
       );
       expect(RepoDetailService.parseGithubGraphqlPulls('nope', now), isEmpty);
     });
+
+    test('parses mergeable and diff size', () {
+      List<RepoPr> parse(String? mergeable) =>
+          RepoDetailService.parseGithubGraphqlPulls({
+            'data': {
+              'repository': {
+                'pullRequests': {
+                  'nodes': [
+                    {
+                      'number': 7,
+                      'title': 'PR 7',
+                      'url': 'https://github.com/acme/api/pull/7',
+                      'isDraft': false,
+                      'createdAt': '2026-07-13T12:00:00Z',
+                      'author': {'login': 'alice'},
+                      'reviewDecision': 'APPROVED',
+                      'reviewRequests': {'totalCount': 0},
+                      'mergeable': mergeable,
+                      'additions': 120,
+                      'deletions': 30,
+                      'changedFiles': 4,
+                    },
+                  ],
+                },
+              },
+            },
+          }, now);
+
+      final conflicting = parse('CONFLICTING').single;
+      expect(conflicting.mergeable, PrMergeable.conflicting);
+      expect(conflicting.additions, 120);
+      expect(conflicting.deletions, 30);
+      expect(conflicting.changedFiles, 4);
+      expect(parse('MERGEABLE').single.mergeable, PrMergeable.mergeable);
+      expect(parse('UNKNOWN').single.mergeable, PrMergeable.unknown);
+      expect(parse(null).single.mergeable, PrMergeable.unknown);
+    });
   });
 
   group('parseAdoPulls', () {
@@ -105,6 +142,35 @@ void main() {
         parse([10]).single.url,
         'https://dev.azure.com/contoso/web/_git/site/pullrequest/12',
       );
+    });
+
+    test('maps mergeStatus to a mergeable state', () {
+      RepoPr parse(String? mergeStatus) => RepoDetailService.parseAdoPulls(
+        [
+          {
+            'pullRequestId': 12,
+            'title': 'Ship',
+            'createdBy': {'displayName': 'Jane Doe'},
+            'creationDate': '2026-07-14T12:00:00Z',
+            'reviewers': const [],
+            'mergeStatus': mergeStatus,
+          },
+        ],
+        now,
+        organization: 'contoso',
+        project: 'web',
+        name: 'site',
+      ).single;
+
+      expect(parse('succeeded').mergeable, PrMergeable.mergeable);
+      expect(parse('conflicts').mergeable, PrMergeable.conflicting);
+      // Only a real merge conflict is "conflicting"; policy/other blocks aren't.
+      expect(parse('rejectedByPolicy').mergeable, PrMergeable.unknown);
+      expect(parse('failure').mergeable, PrMergeable.unknown);
+      expect(parse('queued').mergeable, PrMergeable.unknown);
+      expect(parse(null).mergeable, PrMergeable.unknown);
+      // ADO's list API carries no diff size.
+      expect(parse('succeeded').additions, isNull);
     });
   });
 
