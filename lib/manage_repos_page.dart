@@ -332,8 +332,27 @@ class _ManageReposPageState extends State<ManageReposPage> {
         !_mutedDisplays.contains(oldDisplay)) {
       return;
     }
-    await MuteStore.setMuted(oldDisplay, false);
-    await MuteStore.setMuted(newDisplay, true);
+    try {
+      // Mute the new identity first: if the second write fails the mute intent
+      // survives (worst case a harmless orphan on the vanished old display),
+      // rather than being lost.
+      await MuteStore.setMuted(newDisplay, true);
+      await MuteStore.setMuted(oldDisplay, false);
+    } catch (_) {
+      // Best-effort recovery: resync from persisted state so the UI matches
+      // what's stored, and surface the failure.
+      if (!mounted) return;
+      final muted = await MuteStore.mutedDisplays();
+      if (!mounted) return;
+      setState(() => _mutedDisplays = muted);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not move mute to $newDisplay'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _mutedDisplays = {..._mutedDisplays}

@@ -109,10 +109,11 @@ class NotificationService {
       );
       final now = DateTime.now();
       final appPrefs = await PreferencesStore.load();
-      // Quiet hours *defer*: we hold the notification and, crucially, do NOT
-      // advance the baseline, so these items surface on the next refresh after
-      // quiet hours end. A disabled toggle instead *drops* (baseline advances
-      // below) so re-enabling never replays a backlog.
+      // Quiet hours *defer*: we hold the notification and, for unmuted items,
+      // do NOT advance the baseline, so they surface on the next refresh after
+      // quiet hours end. Muted items still have their baseline advanced (below)
+      // so unmuting never replays a backlog — muting drops, it doesn't defer. A
+      // disabled notifications toggle likewise drops (baseline advances below).
       final inQuietHours =
           appPrefs.notificationsEnabled &&
           appPrefs.quietHoursEnabled &&
