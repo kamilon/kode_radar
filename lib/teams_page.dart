@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'activity_service.dart';
 import 'app_http.dart';
+import 'ci_run_history_store.dart';
 import 'digest_page.dart';
 import 'manage_teams_page.dart';
 import 'metric_snapshot.dart';
@@ -46,6 +47,9 @@ class _TeamsPageState extends State<TeamsPage> {
       );
       // Record a trend snapshot from this load too (deduped ~1/day).
       await MetricStore.capture(activities, restrictToMonitored: true);
+      await CiRunHistoryStore.recordSafely(
+        activities.expand((a) => a.recentRuns),
+      );
       final rollups = TeamService.rollupAll(teams, activities);
       final history = await MetricStore.all();
       final series = <String, List<num>>{

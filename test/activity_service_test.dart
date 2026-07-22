@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kode_radar/activity_service.dart';
+import 'package:kode_radar/ci_run_history.dart';
 import 'package:kode_radar/token_store.dart';
 
 void main() {
@@ -122,6 +123,148 @@ void main() {
     expect(ActivityService.ciStatusFromAdoBuilds({'value': []}), 'unknown');
   });
 
+  test(
+    'ciRunSamplesFromGithubRuns keys by run id + attempt, groups by workflow id',
+    () {
+      final samples = ActivityService.ciRunSamplesFromGithubRuns(
+        {
+          'workflow_runs': [
+            {
+              'id': 101,
+              'workflow_id': 7,
+              'run_attempt': 2,
+              'name': 'CI',
+              'status': 'completed',
+              'conclusion': 'success',
+              'head_branch': 'main',
+              'updated_at': '2026-03-01T10:00:00Z',
+              'html_url': 'https://github.com/o/r/actions/runs/101',
+            },
+            {
+              'id': 102,
+              'workflow_id': 7,
+              'name': 'CI',
+              'status': 'completed',
+              'conclusion': 'failure',
+              'updated_at': '2026-03-01T09:00:00Z',
+            },
+            {'name': 'no-id', 'status': 'completed', 'conclusion': 'success'},
+          ],
+        },
+        repoKey: 'github:o/r',
+        repoDisplay: 'o/r',
+      );
+      expect(samples, hasLength(2));
+      // run id + attempt in the key; provider prefix comes from repoKey (no
+      // double "github:github").
+      expect(samples[0].runKey, 'github:o/r:101:2');
+      expect(samples[0].workflowId, '7');
+      expect(samples[0].workflow, 'CI');
+      expect(samples[0].outcome, CiOutcome.success);
+      expect(samples[0].branch, 'main');
+      // run_attempt defaults to 1 when absent.
+      expect(samples[1].runKey, 'github:o/r:102:1');
+      expect(samples[1].outcome, CiOutcome.failure);
+    },
+  );
+
+  test('githubRunOutcome buckets conclusions; cancelled is not a failure', () {
+    expect(
+      ActivityService.githubRunOutcome({'conclusion': 'success'}),
+      CiOutcome.success,
+    );
+    expect(
+      ActivityService.githubRunOutcome({'conclusion': 'timed_out'}),
+      CiOutcome.failure,
+    );
+    expect(
+      ActivityService.githubRunOutcome({
+        'conclusion': null,
+        'status': 'in_progress',
+      }),
+      CiOutcome.running,
+    );
+    expect(
+      ActivityService.githubRunOutcome({
+        'conclusion': 'cancelled',
+        'status': 'completed',
+      }),
+      CiOutcome.other,
+    );
+    expect(
+      ActivityService.githubRunOutcome({
+        'conclusion': 'skipped',
+        'status': 'completed',
+      }),
+      CiOutcome.other,
+    );
+  });
+
+  test(
+    'adoBuildOutcome: only failed is a failure; canceled/partial are other',
+    () {
+      expect(
+        ActivityService.adoBuildOutcome({
+          'status': 'completed',
+          'result': 'failed',
+        }),
+        CiOutcome.failure,
+      );
+      expect(
+        ActivityService.adoBuildOutcome({
+          'status': 'completed',
+          'result': 'canceled',
+        }),
+        CiOutcome.other,
+      );
+      expect(
+        ActivityService.adoBuildOutcome({
+          'status': 'completed',
+          'result': 'partiallySucceeded',
+        }),
+        CiOutcome.other,
+      );
+      expect(
+        ActivityService.adoBuildOutcome({
+          'status': 'inProgress',
+          'result': null,
+        }),
+        CiOutcome.running,
+      );
+    },
+  );
+
+  test('ciRunSamplesFromAdoBuilds parses builds, skips id-less', () {
+    final samples = ActivityService.ciRunSamplesFromAdoBuilds(
+      {
+        'value': [
+          {
+            'id': 55,
+            'definition': {'id': 3, 'name': 'Pipeline'},
+            'status': 'completed',
+            'result': 'succeeded',
+            'sourceBranch': 'refs/heads/main',
+            'finishTime': '2026-03-01T10:00:00Z',
+            '_links': {
+              'web': {
+                'href': 'https://dev.azure.com/o/p/_build/results?buildId=55',
+              },
+            },
+          },
+          {'status': 'completed', 'result': 'failed'},
+        ],
+      },
+      repoKey: 'ado:o/p/r',
+      repoDisplay: 'o/p/r',
+    );
+    expect(samples, hasLength(1));
+    expect(samples.single.runKey, 'ado:o/p/r:55');
+    expect(samples.single.workflow, 'Pipeline');
+    expect(samples.single.workflowId, '3');
+    expect(samples.single.outcome, CiOutcome.success);
+    expect(samples.single.url, contains('buildId=55'));
+  });
+
   test('ADO PR helpers parse authors review needs and age', () {
     final now = DateTime.parse('2026-07-13T00:00:00Z');
     final data = [
@@ -203,11 +346,17 @@ void main() {
       }
 
       if (request.url.path == '/repos/acme/kode/actions/runs') {
-        expect(request.url.queryParameters['per_page'], '1');
+        expect(request.url.queryParameters['per_page'], '20');
         return http.Response(
           jsonEncode({
             'workflow_runs': [
-              {'status': 'completed', 'conclusion': 'success'},
+              {
+                'id': 1,
+                'name': 'CI',
+                'status': 'completed',
+                'conclusion': 'success',
+                'updated_at': '2026-03-01T10:00:00Z',
+              },
             ],
           }),
           200,
@@ -230,6 +379,8 @@ void main() {
     expect(activity.needsReviewCount, 1);
     expect(activity.contributors, ['alice']);
     expect(activity.ciStatus, 'success');
+    expect(activity.recentRuns.single.outcome, CiOutcome.success);
+    expect(activity.recentRuns.single.runKey, 'github:acme/kode:1:1');
     expect(activity.error, isNull);
   });
 

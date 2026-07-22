@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'activity_service.dart';
 import 'app_http.dart';
+import 'ci_run_history_store.dart';
 import 'config_revision.dart';
 import 'home_menu.dart';
 import 'metric_store.dart';
@@ -57,6 +58,11 @@ class _RadarPageState extends State<RadarPage> {
       if (!mounted || seq != _loadSeq) return;
       // Record a trend snapshot (deduped ~1/day), then load per-repo series.
       await MetricStore.capture(activities, restrictToMonitored: true);
+      // Accumulate observed CI runs so the CI trends insight keeps building on
+      // desktop too, where there's no periodic background sync.
+      await CiRunHistoryStore.recordSafely(
+        activities.expand((a) => a.recentRuns),
+      );
       final history = await MetricStore.all();
       if (!mounted || seq != _loadSeq) return;
       setState(() {

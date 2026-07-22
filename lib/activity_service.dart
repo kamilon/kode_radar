@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ci_run_history.dart';
 import 'repo_discovery_service.dart';
 import 'repo_store.dart';
 import 'token_store.dart';
@@ -20,6 +21,7 @@ class RepoActivity {
     required this.ciStatus,
     required this.contributors,
     required this.activityScore,
+    this.recentRuns = const [],
     this.error,
   });
 
@@ -55,6 +57,11 @@ class RepoActivity {
   final String ciStatus;
   final List<String> contributors;
   final num activityScore;
+
+  /// Recent CI runs observed for this repo this fetch, accumulated into the CI
+  /// run-history store to power the "CI trends" insight. Empty for reference
+  /// entries and providers/repos with no CI.
+  final List<CiRunSample> recentRuns;
   final String? error;
 }
 
@@ -261,6 +268,141 @@ class ActivityService {
     return 'unknown';
   }
 
+  // ---- Per-run CI samples (for the accumulated CI trends history) ----------
+
+  /// Normalized [CiOutcome] for a single GitHub `workflow_run` object. Only a
+  /// real red result counts as a failure — a `cancelled` run (e.g. superseded
+  /// by concurrency) is [CiOutcome.other] so it can't manufacture flakiness.
+  static String githubRunOutcome(Map run) {
+    final conclusion = _lowerString(run['conclusion']);
+    if (conclusion == 'success') return CiOutcome.success;
+    if (const {
+      'failure',
+      'timed_out',
+      'startup_failure',
+    }.contains(conclusion)) {
+      return CiOutcome.failure;
+    }
+    final status = _lowerString(run['status']);
+    if (const {
+      'queued',
+      'requested',
+      'waiting',
+      'pending',
+      'in_progress',
+    }.contains(status)) {
+      return CiOutcome.running;
+    }
+    // cancelled / action_required / neutral / skipped / stale / unknown:
+    // context only, never counted toward pass/fail rates.
+    return CiOutcome.other;
+  }
+
+  /// Normalized [CiOutcome] for a single Azure DevOps build object. Only
+  /// `failed` is a failure — `canceled` and `partiallySucceeded` are
+  /// [CiOutcome.other] so they don't inflate the failure/flakiness rates.
+  static String adoBuildOutcome(Map build) {
+    final result = _lowerString(build['result']);
+    if (result == 'succeeded') return CiOutcome.success;
+    if (result == 'failed') return CiOutcome.failure;
+    final status = _lowerString(build['status']);
+    if (const {
+      'inprogress',
+      'notstarted',
+      'postponed',
+      'cancelling',
+    }.contains(status)) {
+      return CiOutcome.running;
+    }
+    return CiOutcome.other;
+  }
+
+  /// Parses a GitHub Actions `/actions/runs` response into [CiRunSample]s.
+  /// Runs without an `id` are skipped (no stable de-dup key). The de-dup key
+  /// includes `run_attempt` so a failed attempt kept before a successful rerun
+  /// (which reuses the run id) isn't overwritten — preserving the flake signal.
+  static List<CiRunSample> ciRunSamplesFromGithubRuns(
+    dynamic json, {
+    required String repoKey,
+    required String repoDisplay,
+  }) {
+    final runs = json is Map ? json['workflow_runs'] : null;
+    if (runs is! List) return const [];
+    final result = <CiRunSample>[];
+    for (final run in runs) {
+      if (run is! Map) continue;
+      final id = run['id'];
+      if (id == null) continue;
+      final attempt = _intValue(run['run_attempt']) ?? 1;
+      final name =
+          _stringValue(run, 'name') ??
+          _stringValue(run, 'display_title') ??
+          'Workflow';
+      result.add(
+        CiRunSample(
+          provider: TokenStore.providerGithub,
+          repoKey: repoKey,
+          repoDisplay: repoDisplay,
+          workflow: name,
+          workflowId: run['workflow_id']?.toString(),
+          runKey: '$repoKey:$id:$attempt',
+          outcome: githubRunOutcome(run),
+          conclusion: _stringValue(run, 'conclusion') ?? '',
+          branch: _stringValue(run, 'head_branch'),
+          finishedAt: _parseDate(run['updated_at']),
+          url: _stringValue(run, 'html_url'),
+        ),
+      );
+    }
+    return result;
+  }
+
+  /// Parses an Azure DevOps `/build/builds` response into [CiRunSample]s.
+  /// Builds without an `id` are skipped (no stable de-dup key). ADO retries
+  /// create new build ids, so the id alone is a stable per-run key.
+  static List<CiRunSample> ciRunSamplesFromAdoBuilds(
+    dynamic json, {
+    required String repoKey,
+    required String repoDisplay,
+  }) {
+    final builds = json is Map ? json['value'] : json;
+    if (builds is! List) return const [];
+    final result = <CiRunSample>[];
+    for (final build in builds) {
+      if (build is! Map) continue;
+      final id = build['id'];
+      if (id == null) continue;
+      final definition = build['definition'];
+      final defName = definition is Map ? definition['name'] : null;
+      final workflow = defName is String && defName.isNotEmpty
+          ? defName
+          : 'Build';
+      final defId = definition is Map ? definition['id'] : null;
+      String? url;
+      final links = build['_links'];
+      if (links is Map) {
+        final web = links['web'];
+        if (web is Map && web['href'] is String) url = web['href'] as String;
+      }
+      result.add(
+        CiRunSample(
+          provider: TokenStore.providerAdo,
+          repoKey: repoKey,
+          repoDisplay: repoDisplay,
+          workflow: workflow,
+          workflowId: defId?.toString(),
+          runKey: '$repoKey:$id',
+          outcome: adoBuildOutcome(build),
+          conclusion: _stringValue(build, 'result') ?? '',
+          branch: _stringValue(build, 'sourceBranch'),
+          finishedAt: _parseDate(build['finishTime']),
+          url: url,
+        ),
+      );
+    }
+    return result;
+  }
+
   static num scoreActivity({
     required int openPrCount,
     required int needsReviewCount,
@@ -369,6 +511,7 @@ class ActivityService {
       };
       var prs = <dynamic>[];
       var ciStatus = 'unknown';
+      var recentRuns = const <CiRunSample>[];
 
       try {
         final response = await httpClient
@@ -395,16 +538,24 @@ class ActivityService {
       }
 
       try {
+        // Fetch a page of recent runs (not just the latest): the newest still
+        // drives ciStatus, while the rest accumulate into the CI trends history.
         final response = await httpClient
             .get(
               Uri.https('api.github.com', '/repos/$owner/$name/actions/runs', {
-                'per_page': '1',
+                'per_page': '20',
               }),
               headers: headers,
             )
             .timeout(_requestTimeout);
         if (response.statusCode == 200) {
-          ciStatus = ciStatusFromGithubRuns(jsonDecode(response.body));
+          final decoded = jsonDecode(response.body);
+          ciStatus = ciStatusFromGithubRuns(decoded);
+          recentRuns = ciRunSamplesFromGithubRuns(
+            decoded,
+            repoKey: repoKey,
+            repoDisplay: displayName,
+          );
         } else {
           errors.add('GitHub actions returned status ${response.statusCode}');
         }
@@ -434,6 +585,7 @@ class ActivityService {
           ciStatus: ciStatus,
           oldestOpenPrAgeDays: oldestAge,
         ),
+        recentRuns: recentRuns,
         error: errors.isEmpty ? null : errors.join('; '),
       );
     } finally {
@@ -469,6 +621,7 @@ class ActivityService {
       };
       var prs = <dynamic>[];
       var ciStatus = 'unknown';
+      var recentRuns = const <CiRunSample>[];
 
       try {
         final response = await httpClient
@@ -517,6 +670,8 @@ class ActivityService {
         }
 
         if (repositoryId != null) {
+          // Fetch a page of recent builds newest-first: the latest drives
+          // ciStatus, the rest feed the CI trends history.
           final response = await httpClient
               .get(
                 Uri.https(
@@ -525,7 +680,8 @@ class ActivityService {
                   {
                     'repositoryId': repositoryId,
                     'repositoryType': 'TfsGit',
-                    r'$top': '1',
+                    'queryOrder': 'finishTimeDescending',
+                    r'$top': '20',
                     'api-version': '6.0',
                   },
                 ),
@@ -533,7 +689,13 @@ class ActivityService {
               )
               .timeout(_requestTimeout);
           if (response.statusCode == 200) {
-            ciStatus = ciStatusFromAdoBuilds(jsonDecode(response.body));
+            final decoded = jsonDecode(response.body);
+            ciStatus = ciStatusFromAdoBuilds(decoded);
+            recentRuns = ciRunSamplesFromAdoBuilds(
+              decoded,
+              repoKey: repoKey,
+              repoDisplay: displayName,
+            );
           } else {
             errors.add(
               'Azure DevOps builds returned status ${response.statusCode}',
@@ -566,6 +728,7 @@ class ActivityService {
           ciStatus: ciStatus,
           oldestOpenPrAgeDays: oldestAge,
         ),
+        recentRuns: recentRuns,
         error: errors.isEmpty ? null : errors.join('; '),
       );
     } finally {
@@ -711,6 +874,7 @@ class ActivityService {
     String ciStatus = 'unknown',
     List<String> contributors = const [],
     num activityScore = 0,
+    List<CiRunSample> recentRuns = const [],
     String? error,
   }) {
     return RepoActivity(
@@ -725,6 +889,7 @@ class ActivityService {
       ciStatus: ciStatus,
       contributors: contributors,
       activityScore: activityScore,
+      recentRuns: recentRuns,
       error: error,
     );
   }
@@ -740,6 +905,7 @@ class ActivityService {
     String ciStatus = 'unknown',
     List<String> contributors = const [],
     num activityScore = 0,
+    List<CiRunSample> recentRuns = const [],
     String? error,
   }) {
     return RepoActivity(
@@ -754,6 +920,7 @@ class ActivityService {
       ciStatus: ciStatus,
       contributors: contributors,
       activityScore: activityScore,
+      recentRuns: recentRuns,
       error: error,
     );
   }

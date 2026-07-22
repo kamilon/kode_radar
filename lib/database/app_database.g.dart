@@ -4362,6 +4362,707 @@ class NotificationKnownReposCompanion
   }
 }
 
+class $CiRunHistoryTable extends CiRunHistory
+    with TableInfo<$CiRunHistoryTable, CiRunHistoryRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CiRunHistoryTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _providerMeta = const VerificationMeta(
+    'provider',
+  );
+  @override
+  late final GeneratedColumn<String> provider = GeneratedColumn<String>(
+    'provider',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _repoKeyMeta = const VerificationMeta(
+    'repoKey',
+  );
+  @override
+  late final GeneratedColumn<String> repoKey = GeneratedColumn<String>(
+    'repo_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _repoDisplayMeta = const VerificationMeta(
+    'repoDisplay',
+  );
+  @override
+  late final GeneratedColumn<String> repoDisplay = GeneratedColumn<String>(
+    'repo_display',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _workflowMeta = const VerificationMeta(
+    'workflow',
+  );
+  @override
+  late final GeneratedColumn<String> workflow = GeneratedColumn<String>(
+    'workflow',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _workflowIdMeta = const VerificationMeta(
+    'workflowId',
+  );
+  @override
+  late final GeneratedColumn<String> workflowId = GeneratedColumn<String>(
+    'workflow_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _runKeyMeta = const VerificationMeta('runKey');
+  @override
+  late final GeneratedColumn<String> runKey = GeneratedColumn<String>(
+    'run_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _outcomeMeta = const VerificationMeta(
+    'outcome',
+  );
+  @override
+  late final GeneratedColumn<String> outcome = GeneratedColumn<String>(
+    'outcome',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _conclusionMeta = const VerificationMeta(
+    'conclusion',
+  );
+  @override
+  late final GeneratedColumn<String> conclusion = GeneratedColumn<String>(
+    'conclusion',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _branchMeta = const VerificationMeta('branch');
+  @override
+  late final GeneratedColumn<String> branch = GeneratedColumn<String>(
+    'branch',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _finishedAtMeta = const VerificationMeta(
+    'finishedAt',
+  );
+  @override
+  late final GeneratedColumn<int> finishedAt = GeneratedColumn<int>(
+    'finished_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _urlMeta = const VerificationMeta('url');
+  @override
+  late final GeneratedColumn<String> url = GeneratedColumn<String>(
+    'url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    provider,
+    repoKey,
+    repoDisplay,
+    workflow,
+    workflowId,
+    runKey,
+    outcome,
+    conclusion,
+    branch,
+    finishedAt,
+    url,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'ci_run_history';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CiRunHistoryRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('provider')) {
+      context.handle(
+        _providerMeta,
+        provider.isAcceptableOrUnknown(data['provider']!, _providerMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_providerMeta);
+    }
+    if (data.containsKey('repo_key')) {
+      context.handle(
+        _repoKeyMeta,
+        repoKey.isAcceptableOrUnknown(data['repo_key']!, _repoKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_repoKeyMeta);
+    }
+    if (data.containsKey('repo_display')) {
+      context.handle(
+        _repoDisplayMeta,
+        repoDisplay.isAcceptableOrUnknown(
+          data['repo_display']!,
+          _repoDisplayMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_repoDisplayMeta);
+    }
+    if (data.containsKey('workflow')) {
+      context.handle(
+        _workflowMeta,
+        workflow.isAcceptableOrUnknown(data['workflow']!, _workflowMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_workflowMeta);
+    }
+    if (data.containsKey('workflow_id')) {
+      context.handle(
+        _workflowIdMeta,
+        workflowId.isAcceptableOrUnknown(data['workflow_id']!, _workflowIdMeta),
+      );
+    }
+    if (data.containsKey('run_key')) {
+      context.handle(
+        _runKeyMeta,
+        runKey.isAcceptableOrUnknown(data['run_key']!, _runKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_runKeyMeta);
+    }
+    if (data.containsKey('outcome')) {
+      context.handle(
+        _outcomeMeta,
+        outcome.isAcceptableOrUnknown(data['outcome']!, _outcomeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_outcomeMeta);
+    }
+    if (data.containsKey('conclusion')) {
+      context.handle(
+        _conclusionMeta,
+        conclusion.isAcceptableOrUnknown(data['conclusion']!, _conclusionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_conclusionMeta);
+    }
+    if (data.containsKey('branch')) {
+      context.handle(
+        _branchMeta,
+        branch.isAcceptableOrUnknown(data['branch']!, _branchMeta),
+      );
+    }
+    if (data.containsKey('finished_at')) {
+      context.handle(
+        _finishedAtMeta,
+        finishedAt.isAcceptableOrUnknown(data['finished_at']!, _finishedAtMeta),
+      );
+    }
+    if (data.containsKey('url')) {
+      context.handle(
+        _urlMeta,
+        url.isAcceptableOrUnknown(data['url']!, _urlMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CiRunHistoryRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CiRunHistoryRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      provider: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider'],
+      )!,
+      repoKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}repo_key'],
+      )!,
+      repoDisplay: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}repo_display'],
+      )!,
+      workflow: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}workflow'],
+      )!,
+      workflowId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}workflow_id'],
+      ),
+      runKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}run_key'],
+      )!,
+      outcome: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}outcome'],
+      )!,
+      conclusion: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conclusion'],
+      )!,
+      branch: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}branch'],
+      ),
+      finishedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}finished_at'],
+      ),
+      url: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}url'],
+      ),
+    );
+  }
+
+  @override
+  $CiRunHistoryTable createAlias(String alias) {
+    return $CiRunHistoryTable(attachedDatabase, alias);
+  }
+}
+
+class CiRunHistoryRow extends DataClass implements Insertable<CiRunHistoryRow> {
+  final int id;
+  final String provider;
+  final String repoKey;
+  final String repoDisplay;
+  final String workflow;
+  final String? workflowId;
+  final String runKey;
+  final String outcome;
+  final String conclusion;
+  final String? branch;
+  final int? finishedAt;
+  final String? url;
+  const CiRunHistoryRow({
+    required this.id,
+    required this.provider,
+    required this.repoKey,
+    required this.repoDisplay,
+    required this.workflow,
+    this.workflowId,
+    required this.runKey,
+    required this.outcome,
+    required this.conclusion,
+    this.branch,
+    this.finishedAt,
+    this.url,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['provider'] = Variable<String>(provider);
+    map['repo_key'] = Variable<String>(repoKey);
+    map['repo_display'] = Variable<String>(repoDisplay);
+    map['workflow'] = Variable<String>(workflow);
+    if (!nullToAbsent || workflowId != null) {
+      map['workflow_id'] = Variable<String>(workflowId);
+    }
+    map['run_key'] = Variable<String>(runKey);
+    map['outcome'] = Variable<String>(outcome);
+    map['conclusion'] = Variable<String>(conclusion);
+    if (!nullToAbsent || branch != null) {
+      map['branch'] = Variable<String>(branch);
+    }
+    if (!nullToAbsent || finishedAt != null) {
+      map['finished_at'] = Variable<int>(finishedAt);
+    }
+    if (!nullToAbsent || url != null) {
+      map['url'] = Variable<String>(url);
+    }
+    return map;
+  }
+
+  CiRunHistoryCompanion toCompanion(bool nullToAbsent) {
+    return CiRunHistoryCompanion(
+      id: Value(id),
+      provider: Value(provider),
+      repoKey: Value(repoKey),
+      repoDisplay: Value(repoDisplay),
+      workflow: Value(workflow),
+      workflowId: workflowId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(workflowId),
+      runKey: Value(runKey),
+      outcome: Value(outcome),
+      conclusion: Value(conclusion),
+      branch: branch == null && nullToAbsent
+          ? const Value.absent()
+          : Value(branch),
+      finishedAt: finishedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(finishedAt),
+      url: url == null && nullToAbsent ? const Value.absent() : Value(url),
+    );
+  }
+
+  factory CiRunHistoryRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CiRunHistoryRow(
+      id: serializer.fromJson<int>(json['id']),
+      provider: serializer.fromJson<String>(json['provider']),
+      repoKey: serializer.fromJson<String>(json['repoKey']),
+      repoDisplay: serializer.fromJson<String>(json['repoDisplay']),
+      workflow: serializer.fromJson<String>(json['workflow']),
+      workflowId: serializer.fromJson<String?>(json['workflowId']),
+      runKey: serializer.fromJson<String>(json['runKey']),
+      outcome: serializer.fromJson<String>(json['outcome']),
+      conclusion: serializer.fromJson<String>(json['conclusion']),
+      branch: serializer.fromJson<String?>(json['branch']),
+      finishedAt: serializer.fromJson<int?>(json['finishedAt']),
+      url: serializer.fromJson<String?>(json['url']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'provider': serializer.toJson<String>(provider),
+      'repoKey': serializer.toJson<String>(repoKey),
+      'repoDisplay': serializer.toJson<String>(repoDisplay),
+      'workflow': serializer.toJson<String>(workflow),
+      'workflowId': serializer.toJson<String?>(workflowId),
+      'runKey': serializer.toJson<String>(runKey),
+      'outcome': serializer.toJson<String>(outcome),
+      'conclusion': serializer.toJson<String>(conclusion),
+      'branch': serializer.toJson<String?>(branch),
+      'finishedAt': serializer.toJson<int?>(finishedAt),
+      'url': serializer.toJson<String?>(url),
+    };
+  }
+
+  CiRunHistoryRow copyWith({
+    int? id,
+    String? provider,
+    String? repoKey,
+    String? repoDisplay,
+    String? workflow,
+    Value<String?> workflowId = const Value.absent(),
+    String? runKey,
+    String? outcome,
+    String? conclusion,
+    Value<String?> branch = const Value.absent(),
+    Value<int?> finishedAt = const Value.absent(),
+    Value<String?> url = const Value.absent(),
+  }) => CiRunHistoryRow(
+    id: id ?? this.id,
+    provider: provider ?? this.provider,
+    repoKey: repoKey ?? this.repoKey,
+    repoDisplay: repoDisplay ?? this.repoDisplay,
+    workflow: workflow ?? this.workflow,
+    workflowId: workflowId.present ? workflowId.value : this.workflowId,
+    runKey: runKey ?? this.runKey,
+    outcome: outcome ?? this.outcome,
+    conclusion: conclusion ?? this.conclusion,
+    branch: branch.present ? branch.value : this.branch,
+    finishedAt: finishedAt.present ? finishedAt.value : this.finishedAt,
+    url: url.present ? url.value : this.url,
+  );
+  CiRunHistoryRow copyWithCompanion(CiRunHistoryCompanion data) {
+    return CiRunHistoryRow(
+      id: data.id.present ? data.id.value : this.id,
+      provider: data.provider.present ? data.provider.value : this.provider,
+      repoKey: data.repoKey.present ? data.repoKey.value : this.repoKey,
+      repoDisplay: data.repoDisplay.present
+          ? data.repoDisplay.value
+          : this.repoDisplay,
+      workflow: data.workflow.present ? data.workflow.value : this.workflow,
+      workflowId: data.workflowId.present
+          ? data.workflowId.value
+          : this.workflowId,
+      runKey: data.runKey.present ? data.runKey.value : this.runKey,
+      outcome: data.outcome.present ? data.outcome.value : this.outcome,
+      conclusion: data.conclusion.present
+          ? data.conclusion.value
+          : this.conclusion,
+      branch: data.branch.present ? data.branch.value : this.branch,
+      finishedAt: data.finishedAt.present
+          ? data.finishedAt.value
+          : this.finishedAt,
+      url: data.url.present ? data.url.value : this.url,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CiRunHistoryRow(')
+          ..write('id: $id, ')
+          ..write('provider: $provider, ')
+          ..write('repoKey: $repoKey, ')
+          ..write('repoDisplay: $repoDisplay, ')
+          ..write('workflow: $workflow, ')
+          ..write('workflowId: $workflowId, ')
+          ..write('runKey: $runKey, ')
+          ..write('outcome: $outcome, ')
+          ..write('conclusion: $conclusion, ')
+          ..write('branch: $branch, ')
+          ..write('finishedAt: $finishedAt, ')
+          ..write('url: $url')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    provider,
+    repoKey,
+    repoDisplay,
+    workflow,
+    workflowId,
+    runKey,
+    outcome,
+    conclusion,
+    branch,
+    finishedAt,
+    url,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CiRunHistoryRow &&
+          other.id == this.id &&
+          other.provider == this.provider &&
+          other.repoKey == this.repoKey &&
+          other.repoDisplay == this.repoDisplay &&
+          other.workflow == this.workflow &&
+          other.workflowId == this.workflowId &&
+          other.runKey == this.runKey &&
+          other.outcome == this.outcome &&
+          other.conclusion == this.conclusion &&
+          other.branch == this.branch &&
+          other.finishedAt == this.finishedAt &&
+          other.url == this.url);
+}
+
+class CiRunHistoryCompanion extends UpdateCompanion<CiRunHistoryRow> {
+  final Value<int> id;
+  final Value<String> provider;
+  final Value<String> repoKey;
+  final Value<String> repoDisplay;
+  final Value<String> workflow;
+  final Value<String?> workflowId;
+  final Value<String> runKey;
+  final Value<String> outcome;
+  final Value<String> conclusion;
+  final Value<String?> branch;
+  final Value<int?> finishedAt;
+  final Value<String?> url;
+  const CiRunHistoryCompanion({
+    this.id = const Value.absent(),
+    this.provider = const Value.absent(),
+    this.repoKey = const Value.absent(),
+    this.repoDisplay = const Value.absent(),
+    this.workflow = const Value.absent(),
+    this.workflowId = const Value.absent(),
+    this.runKey = const Value.absent(),
+    this.outcome = const Value.absent(),
+    this.conclusion = const Value.absent(),
+    this.branch = const Value.absent(),
+    this.finishedAt = const Value.absent(),
+    this.url = const Value.absent(),
+  });
+  CiRunHistoryCompanion.insert({
+    this.id = const Value.absent(),
+    required String provider,
+    required String repoKey,
+    required String repoDisplay,
+    required String workflow,
+    this.workflowId = const Value.absent(),
+    required String runKey,
+    required String outcome,
+    required String conclusion,
+    this.branch = const Value.absent(),
+    this.finishedAt = const Value.absent(),
+    this.url = const Value.absent(),
+  }) : provider = Value(provider),
+       repoKey = Value(repoKey),
+       repoDisplay = Value(repoDisplay),
+       workflow = Value(workflow),
+       runKey = Value(runKey),
+       outcome = Value(outcome),
+       conclusion = Value(conclusion);
+  static Insertable<CiRunHistoryRow> custom({
+    Expression<int>? id,
+    Expression<String>? provider,
+    Expression<String>? repoKey,
+    Expression<String>? repoDisplay,
+    Expression<String>? workflow,
+    Expression<String>? workflowId,
+    Expression<String>? runKey,
+    Expression<String>? outcome,
+    Expression<String>? conclusion,
+    Expression<String>? branch,
+    Expression<int>? finishedAt,
+    Expression<String>? url,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (provider != null) 'provider': provider,
+      if (repoKey != null) 'repo_key': repoKey,
+      if (repoDisplay != null) 'repo_display': repoDisplay,
+      if (workflow != null) 'workflow': workflow,
+      if (workflowId != null) 'workflow_id': workflowId,
+      if (runKey != null) 'run_key': runKey,
+      if (outcome != null) 'outcome': outcome,
+      if (conclusion != null) 'conclusion': conclusion,
+      if (branch != null) 'branch': branch,
+      if (finishedAt != null) 'finished_at': finishedAt,
+      if (url != null) 'url': url,
+    });
+  }
+
+  CiRunHistoryCompanion copyWith({
+    Value<int>? id,
+    Value<String>? provider,
+    Value<String>? repoKey,
+    Value<String>? repoDisplay,
+    Value<String>? workflow,
+    Value<String?>? workflowId,
+    Value<String>? runKey,
+    Value<String>? outcome,
+    Value<String>? conclusion,
+    Value<String?>? branch,
+    Value<int?>? finishedAt,
+    Value<String?>? url,
+  }) {
+    return CiRunHistoryCompanion(
+      id: id ?? this.id,
+      provider: provider ?? this.provider,
+      repoKey: repoKey ?? this.repoKey,
+      repoDisplay: repoDisplay ?? this.repoDisplay,
+      workflow: workflow ?? this.workflow,
+      workflowId: workflowId ?? this.workflowId,
+      runKey: runKey ?? this.runKey,
+      outcome: outcome ?? this.outcome,
+      conclusion: conclusion ?? this.conclusion,
+      branch: branch ?? this.branch,
+      finishedAt: finishedAt ?? this.finishedAt,
+      url: url ?? this.url,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (provider.present) {
+      map['provider'] = Variable<String>(provider.value);
+    }
+    if (repoKey.present) {
+      map['repo_key'] = Variable<String>(repoKey.value);
+    }
+    if (repoDisplay.present) {
+      map['repo_display'] = Variable<String>(repoDisplay.value);
+    }
+    if (workflow.present) {
+      map['workflow'] = Variable<String>(workflow.value);
+    }
+    if (workflowId.present) {
+      map['workflow_id'] = Variable<String>(workflowId.value);
+    }
+    if (runKey.present) {
+      map['run_key'] = Variable<String>(runKey.value);
+    }
+    if (outcome.present) {
+      map['outcome'] = Variable<String>(outcome.value);
+    }
+    if (conclusion.present) {
+      map['conclusion'] = Variable<String>(conclusion.value);
+    }
+    if (branch.present) {
+      map['branch'] = Variable<String>(branch.value);
+    }
+    if (finishedAt.present) {
+      map['finished_at'] = Variable<int>(finishedAt.value);
+    }
+    if (url.present) {
+      map['url'] = Variable<String>(url.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CiRunHistoryCompanion(')
+          ..write('id: $id, ')
+          ..write('provider: $provider, ')
+          ..write('repoKey: $repoKey, ')
+          ..write('repoDisplay: $repoDisplay, ')
+          ..write('workflow: $workflow, ')
+          ..write('workflowId: $workflowId, ')
+          ..write('runKey: $runKey, ')
+          ..write('outcome: $outcome, ')
+          ..write('conclusion: $conclusion, ')
+          ..write('branch: $branch, ')
+          ..write('finishedAt: $finishedAt, ')
+          ..write('url: $url')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4380,6 +5081,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $NotificationKnownReposTable notificationKnownRepos =
       $NotificationKnownReposTable(this);
+  late final $CiRunHistoryTable ciRunHistory = $CiRunHistoryTable(this);
   late final Index idxMetricSnapshotsRepoKey = Index(
     'idx_metric_snapshots_repo_key',
     'CREATE INDEX idx_metric_snapshots_repo_key ON metric_snapshots (repo_key)',
@@ -4416,6 +5118,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_notification_seen_seen_id',
     'CREATE UNIQUE INDEX idx_notification_seen_seen_id ON notification_seen (seen_id)',
   );
+  late final Index idxCiRunHistoryRunKey = Index(
+    'idx_ci_run_history_run_key',
+    'CREATE UNIQUE INDEX idx_ci_run_history_run_key ON ci_run_history (run_key)',
+  );
+  late final Index idxCiRunHistoryRepoKey = Index(
+    'idx_ci_run_history_repo_key',
+    'CREATE INDEX idx_ci_run_history_repo_key ON ci_run_history (repo_key)',
+  );
+  late final Index idxCiRunHistoryFinishedAt = Index(
+    'idx_ci_run_history_finished_at',
+    'CREATE INDEX idx_ci_run_history_finished_at ON ci_run_history (finished_at)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4431,6 +5145,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     syncState,
     notificationSeen,
     notificationKnownRepos,
+    ciRunHistory,
     idxMetricSnapshotsRepoKey,
     idxActivityEventsRepoKey,
     idxActivityEventsOccurredAt,
@@ -4440,6 +5155,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxRepoRunsRepoKey,
     idxRepoReleasesRepoKey,
     idxNotificationSeenSeenId,
+    idxCiRunHistoryRunKey,
+    idxCiRunHistoryRepoKey,
+    idxCiRunHistoryFinishedAt,
   ];
 }
 
@@ -6756,6 +7474,341 @@ typedef $$NotificationKnownReposTableProcessedTableManager =
       NotificationKnownRepoRow,
       PrefetchHooks Function()
     >;
+typedef $$CiRunHistoryTableCreateCompanionBuilder =
+    CiRunHistoryCompanion Function({
+      Value<int> id,
+      required String provider,
+      required String repoKey,
+      required String repoDisplay,
+      required String workflow,
+      Value<String?> workflowId,
+      required String runKey,
+      required String outcome,
+      required String conclusion,
+      Value<String?> branch,
+      Value<int?> finishedAt,
+      Value<String?> url,
+    });
+typedef $$CiRunHistoryTableUpdateCompanionBuilder =
+    CiRunHistoryCompanion Function({
+      Value<int> id,
+      Value<String> provider,
+      Value<String> repoKey,
+      Value<String> repoDisplay,
+      Value<String> workflow,
+      Value<String?> workflowId,
+      Value<String> runKey,
+      Value<String> outcome,
+      Value<String> conclusion,
+      Value<String?> branch,
+      Value<int?> finishedAt,
+      Value<String?> url,
+    });
+
+class $$CiRunHistoryTableFilterComposer
+    extends Composer<_$AppDatabase, $CiRunHistoryTable> {
+  $$CiRunHistoryTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get provider => $composableBuilder(
+    column: $table.provider,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get repoKey => $composableBuilder(
+    column: $table.repoKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get repoDisplay => $composableBuilder(
+    column: $table.repoDisplay,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get workflow => $composableBuilder(
+    column: $table.workflow,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get workflowId => $composableBuilder(
+    column: $table.workflowId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get runKey => $composableBuilder(
+    column: $table.runKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get outcome => $composableBuilder(
+    column: $table.outcome,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get conclusion => $composableBuilder(
+    column: $table.conclusion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get branch => $composableBuilder(
+    column: $table.branch,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get finishedAt => $composableBuilder(
+    column: $table.finishedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CiRunHistoryTableOrderingComposer
+    extends Composer<_$AppDatabase, $CiRunHistoryTable> {
+  $$CiRunHistoryTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get provider => $composableBuilder(
+    column: $table.provider,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get repoKey => $composableBuilder(
+    column: $table.repoKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get repoDisplay => $composableBuilder(
+    column: $table.repoDisplay,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get workflow => $composableBuilder(
+    column: $table.workflow,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get workflowId => $composableBuilder(
+    column: $table.workflowId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get runKey => $composableBuilder(
+    column: $table.runKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get outcome => $composableBuilder(
+    column: $table.outcome,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get conclusion => $composableBuilder(
+    column: $table.conclusion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get branch => $composableBuilder(
+    column: $table.branch,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get finishedAt => $composableBuilder(
+    column: $table.finishedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CiRunHistoryTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CiRunHistoryTable> {
+  $$CiRunHistoryTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get provider =>
+      $composableBuilder(column: $table.provider, builder: (column) => column);
+
+  GeneratedColumn<String> get repoKey =>
+      $composableBuilder(column: $table.repoKey, builder: (column) => column);
+
+  GeneratedColumn<String> get repoDisplay => $composableBuilder(
+    column: $table.repoDisplay,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get workflow =>
+      $composableBuilder(column: $table.workflow, builder: (column) => column);
+
+  GeneratedColumn<String> get workflowId => $composableBuilder(
+    column: $table.workflowId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get runKey =>
+      $composableBuilder(column: $table.runKey, builder: (column) => column);
+
+  GeneratedColumn<String> get outcome =>
+      $composableBuilder(column: $table.outcome, builder: (column) => column);
+
+  GeneratedColumn<String> get conclusion => $composableBuilder(
+    column: $table.conclusion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get branch =>
+      $composableBuilder(column: $table.branch, builder: (column) => column);
+
+  GeneratedColumn<int> get finishedAt => $composableBuilder(
+    column: $table.finishedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get url =>
+      $composableBuilder(column: $table.url, builder: (column) => column);
+}
+
+class $$CiRunHistoryTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CiRunHistoryTable,
+          CiRunHistoryRow,
+          $$CiRunHistoryTableFilterComposer,
+          $$CiRunHistoryTableOrderingComposer,
+          $$CiRunHistoryTableAnnotationComposer,
+          $$CiRunHistoryTableCreateCompanionBuilder,
+          $$CiRunHistoryTableUpdateCompanionBuilder,
+          (
+            CiRunHistoryRow,
+            BaseReferences<_$AppDatabase, $CiRunHistoryTable, CiRunHistoryRow>,
+          ),
+          CiRunHistoryRow,
+          PrefetchHooks Function()
+        > {
+  $$CiRunHistoryTableTableManager(_$AppDatabase db, $CiRunHistoryTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CiRunHistoryTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CiRunHistoryTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CiRunHistoryTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> provider = const Value.absent(),
+                Value<String> repoKey = const Value.absent(),
+                Value<String> repoDisplay = const Value.absent(),
+                Value<String> workflow = const Value.absent(),
+                Value<String?> workflowId = const Value.absent(),
+                Value<String> runKey = const Value.absent(),
+                Value<String> outcome = const Value.absent(),
+                Value<String> conclusion = const Value.absent(),
+                Value<String?> branch = const Value.absent(),
+                Value<int?> finishedAt = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+              }) => CiRunHistoryCompanion(
+                id: id,
+                provider: provider,
+                repoKey: repoKey,
+                repoDisplay: repoDisplay,
+                workflow: workflow,
+                workflowId: workflowId,
+                runKey: runKey,
+                outcome: outcome,
+                conclusion: conclusion,
+                branch: branch,
+                finishedAt: finishedAt,
+                url: url,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String provider,
+                required String repoKey,
+                required String repoDisplay,
+                required String workflow,
+                Value<String?> workflowId = const Value.absent(),
+                required String runKey,
+                required String outcome,
+                required String conclusion,
+                Value<String?> branch = const Value.absent(),
+                Value<int?> finishedAt = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+              }) => CiRunHistoryCompanion.insert(
+                id: id,
+                provider: provider,
+                repoKey: repoKey,
+                repoDisplay: repoDisplay,
+                workflow: workflow,
+                workflowId: workflowId,
+                runKey: runKey,
+                outcome: outcome,
+                conclusion: conclusion,
+                branch: branch,
+                finishedAt: finishedAt,
+                url: url,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CiRunHistoryTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CiRunHistoryTable,
+      CiRunHistoryRow,
+      $$CiRunHistoryTableFilterComposer,
+      $$CiRunHistoryTableOrderingComposer,
+      $$CiRunHistoryTableAnnotationComposer,
+      $$CiRunHistoryTableCreateCompanionBuilder,
+      $$CiRunHistoryTableUpdateCompanionBuilder,
+      (
+        CiRunHistoryRow,
+        BaseReferences<_$AppDatabase, $CiRunHistoryTable, CiRunHistoryRow>,
+      ),
+      CiRunHistoryRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -6783,4 +7836,6 @@ class $AppDatabaseManager {
         _db,
         _db.notificationKnownRepos,
       );
+  $$CiRunHistoryTableTableManager get ciRunHistory =>
+      $$CiRunHistoryTableTableManager(_db, _db.ciRunHistory);
 }

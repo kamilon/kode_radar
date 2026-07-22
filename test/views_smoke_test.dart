@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kode_radar/activity_service.dart';
+import 'package:kode_radar/ci_run_history.dart';
 import 'package:kode_radar/metric_snapshot.dart';
 import 'package:kode_radar/person.dart';
 import 'package:kode_radar/team.dart';
@@ -8,6 +9,7 @@ import 'package:kode_radar/team_service.dart';
 import 'package:kode_radar/views/age_histogram_view.dart';
 import 'package:kode_radar/views/bubble_view.dart';
 import 'package:kode_radar/views/ci_grid_view.dart';
+import 'package:kode_radar/views/ci_trends_view.dart';
 import 'package:kode_radar/views/contributor_cloud_view.dart';
 import 'package:kode_radar/views/donut_view.dart';
 import 'package:kode_radar/views/freshness_view.dart';
@@ -111,6 +113,19 @@ InsightsData _sampleData() {
         reviewRequests: 2,
       ),
     ],
+    ciTrends: CiWorkflowTrend.aggregate([
+      for (var i = 0; i < 4; i++)
+        CiRunSample(
+          provider: 'github',
+          repoKey: 'github:acme/kode',
+          repoDisplay: 'acme/kode',
+          workflow: 'CI',
+          runKey: 'github:acme/kode:$i',
+          outcome: i.isEven ? CiOutcome.success : CiOutcome.failure,
+          conclusion: i.isEven ? 'success' : 'failure',
+          finishedAt: DateTime.utc(2026, 3, 1, 12 - i),
+        ),
+    ], now: DateTime.utc(2026, 3, 1, 13)),
     loadedAt: DateTime.now(),
   );
 }
@@ -133,6 +148,7 @@ void main() {
     'Quadrant': (d) => QuadrantView(data: d),
     'Donut': (d) => DonutView(data: d),
     'CiGrid': (d) => CiGridView(data: d),
+    'CiTrends': (d) => CiTrendsView(data: d),
     'Treemap': (d) => TreemapView(data: d),
     'AgeHistogram': (d) => AgeHistogramView(data: d),
     'Heatmap': (d) => HeatmapView(data: d),
