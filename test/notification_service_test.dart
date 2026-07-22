@@ -248,4 +248,90 @@ void main() {
       );
     });
   });
+
+  group('notifiableItems', () {
+    AttentionItem item(String id, String repo) => AttentionItem(
+      id: id,
+      category: 'reviewRequested',
+      severity: 3000,
+      titleTemplate: id,
+      subtitleTemplate: '',
+      repoDisplay: repo,
+    );
+
+    test('excludes items from muted repos', () {
+      final items = [
+        item('a', 'acme/api'),
+        item('b', 'acme/web'),
+        item('c', 'acme/api'),
+      ];
+      final result = NotificationService.notifiableItems(
+        items,
+        {'a', 'b', 'c'},
+        {'acme/api'},
+      );
+      expect(result.map((i) => i.id), ['b']);
+    });
+
+    test('keeps only new ids when nothing is muted', () {
+      final items = [item('a', 'acme/api'), item('b', 'acme/web')];
+      final result = NotificationService.notifiableItems(items, {
+        'a',
+      }, const {});
+      expect(result.map((i) => i.id), ['a']);
+    });
+  });
+
+  group('baselineIdsToRecord', () {
+    AttentionItem item(String id, String repo) => AttentionItem(
+      id: id,
+      category: 'reviewRequested',
+      severity: 3000,
+      titleTemplate: id,
+      subtitleTemplate: '',
+      repoDisplay: repo,
+    );
+
+    final items = [item('a', 'acme/api'), item('b', 'acme/web')];
+
+    test('records all current ids outside quiet hours', () {
+      expect(
+        NotificationService.baselineIdsToRecord(
+          currentIds: {'a', 'b'},
+          items: items,
+          mutedDisplays: {'acme/api'},
+          firstRun: false,
+          inQuietHours: false,
+        ),
+        {'a', 'b'},
+      );
+    });
+
+    test('records all current ids on the first run during quiet hours', () {
+      expect(
+        NotificationService.baselineIdsToRecord(
+          currentIds: {'a', 'b'},
+          items: items,
+          mutedDisplays: const {},
+          firstRun: true,
+          inQuietHours: true,
+        ),
+        {'a', 'b'},
+      );
+    });
+
+    test('during quiet hours records only muted ids (defers the rest)', () {
+      // 'a' (muted repo) is recorded so unmute can't replay it; 'b' is deferred.
+      expect(
+        NotificationService.baselineIdsToRecord(
+          currentIds: {'a', 'b'},
+          items: items,
+          mutedDisplays: {'acme/api'},
+          firstRun: false,
+          inQuietHours: true,
+        ),
+        {'a'},
+      );
+    });
+  });
 }

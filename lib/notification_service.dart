@@ -5,6 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'attention_service.dart';
+import 'mute_store.dart';
 import 'notification_seen_store.dart';
 import 'preferences_store.dart';
 import 'repo_store.dart';
@@ -108,10 +109,11 @@ class NotificationService {
       );
       final now = DateTime.now();
       final appPrefs = await PreferencesStore.load();
-      // Quiet hours *defer*: we hold the notification and, crucially, do NOT
-      // advance the baseline, so these items surface on the next refresh after
-      // quiet hours end. A disabled toggle instead *drops* (baseline advances
-      // below) so re-enabling never replays a backlog.
+      // Quiet hours *defer*: we hold the notification and, for unmuted items,
+      // do NOT advance the baseline, so they surface on the next refresh after
+      // quiet hours end. Muted items still have their baseline advanced (below)
+      // so unmuting never replays a backlog — muting drops, it doesn't defer. A
+      // disabled notifications toggle likewise drops (baseline advances below).
       final inQuietHours =
           appPrefs.notificationsEnabled &&
           appPrefs.quietHoursEnabled &&
@@ -121,33 +123,89 @@ class NotificationService {
             appPrefs.quietEndHour,
           );
 
+      // Read the muted repos once: used both to filter notifications and to
+      // still advance the baseline for muted items during quiet hours (below).
+      final muted = await MuteStore.mutedDisplays();
+
       if (newIds.isNotEmpty &&
           PreferencesStore.notificationsAllowed(appPrefs, now)) {
-        final newItems = attention
-            .where((item) => newIds.contains(item.id))
-            .toList(growable: false);
+        // Exclude items from muted repos (their items still appear in the
+        // inbox; muting only suppresses the notification).
+        final newItems = notifiableItems(attention, newIds, muted);
         await _showSummaryNotification(newItems);
       }
 
-      // Seed on first run always; otherwise hold the baseline while deferring
-      // for quiet hours.
-      if (shouldAdvanceBaseline(
+      // Advance the seen baseline. Normally (first run / outside quiet hours) we
+      // record every current id + mark repos known. During quiet hours we defer
+      // unmuted items (hold their baseline so they surface after quiet hours)
+      // but still record muted items, so unmuting never replays a backlog —
+      // muting drops, it doesn't defer.
+      final advanceAll = shouldAdvanceBaseline(
         firstRun: firstRun,
         inQuietHours: inQuietHours,
-      )) {
+      );
+      final baselineIds = baselineIdsToRecord(
+        currentIds: currentIds,
+        items: attention,
+        mutedDisplays: muted,
+        firstRun: firstRun,
+        inQuietHours: inQuietHours,
+      );
+      if (advanceAll || baselineIds.isNotEmpty) {
         // Additive, atomic union in the DB: ids are never dropped (a
         // transiently-failed repo keeps its baseline) and concurrent isolates
-        // can't clobber each other's snapshot. Repos are recorded so their first
-        // appearance is only ever seeded once.
-        await NotificationSeenStore.recordBaseline(currentIds, monitoredRepos);
+        // can't clobber each other's snapshot. Repos are recorded (only in the
+        // full-advance case) so their first appearance is only ever seeded once.
+        await NotificationSeenStore.recordBaseline(
+          baselineIds,
+          advanceAll ? monitoredRepos : const <String>{},
+        );
       }
     } catch (e) {
       debugPrint('Failed to process attention notifications: $e');
     }
   }
 
+  /// The item ids to record into the seen baseline this cycle. Normally (first
+  /// run or outside quiet hours) that's every id in [currentIds]. During quiet
+  /// hours we defer unmuted items (hold their baseline so they notify after
+  /// quiet hours end) but still record muted items, so unmuting can't replay a
+  /// backlog that accrued while muted.
+  @visibleForTesting
+  static Set<String> baselineIdsToRecord({
+    required Set<String> currentIds,
+    required List<AttentionItem> items,
+    required Set<String> mutedDisplays,
+    required bool firstRun,
+    required bool inQuietHours,
+  }) {
+    if (firstRun || !inQuietHours) return currentIds;
+    return items
+        .where((item) => mutedDisplays.contains(item.repoDisplay))
+        .map((item) => item.id)
+        .toSet();
+  }
+
   static Set<String> diffNew(Set<String> seen, Iterable<String> current) =>
       current.toSet().difference(seen);
+
+  /// The items to actually notify about: those whose id is in [newIds] and whose
+  /// repo isn't in [mutedDisplays]. Muting suppresses only the notification —
+  /// the items still show in the inbox, and the seen baseline still advances.
+  @visibleForTesting
+  static List<AttentionItem> notifiableItems(
+    List<AttentionItem> items,
+    Set<String> newIds,
+    Set<String> mutedDisplays,
+  ) {
+    return items
+        .where(
+          (item) =>
+              newIds.contains(item.id) &&
+              !mutedDisplays.contains(item.repoDisplay),
+        )
+        .toList(growable: false);
+  }
 
   /// The payload for a summary notification. When exactly one new item is being
   /// notified and it has a trusted PR URL, the payload is that URL so a tap can
