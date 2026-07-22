@@ -67,11 +67,14 @@ class CiRunHistoryStore {
     return _runLocked(() async {
       final db = _database;
       await db.transaction(() async {
-        for (final s in rows) {
-          await db
-              .into(db.ciRunHistory)
-              .insert(_companion(s), mode: InsertMode.insertOrReplace);
-        }
+        // One batched insert-or-replace rather than a statement per sample.
+        await db.batch((b) {
+          b.insertAll(
+            db.ciRunHistory,
+            rows.map(_companion).toList(),
+            mode: InsertMode.insertOrReplace,
+          );
+        });
         // Age prune. Every stored row has a finish time (see the filter above),
         // so nothing escapes this by being null.
         final cutoff = at.subtract(retention).millisecondsSinceEpoch;

@@ -44,7 +44,9 @@ class CiRunSample {
   /// The workflow / pipeline / build-definition name this run belongs to.
   final String workflow;
 
-  /// Stable de-duplication key, e.g. `github:<repoKey>:<runId>:<attempt>`.
+  /// Stable de-duplication key, e.g. `<repoKey>:<runId>:<attempt>` — repoKey
+  /// already carries the provider prefix (`github:owner/name`), so it's not
+  /// repeated here.
   final String runKey;
 
   /// Normalized [CiOutcome].
