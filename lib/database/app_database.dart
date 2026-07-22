@@ -126,6 +126,36 @@ class RepoReleases extends Table {
   TextColumn get url => text().nullable()();
 }
 
+/// Accumulated CI run history (Phase 5): one row per observed workflow/build
+/// run, de-duplicated by [runKey] (a provider-stable id), so repeated syncs
+/// that re-see the same recent runs union rather than double-count. Powers the
+/// "CI trends" insight (per-workflow failure rate + flakiness). Rows are pruned
+/// by age and a per-repo cap so the table stays bounded. `outcome` is the
+/// normalized bucket (success/failure/running/other); `conclusion` keeps the
+/// raw provider result for display.
+@DataClassName('CiRunHistoryRow')
+@TableIndex(
+  name: 'idx_ci_run_history_run_key',
+  columns: {#runKey},
+  unique: true,
+)
+@TableIndex(name: 'idx_ci_run_history_repo_key', columns: {#repoKey})
+@TableIndex(name: 'idx_ci_run_history_finished_at', columns: {#finishedAt})
+class CiRunHistory extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get provider => text()();
+  TextColumn get repoKey => text()();
+  TextColumn get repoDisplay => text()();
+  TextColumn get workflow => text()();
+  TextColumn get workflowId => text().nullable()();
+  TextColumn get runKey => text()();
+  TextColumn get outcome => text()();
+  TextColumn get conclusion => text()();
+  TextColumn get branch => text().nullable()();
+  IntColumn get finishedAt => integer().nullable()();
+  TextColumn get url => text().nullable()();
+}
+
 /// Per-scope sync provenance (Phase 3): when a cache scope was last refreshed
 /// successfully from the network, so the UI can show an accurate "updated Xh
 /// ago" instead of "just now" when it's actually displaying stale cached data.
@@ -198,6 +228,7 @@ class AppMeta extends Table {
     SyncState,
     NotificationSeen,
     NotificationKnownRepos,
+    CiRunHistory,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -208,7 +239,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forExecutor(super.executor);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -355,6 +386,27 @@ class AppDatabase extends _$AppDatabase {
             }
           }
         }
+      }
+      // v10 adds the CI run-history table (Phase 5). Same idempotent-DDL
+      // reasoning as the earlier steps: `createTable` emits only
+      // `CREATE TABLE IF NOT EXISTS`, so create each @TableIndex explicitly with
+      // `CREATE [UNIQUE] INDEX IF NOT EXISTS` — the unique run_key index the
+      // record() upsert relies on especially — so a concurrent open from the
+      // background-sync isolate can't crash on an already-existing object.
+      if (from < 10) {
+        await m.createTable(ciRunHistory);
+        await customStatement(
+          'CREATE UNIQUE INDEX IF NOT EXISTS idx_ci_run_history_run_key '
+          'ON ci_run_history (run_key)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_ci_run_history_repo_key '
+          'ON ci_run_history (repo_key)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_ci_run_history_finished_at '
+          'ON ci_run_history (finished_at)',
+        );
       }
     },
   );

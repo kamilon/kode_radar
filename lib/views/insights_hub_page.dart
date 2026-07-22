@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../activity_service.dart';
 import '../app_http.dart';
+import '../ci_run_history_store.dart';
 import '../metric_store.dart';
 import '../people_service.dart';
 import '../team_service.dart';
@@ -9,6 +10,7 @@ import '../team_store.dart';
 import 'age_histogram_view.dart';
 import 'bubble_view.dart';
 import 'ci_grid_view.dart';
+import 'ci_trends_view.dart';
 import 'contributor_cloud_view.dart';
 import 'donut_view.dart';
 import 'freshness_view.dart';
@@ -77,6 +79,12 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       blurb: 'Status board, failures first',
       icon: Icons.grid_view,
       builder: (d) => CiGridView(data: d),
+    ),
+    ViewInfo(
+      title: 'CI trends',
+      blurb: 'Flaky & chronically-failing workflows',
+      icon: Icons.timeline,
+      builder: (d) => CiTrendsView(data: d),
     ),
     ViewInfo(
       title: 'Treemap',
@@ -168,6 +176,12 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       // Record a trend snapshot from this load too (deduped ~1/day), matching
       // Radar/Teams/Digest, so opening Insights also advances trend history.
       await MetricStore.capture(activities, restrictToMonitored: true);
+      // Accumulate this fetch's CI runs, then read back the rolled-up trends so
+      // the CI trends view reflects the freshest history.
+      await CiRunHistoryStore.recordSafely(
+        activities.expand((a) => a.recentRuns),
+      );
+      final ciTrends = await CiRunHistoryStore.trends();
       final history = await MetricStore.all();
       final teams = await TeamStore.list();
       final rollups = TeamService.rollupAll(teams, activities);
@@ -179,6 +193,7 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
           teams: teams,
           rollups: rollups,
           people: people,
+          ciTrends: ciTrends,
           loadedAt: DateTime.now(),
         );
         _loading = false;

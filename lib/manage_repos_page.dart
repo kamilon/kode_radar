@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'register_github_repo.dart';
 import 'register_ado_repo.dart';
 import 'activity_event_store.dart';
+import 'ci_run_history_store.dart';
 import 'repo_detail_store.dart';
 import 'sync_state_store.dart';
 import 'ignore_store.dart';
@@ -257,6 +258,7 @@ class _ManageReposPageState extends State<ManageReposPage> {
         await RepoDetailStore.removeRepo(repoKey);
         await SyncStateStore.remove(SyncStateStore.repoScope(repoKey));
         await TeamStore.removeRepoFromAll(repoKey);
+        await CiRunHistoryStore.removeRepo(repoKey);
       }
     }
     // Mutes are keyed by display label, not repoKey, so prune independently:

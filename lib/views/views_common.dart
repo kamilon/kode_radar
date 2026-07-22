@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../activity_service.dart';
+import '../ci_run_history.dart';
 import '../metric_snapshot.dart';
 import '../person.dart';
 import '../team.dart';
@@ -19,6 +20,7 @@ class InsightsData {
     required List<Team> teams,
     required Map<String, TeamRollup> rollups,
     required List<Person> people,
+    List<CiWorkflowTrend> ciTrends = const [],
     required this.loadedAt,
   }) : activities = List.unmodifiable(activities),
        history = Map.unmodifiable({
@@ -29,13 +31,18 @@ class InsightsData {
        rollups = Map.unmodifiable({
          for (final e in rollups.entries) e.key: _readonlyRollup(e.value),
        }),
-       people = List.unmodifiable(people);
+       people = List.unmodifiable(people),
+       ciTrends = List.unmodifiable(ciTrends);
 
   final List<RepoActivity> activities;
   final Map<String, List<MetricSnapshot>> history;
   final List<Team> teams;
   final Map<String, TeamRollup> rollups;
   final List<Person> people;
+
+  /// Per-workflow CI trends (failure rate + flakiness), worst-first, from the
+  /// accumulated run history. Empty until the sync/insights load records runs.
+  final List<CiWorkflowTrend> ciTrends;
   final DateTime loadedAt;
 
   /// Repos whose fetch succeeded (errored repos would read as healthy zeros).

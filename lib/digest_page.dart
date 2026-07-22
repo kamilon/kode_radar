@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'activity_service.dart';
 import 'app_http.dart';
+import 'ci_run_history_store.dart';
 import 'digest_service.dart';
 import 'metric_store.dart';
 import 'team_store.dart';
@@ -38,6 +39,9 @@ class _DigestPageState extends State<DigestPage> {
       // Record a trend snapshot from this load too (deduped ~1/day) before
       // reading history, so the digest reflects the latest observation.
       await MetricStore.capture(activities, restrictToMonitored: true);
+      await CiRunHistoryStore.recordSafely(
+        activities.expand((a) => a.recentRuns),
+      );
       final history = await MetricStore.all();
       final digest = DigestService.buildDigest(
         teams: teams,

@@ -8,6 +8,7 @@ import 'activity_service.dart';
 import 'app_http.dart';
 import 'attention_service.dart';
 import 'attention_store.dart';
+import 'ci_run_history_store.dart';
 import 'identity_store.dart';
 import 'metric_store.dart';
 import 'monitored_repos.dart';
@@ -80,6 +81,11 @@ class SyncService {
           activities,
           restrictToMonitored: true,
           force: force,
+        );
+        // Accumulate the CI runs this fetch observed so the "CI trends" insight
+        // can surface chronically-failing / flaky workflows over time.
+        await CiRunHistoryStore.recordSafely(
+          activities.expand((a) => a.recentRuns),
         );
         return SyncResult(activityOk: true, repoCount: activities.length);
       } catch (e, st) {
