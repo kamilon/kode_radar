@@ -58,8 +58,9 @@ class AppPreferences {
       backgroundSyncEnabled:
           backgroundSyncEnabled ?? this.backgroundSyncEnabled,
       notifyMineOnly: notifyMineOnly ?? this.notifyMineOnly,
-      silencedNotifyCategories:
-          silencedNotifyCategories ?? this.silencedNotifyCategories,
+      silencedNotifyCategories: Set.unmodifiable(
+        silencedNotifyCategories ?? this.silencedNotifyCategories,
+      ),
     );
   }
 }
@@ -111,9 +112,10 @@ class PreferencesStore {
           prefs.getBool(_backgroundSyncEnabled) ??
           defaults.backgroundSyncEnabled,
       notifyMineOnly: prefs.getBool(_notifyMineOnly) ?? defaults.notifyMineOnly,
-      silencedNotifyCategories:
-          prefs.getStringList(_silencedNotifyCategories)?.toSet() ??
-          defaults.silencedNotifyCategories,
+      silencedNotifyCategories: Set.unmodifiable(
+        prefs.getStringList(_silencedNotifyCategories)?.toSet() ??
+            defaults.silencedNotifyCategories,
+      ),
     );
   }
 
