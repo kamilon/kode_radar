@@ -26,8 +26,10 @@ class CiWorkflowDetailPage extends StatelessWidget {
         final af = a.finishedAt;
         final bf = b.finishedAt;
         if (af == null && bf == null) return 0;
-        if (af == null) return -1;
-        if (bf == null) return 1;
+        // Newest first; a run with no finish time sorts last (its time is
+        // unknown, so it isn't "newest").
+        if (af == null) return 1;
+        if (bf == null) return -1;
         return bf.compareTo(af);
       });
     final ratePct = (trend.failureRate * 100).round();

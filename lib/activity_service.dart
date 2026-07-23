@@ -346,7 +346,11 @@ class ActivityService {
           : null;
       final effectiveDefault = defaultBranch ?? payloadDefault;
       final headBranch = _stringValue(run, 'head_branch');
-      // Scope to the default branch when we can determine it.
+      // Keep only runs we can confirm are on the default branch. When the
+      // default is known, a run whose head_branch is missing/mismatched is
+      // excluded rather than risk polluting the trend with a non-default run
+      // (head_branch is present for normal push/PR runs, so this rarely drops
+      // real default-branch runs).
       if (effectiveDefault != null && headBranch != effectiveDefault) continue;
       final attempt = _intValue(run['run_attempt']) ?? 1;
       final name =
@@ -393,7 +397,10 @@ class ActivityService {
       final id = build['id'];
       if (id == null) continue;
       final sourceBranch = _stringValue(build, 'sourceBranch');
-      // Scope to the default branch when we know it.
+      // Keep only builds we can confirm are on the default branch; when the
+      // default is known, a build whose sourceBranch is missing/mismatched is
+      // excluded rather than risk polluting the trend (sourceBranch is present
+      // for normal builds, so this rarely drops real default-branch builds).
       if (defaultBranch != null && sourceBranch != defaultBranch) continue;
       final definition = build['definition'];
       final defName = definition is Map ? definition['name'] : null;
