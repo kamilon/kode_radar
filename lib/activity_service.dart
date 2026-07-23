@@ -374,8 +374,6 @@ class ActivityService {
 
   /// Parses an Azure DevOps `/build/builds` response into [CiRunSample]s.
   /// Builds without an `id` are skipped (no stable de-dup key). ADO retries
-  /// Parses an Azure DevOps `/build/builds` response into [CiRunSample]s.
-  /// Builds without an `id` are skipped (no stable de-dup key). ADO retries
   /// create new build ids, so the id alone is a stable per-run key.
   ///
   /// Only builds on the repo's [defaultBranch] (e.g. `refs/heads/main`, from

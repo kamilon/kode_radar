@@ -124,10 +124,12 @@ InsightsData _sampleData() {
           runKey: 'github:acme/kode:$i',
           outcome: i.isEven ? CiOutcome.success : CiOutcome.failure,
           conclusion: i.isEven ? 'success' : 'failure',
-          finishedAt: DateTime.now().subtract(Duration(days: i)),
+          // Within the default 30-day window of the fixed loadedAt below, so
+          // the view renders populated deterministically (no wall-clock).
+          finishedAt: DateTime.utc(2026, 3, 1, 12).subtract(Duration(days: i)),
         ),
     ],
-    loadedAt: DateTime.now(),
+    loadedAt: DateTime.utc(2026, 3, 1, 13),
   );
 }
 
