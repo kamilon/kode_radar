@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../activity_service.dart';
 import '../app_http.dart';
 import '../ci_run_history_store.dart';
+import '../cycle_time_service.dart';
+import '../cycle_time_store.dart';
 import '../metric_store.dart';
 import '../people_service.dart';
 import '../team_service.dart';
@@ -12,6 +14,7 @@ import 'bubble_view.dart';
 import 'ci_grid_view.dart';
 import 'ci_trends_view.dart';
 import 'contributor_cloud_view.dart';
+import 'cycle_time_view.dart';
 import 'donut_view.dart';
 import 'freshness_view.dart';
 import 'health_gauge_view.dart';
@@ -85,6 +88,12 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       blurb: 'Flaky & chronically-failing workflows',
       icon: Icons.timeline,
       builder: (d) => CiTrendsView(data: d),
+    ),
+    ViewInfo(
+      title: 'Cycle time',
+      blurb: 'PR review & merge speed trends',
+      icon: Icons.speed,
+      builder: (d) => CycleTimeView(data: d),
     ),
     ViewInfo(
       title: 'Treemap',
@@ -169,9 +178,10 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
     try {
       // Run the two network passes concurrently so loading People doesn't
       // serialize behind the repo activity fetch.
-      final (activities, people) = await (
+      final (activities, people, cycleFetched) = await (
         ActivityService.computeAll(client: AppHttp.client),
         PeopleService.computeAll(client: AppHttp.client),
+        CycleTimeService.computeAll(client: AppHttp.client),
       ).wait;
       // Record a trend snapshot from this load too (deduped ~1/day), matching
       // Radar/Teams/Digest, so opening Insights also advances trend history.
@@ -182,6 +192,9 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
         activities.expand((a) => a.recentRuns),
       );
       final ciRunSamples = await CiRunHistoryStore.allSamples();
+      // Same accumulate-then-read pattern for merged-PR cycle-time history.
+      await CycleTimeStore.recordSafely(cycleFetched);
+      final cycleSamples = await CycleTimeStore.allSamples();
       final history = await MetricStore.all();
       final teams = await TeamStore.list();
       final rollups = TeamService.rollupAll(teams, activities);
@@ -194,6 +207,7 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
           rollups: rollups,
           people: people,
           ciRunSamples: ciRunSamples,
+          cycleSamples: cycleSamples,
           loadedAt: DateTime.now(),
         );
         _loading = false;

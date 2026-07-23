@@ -9,6 +9,8 @@ import 'app_http.dart';
 import 'attention_service.dart';
 import 'attention_store.dart';
 import 'ci_run_history_store.dart';
+import 'cycle_time_service.dart';
+import 'cycle_time_store.dart';
 import 'identity_store.dart';
 import 'metric_store.dart';
 import 'monitored_repos.dart';
@@ -159,6 +161,17 @@ class SyncService {
       }
     }
 
+    Future<void> cyclePhase() async {
+      try {
+        final samples = await withDeadline(
+          CycleTimeService.computeAll(client: httpClient),
+        );
+        await CycleTimeStore.recordSafely(samples);
+      } catch (e, st) {
+        debugPrint('SyncService: cycle-time capture failed: $e\n$st');
+      }
+    }
+
     if (background) {
       // Concurrent to fit the budget; each phase is independently deadlined and
       // its errors isolated.
@@ -167,6 +180,7 @@ class SyncService {
         activityPhase().then((r) => result = r),
         attentionPhase(),
         feedPhase(),
+        cyclePhase(),
       ]);
       return result;
     }
@@ -174,6 +188,7 @@ class SyncService {
     final result = await activityPhase();
     await attentionPhase();
     await feedPhase();
+    await cyclePhase();
     return result;
   }
 }

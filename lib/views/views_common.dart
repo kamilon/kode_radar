@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../activity_service.dart';
 import '../ci_run_history.dart';
+import '../cycle_time.dart';
 import '../metric_snapshot.dart';
 import '../person.dart';
 import '../team.dart';
@@ -21,6 +22,7 @@ class InsightsData {
     required Map<String, TeamRollup> rollups,
     required List<Person> people,
     List<CiRunSample> ciRunSamples = const [],
+    List<MergedPrSample> cycleSamples = const [],
     required this.loadedAt,
   }) : activities = List.unmodifiable(activities),
        history = Map.unmodifiable({
@@ -32,7 +34,8 @@ class InsightsData {
          for (final e in rollups.entries) e.key: _readonlyRollup(e.value),
        }),
        people = List.unmodifiable(people),
-       ciRunSamples = List.unmodifiable(ciRunSamples);
+       ciRunSamples = List.unmodifiable(ciRunSamples),
+       cycleSamples = List.unmodifiable(cycleSamples);
 
   final List<RepoActivity> activities;
   final Map<String, List<MetricSnapshot>> history;
@@ -43,6 +46,10 @@ class InsightsData {
   /// Raw CI run history (default-branch, bounded by retention) from which the
   /// CI trends view aggregates per-workflow trends for a user-chosen window.
   final List<CiRunSample> ciRunSamples;
+
+  /// Raw merged-PR history (bounded by retention) from which the cycle-time
+  /// view aggregates per-repo / per-team review- and merge-time medians.
+  final List<MergedPrSample> cycleSamples;
   final DateTime loadedAt;
 
   /// Repos whose fetch succeeded (errored repos would read as healthy zeros).
@@ -154,6 +161,21 @@ String? formatDurationMs(int? ms) {
   if (h > 0) return m > 0 ? '${h}h ${m}m' : '${h}h';
   if (m > 0) return s > 0 ? '${m}m ${s}s' : '${m}m';
   return '${s}s';
+}
+
+/// Formats a longer span (up to days) for cycle-time durations, which routinely
+/// run to days rather than the minutes/hours of a CI run. Returns null for
+/// null/non-positive input. E.g. `2d 4h`, `5h 30m`, `12m`.
+String? formatLongDurationMs(int? ms) {
+  if (ms == null || ms <= 0) return null;
+  final totalMinutes = ms ~/ 60000;
+  final d = totalMinutes ~/ 1440;
+  final h = (totalMinutes % 1440) ~/ 60;
+  final m = totalMinutes % 60;
+  if (d > 0) return h > 0 ? '${d}d ${h}h' : '${d}d';
+  if (h > 0) return m > 0 ? '${h}h ${m}m' : '${h}h';
+  if (m > 0) return '${m}m';
+  return '<1m';
 }
 
 // ---- Freshness / heat scale -------------------------------------------------

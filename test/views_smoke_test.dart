@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kode_radar/activity_service.dart';
 import 'package:kode_radar/ci_run_history.dart';
+import 'package:kode_radar/cycle_time.dart';
 import 'package:kode_radar/metric_snapshot.dart';
 import 'package:kode_radar/person.dart';
 import 'package:kode_radar/team.dart';
@@ -11,6 +12,7 @@ import 'package:kode_radar/views/bubble_view.dart';
 import 'package:kode_radar/views/ci_grid_view.dart';
 import 'package:kode_radar/views/ci_trends_view.dart';
 import 'package:kode_radar/views/contributor_cloud_view.dart';
+import 'package:kode_radar/views/cycle_time_view.dart';
 import 'package:kode_radar/views/donut_view.dart';
 import 'package:kode_radar/views/freshness_view.dart';
 import 'package:kode_radar/views/health_gauge_view.dart';
@@ -129,6 +131,24 @@ InsightsData _sampleData() {
           finishedAt: DateTime.utc(2026, 3, 1, 12).subtract(Duration(days: i)),
         ),
     ],
+    cycleSamples: [
+      for (var i = 0; i < 4; i++)
+        MergedPrSample(
+          provider: 'github',
+          repoKey: 'github:o/alpha',
+          repoDisplay: 'o/alpha',
+          prKey: 'github:o/alpha:$i',
+          // Within the default 30-day window of the fixed loadedAt below.
+          createdAt: DateTime.utc(2026, 2, 25, 8).subtract(Duration(days: i)),
+          mergedAt: DateTime.utc(2026, 2, 26, 8).subtract(Duration(days: i)),
+          firstReviewAt: i.isEven
+              ? DateTime.utc(2026, 2, 25, 14).subtract(Duration(days: i))
+              : null,
+          title: 'PR $i',
+          author: 'alice',
+          url: 'https://github.com/o/alpha/pull/$i',
+        ),
+    ],
     loadedAt: DateTime.utc(2026, 3, 1, 13),
   );
 }
@@ -152,6 +172,7 @@ void main() {
     'Donut': (d) => DonutView(data: d),
     'CiGrid': (d) => CiGridView(data: d),
     'CiTrends': (d) => CiTrendsView(data: d),
+    'CycleTime': (d) => CycleTimeView(data: d),
     'Treemap': (d) => TreemapView(data: d),
     'AgeHistogram': (d) => AgeHistogramView(data: d),
     'Heatmap': (d) => HeatmapView(data: d),

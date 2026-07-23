@@ -5114,6 +5114,658 @@ class CiRunHistoryCompanion extends UpdateCompanion<CiRunHistoryRow> {
   }
 }
 
+class $MergedPrsTable extends MergedPrs
+    with TableInfo<$MergedPrsTable, MergedPrRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MergedPrsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _providerMeta = const VerificationMeta(
+    'provider',
+  );
+  @override
+  late final GeneratedColumn<String> provider = GeneratedColumn<String>(
+    'provider',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _repoKeyMeta = const VerificationMeta(
+    'repoKey',
+  );
+  @override
+  late final GeneratedColumn<String> repoKey = GeneratedColumn<String>(
+    'repo_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _repoDisplayMeta = const VerificationMeta(
+    'repoDisplay',
+  );
+  @override
+  late final GeneratedColumn<String> repoDisplay = GeneratedColumn<String>(
+    'repo_display',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _prKeyMeta = const VerificationMeta('prKey');
+  @override
+  late final GeneratedColumn<String> prKey = GeneratedColumn<String>(
+    'pr_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _mergedAtMeta = const VerificationMeta(
+    'mergedAt',
+  );
+  @override
+  late final GeneratedColumn<int> mergedAt = GeneratedColumn<int>(
+    'merged_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _firstReviewAtMeta = const VerificationMeta(
+    'firstReviewAt',
+  );
+  @override
+  late final GeneratedColumn<int> firstReviewAt = GeneratedColumn<int>(
+    'first_review_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _authorMeta = const VerificationMeta('author');
+  @override
+  late final GeneratedColumn<String> author = GeneratedColumn<String>(
+    'author',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _urlMeta = const VerificationMeta('url');
+  @override
+  late final GeneratedColumn<String> url = GeneratedColumn<String>(
+    'url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    provider,
+    repoKey,
+    repoDisplay,
+    prKey,
+    createdAt,
+    mergedAt,
+    firstReviewAt,
+    title,
+    author,
+    url,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'merged_prs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MergedPrRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('provider')) {
+      context.handle(
+        _providerMeta,
+        provider.isAcceptableOrUnknown(data['provider']!, _providerMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_providerMeta);
+    }
+    if (data.containsKey('repo_key')) {
+      context.handle(
+        _repoKeyMeta,
+        repoKey.isAcceptableOrUnknown(data['repo_key']!, _repoKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_repoKeyMeta);
+    }
+    if (data.containsKey('repo_display')) {
+      context.handle(
+        _repoDisplayMeta,
+        repoDisplay.isAcceptableOrUnknown(
+          data['repo_display']!,
+          _repoDisplayMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_repoDisplayMeta);
+    }
+    if (data.containsKey('pr_key')) {
+      context.handle(
+        _prKeyMeta,
+        prKey.isAcceptableOrUnknown(data['pr_key']!, _prKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_prKeyMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('merged_at')) {
+      context.handle(
+        _mergedAtMeta,
+        mergedAt.isAcceptableOrUnknown(data['merged_at']!, _mergedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_mergedAtMeta);
+    }
+    if (data.containsKey('first_review_at')) {
+      context.handle(
+        _firstReviewAtMeta,
+        firstReviewAt.isAcceptableOrUnknown(
+          data['first_review_at']!,
+          _firstReviewAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    }
+    if (data.containsKey('author')) {
+      context.handle(
+        _authorMeta,
+        author.isAcceptableOrUnknown(data['author']!, _authorMeta),
+      );
+    }
+    if (data.containsKey('url')) {
+      context.handle(
+        _urlMeta,
+        url.isAcceptableOrUnknown(data['url']!, _urlMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MergedPrRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MergedPrRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      provider: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider'],
+      )!,
+      repoKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}repo_key'],
+      )!,
+      repoDisplay: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}repo_display'],
+      )!,
+      prKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pr_key'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      mergedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}merged_at'],
+      )!,
+      firstReviewAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}first_review_at'],
+      ),
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      ),
+      author: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}author'],
+      ),
+      url: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}url'],
+      ),
+    );
+  }
+
+  @override
+  $MergedPrsTable createAlias(String alias) {
+    return $MergedPrsTable(attachedDatabase, alias);
+  }
+}
+
+class MergedPrRow extends DataClass implements Insertable<MergedPrRow> {
+  final int id;
+  final String provider;
+  final String repoKey;
+  final String repoDisplay;
+  final String prKey;
+  final int createdAt;
+  final int mergedAt;
+  final int? firstReviewAt;
+  final String? title;
+  final String? author;
+  final String? url;
+  const MergedPrRow({
+    required this.id,
+    required this.provider,
+    required this.repoKey,
+    required this.repoDisplay,
+    required this.prKey,
+    required this.createdAt,
+    required this.mergedAt,
+    this.firstReviewAt,
+    this.title,
+    this.author,
+    this.url,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['provider'] = Variable<String>(provider);
+    map['repo_key'] = Variable<String>(repoKey);
+    map['repo_display'] = Variable<String>(repoDisplay);
+    map['pr_key'] = Variable<String>(prKey);
+    map['created_at'] = Variable<int>(createdAt);
+    map['merged_at'] = Variable<int>(mergedAt);
+    if (!nullToAbsent || firstReviewAt != null) {
+      map['first_review_at'] = Variable<int>(firstReviewAt);
+    }
+    if (!nullToAbsent || title != null) {
+      map['title'] = Variable<String>(title);
+    }
+    if (!nullToAbsent || author != null) {
+      map['author'] = Variable<String>(author);
+    }
+    if (!nullToAbsent || url != null) {
+      map['url'] = Variable<String>(url);
+    }
+    return map;
+  }
+
+  MergedPrsCompanion toCompanion(bool nullToAbsent) {
+    return MergedPrsCompanion(
+      id: Value(id),
+      provider: Value(provider),
+      repoKey: Value(repoKey),
+      repoDisplay: Value(repoDisplay),
+      prKey: Value(prKey),
+      createdAt: Value(createdAt),
+      mergedAt: Value(mergedAt),
+      firstReviewAt: firstReviewAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(firstReviewAt),
+      title: title == null && nullToAbsent
+          ? const Value.absent()
+          : Value(title),
+      author: author == null && nullToAbsent
+          ? const Value.absent()
+          : Value(author),
+      url: url == null && nullToAbsent ? const Value.absent() : Value(url),
+    );
+  }
+
+  factory MergedPrRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MergedPrRow(
+      id: serializer.fromJson<int>(json['id']),
+      provider: serializer.fromJson<String>(json['provider']),
+      repoKey: serializer.fromJson<String>(json['repoKey']),
+      repoDisplay: serializer.fromJson<String>(json['repoDisplay']),
+      prKey: serializer.fromJson<String>(json['prKey']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      mergedAt: serializer.fromJson<int>(json['mergedAt']),
+      firstReviewAt: serializer.fromJson<int?>(json['firstReviewAt']),
+      title: serializer.fromJson<String?>(json['title']),
+      author: serializer.fromJson<String?>(json['author']),
+      url: serializer.fromJson<String?>(json['url']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'provider': serializer.toJson<String>(provider),
+      'repoKey': serializer.toJson<String>(repoKey),
+      'repoDisplay': serializer.toJson<String>(repoDisplay),
+      'prKey': serializer.toJson<String>(prKey),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'mergedAt': serializer.toJson<int>(mergedAt),
+      'firstReviewAt': serializer.toJson<int?>(firstReviewAt),
+      'title': serializer.toJson<String?>(title),
+      'author': serializer.toJson<String?>(author),
+      'url': serializer.toJson<String?>(url),
+    };
+  }
+
+  MergedPrRow copyWith({
+    int? id,
+    String? provider,
+    String? repoKey,
+    String? repoDisplay,
+    String? prKey,
+    int? createdAt,
+    int? mergedAt,
+    Value<int?> firstReviewAt = const Value.absent(),
+    Value<String?> title = const Value.absent(),
+    Value<String?> author = const Value.absent(),
+    Value<String?> url = const Value.absent(),
+  }) => MergedPrRow(
+    id: id ?? this.id,
+    provider: provider ?? this.provider,
+    repoKey: repoKey ?? this.repoKey,
+    repoDisplay: repoDisplay ?? this.repoDisplay,
+    prKey: prKey ?? this.prKey,
+    createdAt: createdAt ?? this.createdAt,
+    mergedAt: mergedAt ?? this.mergedAt,
+    firstReviewAt: firstReviewAt.present
+        ? firstReviewAt.value
+        : this.firstReviewAt,
+    title: title.present ? title.value : this.title,
+    author: author.present ? author.value : this.author,
+    url: url.present ? url.value : this.url,
+  );
+  MergedPrRow copyWithCompanion(MergedPrsCompanion data) {
+    return MergedPrRow(
+      id: data.id.present ? data.id.value : this.id,
+      provider: data.provider.present ? data.provider.value : this.provider,
+      repoKey: data.repoKey.present ? data.repoKey.value : this.repoKey,
+      repoDisplay: data.repoDisplay.present
+          ? data.repoDisplay.value
+          : this.repoDisplay,
+      prKey: data.prKey.present ? data.prKey.value : this.prKey,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      mergedAt: data.mergedAt.present ? data.mergedAt.value : this.mergedAt,
+      firstReviewAt: data.firstReviewAt.present
+          ? data.firstReviewAt.value
+          : this.firstReviewAt,
+      title: data.title.present ? data.title.value : this.title,
+      author: data.author.present ? data.author.value : this.author,
+      url: data.url.present ? data.url.value : this.url,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MergedPrRow(')
+          ..write('id: $id, ')
+          ..write('provider: $provider, ')
+          ..write('repoKey: $repoKey, ')
+          ..write('repoDisplay: $repoDisplay, ')
+          ..write('prKey: $prKey, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('mergedAt: $mergedAt, ')
+          ..write('firstReviewAt: $firstReviewAt, ')
+          ..write('title: $title, ')
+          ..write('author: $author, ')
+          ..write('url: $url')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    provider,
+    repoKey,
+    repoDisplay,
+    prKey,
+    createdAt,
+    mergedAt,
+    firstReviewAt,
+    title,
+    author,
+    url,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MergedPrRow &&
+          other.id == this.id &&
+          other.provider == this.provider &&
+          other.repoKey == this.repoKey &&
+          other.repoDisplay == this.repoDisplay &&
+          other.prKey == this.prKey &&
+          other.createdAt == this.createdAt &&
+          other.mergedAt == this.mergedAt &&
+          other.firstReviewAt == this.firstReviewAt &&
+          other.title == this.title &&
+          other.author == this.author &&
+          other.url == this.url);
+}
+
+class MergedPrsCompanion extends UpdateCompanion<MergedPrRow> {
+  final Value<int> id;
+  final Value<String> provider;
+  final Value<String> repoKey;
+  final Value<String> repoDisplay;
+  final Value<String> prKey;
+  final Value<int> createdAt;
+  final Value<int> mergedAt;
+  final Value<int?> firstReviewAt;
+  final Value<String?> title;
+  final Value<String?> author;
+  final Value<String?> url;
+  const MergedPrsCompanion({
+    this.id = const Value.absent(),
+    this.provider = const Value.absent(),
+    this.repoKey = const Value.absent(),
+    this.repoDisplay = const Value.absent(),
+    this.prKey = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.mergedAt = const Value.absent(),
+    this.firstReviewAt = const Value.absent(),
+    this.title = const Value.absent(),
+    this.author = const Value.absent(),
+    this.url = const Value.absent(),
+  });
+  MergedPrsCompanion.insert({
+    this.id = const Value.absent(),
+    required String provider,
+    required String repoKey,
+    required String repoDisplay,
+    required String prKey,
+    required int createdAt,
+    required int mergedAt,
+    this.firstReviewAt = const Value.absent(),
+    this.title = const Value.absent(),
+    this.author = const Value.absent(),
+    this.url = const Value.absent(),
+  }) : provider = Value(provider),
+       repoKey = Value(repoKey),
+       repoDisplay = Value(repoDisplay),
+       prKey = Value(prKey),
+       createdAt = Value(createdAt),
+       mergedAt = Value(mergedAt);
+  static Insertable<MergedPrRow> custom({
+    Expression<int>? id,
+    Expression<String>? provider,
+    Expression<String>? repoKey,
+    Expression<String>? repoDisplay,
+    Expression<String>? prKey,
+    Expression<int>? createdAt,
+    Expression<int>? mergedAt,
+    Expression<int>? firstReviewAt,
+    Expression<String>? title,
+    Expression<String>? author,
+    Expression<String>? url,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (provider != null) 'provider': provider,
+      if (repoKey != null) 'repo_key': repoKey,
+      if (repoDisplay != null) 'repo_display': repoDisplay,
+      if (prKey != null) 'pr_key': prKey,
+      if (createdAt != null) 'created_at': createdAt,
+      if (mergedAt != null) 'merged_at': mergedAt,
+      if (firstReviewAt != null) 'first_review_at': firstReviewAt,
+      if (title != null) 'title': title,
+      if (author != null) 'author': author,
+      if (url != null) 'url': url,
+    });
+  }
+
+  MergedPrsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? provider,
+    Value<String>? repoKey,
+    Value<String>? repoDisplay,
+    Value<String>? prKey,
+    Value<int>? createdAt,
+    Value<int>? mergedAt,
+    Value<int?>? firstReviewAt,
+    Value<String?>? title,
+    Value<String?>? author,
+    Value<String?>? url,
+  }) {
+    return MergedPrsCompanion(
+      id: id ?? this.id,
+      provider: provider ?? this.provider,
+      repoKey: repoKey ?? this.repoKey,
+      repoDisplay: repoDisplay ?? this.repoDisplay,
+      prKey: prKey ?? this.prKey,
+      createdAt: createdAt ?? this.createdAt,
+      mergedAt: mergedAt ?? this.mergedAt,
+      firstReviewAt: firstReviewAt ?? this.firstReviewAt,
+      title: title ?? this.title,
+      author: author ?? this.author,
+      url: url ?? this.url,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (provider.present) {
+      map['provider'] = Variable<String>(provider.value);
+    }
+    if (repoKey.present) {
+      map['repo_key'] = Variable<String>(repoKey.value);
+    }
+    if (repoDisplay.present) {
+      map['repo_display'] = Variable<String>(repoDisplay.value);
+    }
+    if (prKey.present) {
+      map['pr_key'] = Variable<String>(prKey.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (mergedAt.present) {
+      map['merged_at'] = Variable<int>(mergedAt.value);
+    }
+    if (firstReviewAt.present) {
+      map['first_review_at'] = Variable<int>(firstReviewAt.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (author.present) {
+      map['author'] = Variable<String>(author.value);
+    }
+    if (url.present) {
+      map['url'] = Variable<String>(url.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MergedPrsCompanion(')
+          ..write('id: $id, ')
+          ..write('provider: $provider, ')
+          ..write('repoKey: $repoKey, ')
+          ..write('repoDisplay: $repoDisplay, ')
+          ..write('prKey: $prKey, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('mergedAt: $mergedAt, ')
+          ..write('firstReviewAt: $firstReviewAt, ')
+          ..write('title: $title, ')
+          ..write('author: $author, ')
+          ..write('url: $url')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5133,6 +5785,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $NotificationKnownReposTable notificationKnownRepos =
       $NotificationKnownReposTable(this);
   late final $CiRunHistoryTable ciRunHistory = $CiRunHistoryTable(this);
+  late final $MergedPrsTable mergedPrs = $MergedPrsTable(this);
   late final Index idxMetricSnapshotsRepoKey = Index(
     'idx_metric_snapshots_repo_key',
     'CREATE INDEX idx_metric_snapshots_repo_key ON metric_snapshots (repo_key)',
@@ -5181,6 +5834,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_ci_run_history_finished_at',
     'CREATE INDEX idx_ci_run_history_finished_at ON ci_run_history (finished_at)',
   );
+  late final Index idxMergedPrsPrKey = Index(
+    'idx_merged_prs_pr_key',
+    'CREATE UNIQUE INDEX idx_merged_prs_pr_key ON merged_prs (pr_key)',
+  );
+  late final Index idxMergedPrsRepoKey = Index(
+    'idx_merged_prs_repo_key',
+    'CREATE INDEX idx_merged_prs_repo_key ON merged_prs (repo_key)',
+  );
+  late final Index idxMergedPrsMergedAt = Index(
+    'idx_merged_prs_merged_at',
+    'CREATE INDEX idx_merged_prs_merged_at ON merged_prs (merged_at)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5197,6 +5862,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     notificationSeen,
     notificationKnownRepos,
     ciRunHistory,
+    mergedPrs,
     idxMetricSnapshotsRepoKey,
     idxActivityEventsRepoKey,
     idxActivityEventsOccurredAt,
@@ -5209,6 +5875,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxCiRunHistoryRunKey,
     idxCiRunHistoryRepoKey,
     idxCiRunHistoryFinishedAt,
+    idxMergedPrsPrKey,
+    idxMergedPrsRepoKey,
+    idxMergedPrsMergedAt,
   ];
 }
 
@@ -7881,6 +8550,318 @@ typedef $$CiRunHistoryTableProcessedTableManager =
       CiRunHistoryRow,
       PrefetchHooks Function()
     >;
+typedef $$MergedPrsTableCreateCompanionBuilder =
+    MergedPrsCompanion Function({
+      Value<int> id,
+      required String provider,
+      required String repoKey,
+      required String repoDisplay,
+      required String prKey,
+      required int createdAt,
+      required int mergedAt,
+      Value<int?> firstReviewAt,
+      Value<String?> title,
+      Value<String?> author,
+      Value<String?> url,
+    });
+typedef $$MergedPrsTableUpdateCompanionBuilder =
+    MergedPrsCompanion Function({
+      Value<int> id,
+      Value<String> provider,
+      Value<String> repoKey,
+      Value<String> repoDisplay,
+      Value<String> prKey,
+      Value<int> createdAt,
+      Value<int> mergedAt,
+      Value<int?> firstReviewAt,
+      Value<String?> title,
+      Value<String?> author,
+      Value<String?> url,
+    });
+
+class $$MergedPrsTableFilterComposer
+    extends Composer<_$AppDatabase, $MergedPrsTable> {
+  $$MergedPrsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get provider => $composableBuilder(
+    column: $table.provider,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get repoKey => $composableBuilder(
+    column: $table.repoKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get repoDisplay => $composableBuilder(
+    column: $table.repoDisplay,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get prKey => $composableBuilder(
+    column: $table.prKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get mergedAt => $composableBuilder(
+    column: $table.mergedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get firstReviewAt => $composableBuilder(
+    column: $table.firstReviewAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get author => $composableBuilder(
+    column: $table.author,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$MergedPrsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MergedPrsTable> {
+  $$MergedPrsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get provider => $composableBuilder(
+    column: $table.provider,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get repoKey => $composableBuilder(
+    column: $table.repoKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get repoDisplay => $composableBuilder(
+    column: $table.repoDisplay,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get prKey => $composableBuilder(
+    column: $table.prKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get mergedAt => $composableBuilder(
+    column: $table.mergedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get firstReviewAt => $composableBuilder(
+    column: $table.firstReviewAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get author => $composableBuilder(
+    column: $table.author,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get url => $composableBuilder(
+    column: $table.url,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$MergedPrsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MergedPrsTable> {
+  $$MergedPrsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get provider =>
+      $composableBuilder(column: $table.provider, builder: (column) => column);
+
+  GeneratedColumn<String> get repoKey =>
+      $composableBuilder(column: $table.repoKey, builder: (column) => column);
+
+  GeneratedColumn<String> get repoDisplay => $composableBuilder(
+    column: $table.repoDisplay,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get prKey =>
+      $composableBuilder(column: $table.prKey, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get mergedAt =>
+      $composableBuilder(column: $table.mergedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get firstReviewAt => $composableBuilder(
+    column: $table.firstReviewAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get author =>
+      $composableBuilder(column: $table.author, builder: (column) => column);
+
+  GeneratedColumn<String> get url =>
+      $composableBuilder(column: $table.url, builder: (column) => column);
+}
+
+class $$MergedPrsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MergedPrsTable,
+          MergedPrRow,
+          $$MergedPrsTableFilterComposer,
+          $$MergedPrsTableOrderingComposer,
+          $$MergedPrsTableAnnotationComposer,
+          $$MergedPrsTableCreateCompanionBuilder,
+          $$MergedPrsTableUpdateCompanionBuilder,
+          (
+            MergedPrRow,
+            BaseReferences<_$AppDatabase, $MergedPrsTable, MergedPrRow>,
+          ),
+          MergedPrRow,
+          PrefetchHooks Function()
+        > {
+  $$MergedPrsTableTableManager(_$AppDatabase db, $MergedPrsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MergedPrsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MergedPrsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MergedPrsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> provider = const Value.absent(),
+                Value<String> repoKey = const Value.absent(),
+                Value<String> repoDisplay = const Value.absent(),
+                Value<String> prKey = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> mergedAt = const Value.absent(),
+                Value<int?> firstReviewAt = const Value.absent(),
+                Value<String?> title = const Value.absent(),
+                Value<String?> author = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+              }) => MergedPrsCompanion(
+                id: id,
+                provider: provider,
+                repoKey: repoKey,
+                repoDisplay: repoDisplay,
+                prKey: prKey,
+                createdAt: createdAt,
+                mergedAt: mergedAt,
+                firstReviewAt: firstReviewAt,
+                title: title,
+                author: author,
+                url: url,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String provider,
+                required String repoKey,
+                required String repoDisplay,
+                required String prKey,
+                required int createdAt,
+                required int mergedAt,
+                Value<int?> firstReviewAt = const Value.absent(),
+                Value<String?> title = const Value.absent(),
+                Value<String?> author = const Value.absent(),
+                Value<String?> url = const Value.absent(),
+              }) => MergedPrsCompanion.insert(
+                id: id,
+                provider: provider,
+                repoKey: repoKey,
+                repoDisplay: repoDisplay,
+                prKey: prKey,
+                createdAt: createdAt,
+                mergedAt: mergedAt,
+                firstReviewAt: firstReviewAt,
+                title: title,
+                author: author,
+                url: url,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$MergedPrsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MergedPrsTable,
+      MergedPrRow,
+      $$MergedPrsTableFilterComposer,
+      $$MergedPrsTableOrderingComposer,
+      $$MergedPrsTableAnnotationComposer,
+      $$MergedPrsTableCreateCompanionBuilder,
+      $$MergedPrsTableUpdateCompanionBuilder,
+      (
+        MergedPrRow,
+        BaseReferences<_$AppDatabase, $MergedPrsTable, MergedPrRow>,
+      ),
+      MergedPrRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7910,4 +8891,6 @@ class $AppDatabaseManager {
       );
   $$CiRunHistoryTableTableManager get ciRunHistory =>
       $$CiRunHistoryTableTableManager(_db, _db.ciRunHistory);
+  $$MergedPrsTableTableManager get mergedPrs =>
+      $$MergedPrsTableTableManager(_db, _db.mergedPrs);
 }
