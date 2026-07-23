@@ -15,6 +15,30 @@ void main() {
     expect(prefs.quietHoursEnabled, isFalse);
     expect(prefs.feedLookbackDays, 14);
     expect(prefs.backgroundSyncEnabled, isTrue);
+    expect(prefs.notifyMineOnly, isFalse);
+    expect(prefs.silencedNotifyCategories, isEmpty);
+  });
+
+  test('notify mine-only setting round-trips through load()', () async {
+    await PreferencesStore.setNotifyMineOnly(true);
+    expect((await PreferencesStore.load()).notifyMineOnly, isTrue);
+    await PreferencesStore.setNotifyMineOnly(false);
+    expect((await PreferencesStore.load()).notifyMineOnly, isFalse);
+  });
+
+  test('silenced notify categories round-trip and toggle', () async {
+    await PreferencesStore.setCategorySilenced('oldOpenPr', true);
+    await PreferencesStore.setCategorySilenced('error', true);
+    expect((await PreferencesStore.load()).silencedNotifyCategories, {
+      'oldOpenPr',
+      'error',
+    });
+    // Idempotent add + independent remove.
+    await PreferencesStore.setCategorySilenced('oldOpenPr', true);
+    await PreferencesStore.setCategorySilenced('error', false);
+    expect((await PreferencesStore.load()).silencedNotifyCategories, {
+      'oldOpenPr',
+    });
   });
 
   test('background sync setting round-trips through load()', () async {

@@ -250,13 +250,19 @@ void main() {
   });
 
   group('notifiableItems', () {
-    AttentionItem item(String id, String repo) => AttentionItem(
+    AttentionItem item(
+      String id,
+      String repo, {
+      String category = 'reviewRequested',
+      bool isMine = false,
+    }) => AttentionItem(
       id: id,
-      category: 'reviewRequested',
+      category: category,
       severity: 3000,
       titleTemplate: id,
       subtitleTemplate: '',
       repoDisplay: repo,
+      isMine: isMine,
     );
 
     test('excludes items from muted repos', () {
@@ -268,28 +274,70 @@ void main() {
       final result = NotificationService.notifiableItems(
         items,
         {'a', 'b', 'c'},
-        {'acme/api'},
+        mutedDisplays: {'acme/api'},
+        silencedCategories: const {},
+        mineOnly: false,
       );
       expect(result.map((i) => i.id), ['b']);
     });
 
-    test('keeps only new ids when nothing is muted', () {
+    test('keeps only new ids when nothing is filtered', () {
       final items = [item('a', 'acme/api'), item('b', 'acme/web')];
-      final result = NotificationService.notifiableItems(items, {
-        'a',
-      }, const {});
+      final result = NotificationService.notifiableItems(
+        items,
+        {'a'},
+        mutedDisplays: const {},
+        silencedCategories: const {},
+        mineOnly: false,
+      );
+      expect(result.map((i) => i.id), ['a']);
+    });
+
+    test('excludes items in silenced categories', () {
+      final items = [
+        item('a', 'acme/api', category: 'reviewRequested'),
+        item('b', 'acme/web', category: 'oldOpenPr'),
+      ];
+      final result = NotificationService.notifiableItems(
+        items,
+        {'a', 'b'},
+        mutedDisplays: const {},
+        silencedCategories: {'oldOpenPr'},
+        mineOnly: false,
+      );
+      expect(result.map((i) => i.id), ['a']);
+    });
+
+    test('mineOnly excludes items that are not the user\'s', () {
+      final items = [
+        item('a', 'acme/api', isMine: true),
+        item('b', 'acme/web', isMine: false),
+      ];
+      final result = NotificationService.notifiableItems(
+        items,
+        {'a', 'b'},
+        mutedDisplays: const {},
+        silencedCategories: const {},
+        mineOnly: true,
+      );
       expect(result.map((i) => i.id), ['a']);
     });
   });
 
   group('baselineIdsToRecord', () {
-    AttentionItem item(String id, String repo) => AttentionItem(
+    AttentionItem item(
+      String id,
+      String repo, {
+      String category = 'reviewRequested',
+      bool isMine = false,
+    }) => AttentionItem(
       id: id,
-      category: 'reviewRequested',
+      category: category,
       severity: 3000,
       titleTemplate: id,
       subtitleTemplate: '',
       repoDisplay: repo,
+      isMine: isMine,
     );
 
     final items = [item('a', 'acme/api'), item('b', 'acme/web')];
@@ -300,6 +348,9 @@ void main() {
           currentIds: {'a', 'b'},
           items: items,
           mutedDisplays: {'acme/api'},
+          silencedCategories: const {},
+          mineOnly: false,
+          notificationsEnabled: true,
           firstRun: false,
           inQuietHours: false,
         ),
@@ -313,10 +364,35 @@ void main() {
           currentIds: {'a', 'b'},
           items: items,
           mutedDisplays: const {},
+          silencedCategories: const {},
+          mineOnly: false,
+          notificationsEnabled: true,
           firstRun: true,
           inQuietHours: true,
         ),
         {'a', 'b'},
+      );
+    });
+
+    test('records all ids when notifications are disabled (drops backlog)', () {
+      // Master off: never defer, or re-enabling would replay the backlog — even
+      // the not-mine item under mine-only is recorded.
+      final mixed = [
+        item('mine', 'acme/api', isMine: true),
+        item('other', 'acme/web', isMine: false),
+      ];
+      expect(
+        NotificationService.baselineIdsToRecord(
+          currentIds: {'mine', 'other'},
+          items: mixed,
+          mutedDisplays: const {},
+          silencedCategories: const {},
+          mineOnly: true,
+          notificationsEnabled: false,
+          firstRun: false,
+          inQuietHours: false,
+        ),
+        {'mine', 'other'},
       );
     });
 
@@ -327,10 +403,89 @@ void main() {
           currentIds: {'a', 'b'},
           items: items,
           mutedDisplays: {'acme/api'},
+          silencedCategories: const {},
+          mineOnly: false,
+          notificationsEnabled: true,
           firstRun: false,
           inQuietHours: true,
         ),
         {'a'},
+      );
+    });
+
+    test(
+      'quiet hours: silenced drops (records); would-notify & not-mine defer',
+      () {
+        final mixed = [
+          item('rev', 'acme/api', category: 'reviewRequested', isMine: true),
+          item('old', 'acme/web', category: 'oldOpenPr', isMine: true),
+          item('other', 'acme/db', category: 'reviewRequested', isMine: false),
+        ];
+        // 'old' (silenced category) never notifies -> its baseline advances.
+        // 'rev' (would-notify) is deferred by quiet hours; 'other' (not mine,
+        // mine-only) is deferred by audience so it can notify if it becomes mine.
+        expect(
+          NotificationService.baselineIdsToRecord(
+            currentIds: {'rev', 'old', 'other'},
+            items: mixed,
+            mutedDisplays: const {},
+            silencedCategories: {'oldOpenPr'},
+            mineOnly: true,
+            notificationsEnabled: true,
+            firstRun: false,
+            inQuietHours: true,
+          ),
+          {'old'},
+        );
+      },
+    );
+
+    test(
+      'mine-only defers a not-mine item outside quiet hours (records rest)',
+      () {
+        // Regression for the "becomes mine later" miss: a not-mine item must NOT
+        // be recorded (dropped) under mine-only, or it could never notify once it
+        // becomes the user's.
+        final mixed = [
+          item('mine', 'acme/api', isMine: true),
+          item('other', 'acme/web', isMine: false),
+        ];
+        expect(
+          NotificationService.baselineIdsToRecord(
+            currentIds: {'mine', 'other'},
+            items: mixed,
+            mutedDisplays: const {},
+            silencedCategories: const {},
+            mineOnly: true,
+            notificationsEnabled: true,
+            firstRun: false,
+            inQuietHours: false,
+          ),
+          {'mine'},
+        );
+      },
+    );
+
+    test('first run seeds all but defers not-mine under mine-only', () {
+      // The pre-existing backlog is seeded (so it isn't announced on install),
+      // except a not-mine item under mine-only, which stays unseen so it can
+      // notify if it later becomes the user's.
+      final mixed = [
+        item('mine', 'acme/api', isMine: true),
+        item('other', 'acme/web', isMine: false),
+      ];
+      expect(
+        NotificationService.baselineIdsToRecord(
+          currentIds: {'mine', 'other'},
+          items: mixed,
+          mutedDisplays: const {},
+          silencedCategories: const {},
+          mineOnly: true,
+          notificationsEnabled: true,
+          firstRun: true,
+          inQuietHours: false,
+        ),
+        {'mine'},
       );
     });
   });

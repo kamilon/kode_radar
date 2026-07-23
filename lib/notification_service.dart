@@ -126,12 +126,20 @@ class NotificationService {
       // Read the muted repos once: used both to filter notifications and to
       // still advance the baseline for muted items during quiet hours (below).
       final muted = await MuteStore.mutedDisplays();
+      final silenced = appPrefs.silencedNotifyCategories;
+      final mineOnly = appPrefs.notifyMineOnly;
 
       if (newIds.isNotEmpty &&
           PreferencesStore.notificationsAllowed(appPrefs, now)) {
-        // Exclude items from muted repos (their items still appear in the
-        // inbox; muting only suppresses the notification).
-        final newItems = notifiableItems(attention, newIds, muted);
+        // Exclude muted repos, silenced categories, and (when mine-only) items
+        // that aren't the user's — they still appear in the inbox.
+        final newItems = notifiableItems(
+          attention,
+          newIds,
+          mutedDisplays: muted,
+          silencedCategories: silenced,
+          mineOnly: mineOnly,
+        );
         await _showSummaryNotification(newItems);
       }
 
@@ -148,6 +156,9 @@ class NotificationService {
         currentIds: currentIds,
         items: attention,
         mutedDisplays: muted,
+        silencedCategories: silenced,
+        mineOnly: mineOnly,
+        notificationsEnabled: appPrefs.notificationsEnabled,
         firstRun: firstRun,
         inQuietHours: inQuietHours,
       );
@@ -166,45 +177,85 @@ class NotificationService {
     }
   }
 
-  /// The item ids to record into the seen baseline this cycle. Normally (first
-  /// run or outside quiet hours) that's every id in [currentIds]. During quiet
-  /// hours we defer unmuted items (hold their baseline so they notify after
-  /// quiet hours end) but still record muted items, so unmuting can't replay a
-  /// backlog that accrued while muted.
+  /// The item ids to record into the seen baseline this cycle.
+  ///
+  /// - Notifications fully off: drop the whole backlog (record every id) — never
+  ///   defer, or re-enabling notifications would replay everything held.
+  /// - Muted repos / silenced categories **drop**: record their baseline so
+  ///   un-muting or re-enabling the category never replays a backlog. (They also
+  ///   won't notify on becoming the user's — correct, they were silenced.)
+  /// - Mine-only **defers** a not-mine item — including on the first run — by
+  ///   NOT recording it, so if it later becomes the user's (e.g. they're added
+  ///   as a reviewer, same id) it's still unseen and can notify.
+  /// - Otherwise a would-notify item is seeded on the first run (so the existing
+  ///   backlog isn't announced on install) and recorded whenever it's actually
+  ///   notified; during quiet hours it's held to notify once quiet hours end.
   @visibleForTesting
   static Set<String> baselineIdsToRecord({
     required Set<String> currentIds,
     required List<AttentionItem> items,
     required Set<String> mutedDisplays,
+    required Set<String> silencedCategories,
+    required bool mineOnly,
+    required bool notificationsEnabled,
     required bool firstRun,
     required bool inQuietHours,
   }) {
-    if (firstRun || !inQuietHours) return currentIds;
-    return items
-        .where((item) => mutedDisplays.contains(item.repoDisplay))
-        .map((item) => item.id)
-        .toSet();
+    if (!notificationsEnabled) return currentIds;
+    final ids = <String>{};
+    for (final item in items) {
+      if (mutedDisplays.contains(item.repoDisplay) ||
+          silencedCategories.contains(item.category)) {
+        ids.add(item.id); // dropped: record so re-enabling can't replay
+        continue;
+      }
+      if (mineOnly && !item.isMine) continue; // deferred by audience
+      if (firstRun || !inQuietHours) ids.add(item.id); // seeded / notified
+    }
+    return ids;
   }
 
   static Set<String> diffNew(Set<String> seen, Iterable<String> current) =>
       current.toSet().difference(seen);
 
-  /// The items to actually notify about: those whose id is in [newIds] and whose
-  /// repo isn't in [mutedDisplays]. Muting suppresses only the notification —
-  /// the items still show in the inbox, and the seen baseline still advances.
+  /// The items to actually notify about: those whose id is in [newIds] and that
+  /// pass the notification filters ([notifiesFor]). Suppressed items still show
+  /// in the inbox, and the seen baseline still advances for them.
   @visibleForTesting
   static List<AttentionItem> notifiableItems(
     List<AttentionItem> items,
-    Set<String> newIds,
-    Set<String> mutedDisplays,
-  ) {
+    Set<String> newIds, {
+    required Set<String> mutedDisplays,
+    required Set<String> silencedCategories,
+    required bool mineOnly,
+  }) {
     return items
         .where(
           (item) =>
               newIds.contains(item.id) &&
-              !mutedDisplays.contains(item.repoDisplay),
+              notifiesFor(
+                item,
+                mutedDisplays: mutedDisplays,
+                silencedCategories: silencedCategories,
+                mineOnly: mineOnly,
+              ),
         )
         .toList(growable: false);
+  }
+
+  /// Whether [item] should raise a notification given the user's filters: its
+  /// repo isn't muted, its category isn't silenced, and — when [mineOnly] — it
+  /// concerns the user. Pure; the inbox is unaffected by any of these.
+  @visibleForTesting
+  static bool notifiesFor(
+    AttentionItem item, {
+    required Set<String> mutedDisplays,
+    required Set<String> silencedCategories,
+    required bool mineOnly,
+  }) {
+    return !mutedDisplays.contains(item.repoDisplay) &&
+        !silencedCategories.contains(item.category) &&
+        (!mineOnly || item.isMine);
   }
 
   /// The payload for a summary notification. When exactly one new item is being

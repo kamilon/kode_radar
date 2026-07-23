@@ -25,7 +25,8 @@ class AttentionItem {
   /// Stable identity for the item (enables list keys and future snooze).
   final String id;
 
-  /// One of: `reviewRequested`, `changesRequested`, `oldOpenPr`, `error`.
+  /// One of: `reviewRequested`, `changesRequested`, `approved`, `oldOpenPr`,
+  /// `error`.
   final String category;
 
   /// Higher = more urgent (used for ranking). Category dominates age.
@@ -108,8 +109,9 @@ class AttentionService {
 
   // Category tiers; severity = tier * 1000 + age, so category always dominates
   // age in ranking while older items still sort first within a category.
-  static const int _tierReviewRequested = 3;
-  static const int _tierChangesRequested = 2;
+  static const int _tierReviewRequested = 4;
+  static const int _tierChangesRequested = 3;
+  static const int _tierApproved = 2;
   static const int _tierOldOpen = 1;
   static const int _tierError = 0;
 
@@ -122,14 +124,26 @@ class AttentionService {
   static const List<String> categories = [
     'reviewRequested',
     'changesRequested',
+    'approved',
     'oldOpenPr',
     'error',
+  ];
+
+  /// Categories that can actually raise a notification, for the notification
+  /// settings UI. Excludes `error`: error items appear in the inbox but are
+  /// stripped before the notification gate, so a toggle for them would be inert.
+  static const List<String> notifiableCategories = [
+    'reviewRequested',
+    'changesRequested',
+    'approved',
+    'oldOpenPr',
   ];
 
   /// A short, human-readable label for an attention [category].
   static String categoryLabel(String category) => switch (category) {
     'reviewRequested' => 'Review requested',
     'changesRequested' => 'Changes requested',
+    'approved' => 'Approved',
     'oldOpenPr' => 'Old open',
     'error' => 'Errors',
     _ => category,
@@ -188,6 +202,13 @@ class AttentionService {
       final changesRequested =
           decision == 'CHANGES_REQUESTED' ||
           _hasChangesRequestedReview(pr['latestOpinionatedReviews']);
+      // Approved & ready to merge: the required review decision is APPROVED, or
+      // (on repos without required reviews, where decision is null) an author
+      // left an approving review and none requested changes.
+      final approved =
+          decision == 'APPROVED' ||
+          (decision == null &&
+              _hasApprovingReview(pr['latestOpinionatedReviews']));
 
       final reviewRequests = pr['reviewRequests'];
       final pendingCount =
@@ -195,10 +216,11 @@ class AttentionService {
           ? reviewRequests['totalCount'] as int
           : 0;
       final reviewerLogins = _requestedReviewerLogins(reviewRequests);
+      final authoredByMe =
+          self.isNotEmpty && self.contains(author.trim().toLowerCase());
       final mine =
-          self.isNotEmpty &&
-          (self.contains(author.trim().toLowerCase()) ||
-              reviewerLogins.any(self.contains));
+          authoredByMe ||
+          (self.isNotEmpty && reviewerLogins.any(self.contains));
 
       final label = 'PR #$number';
       if (changesRequested) {
@@ -212,6 +234,21 @@ class AttentionService {
             url,
             createdAt: createdAt,
             isMine: mine,
+          ),
+        );
+      } else if (authoredByMe && approved) {
+        // Only surface "approved" for the user's OWN PRs — merging is the
+        // author's action. (A satisfied required decision wins even if an
+        // optional reviewer is still pending.)
+        items.add(
+          _approved(
+            repoDisplay,
+            label,
+            title,
+            author,
+            age,
+            url,
+            createdAt: createdAt,
           ),
         );
       } else if (decision == 'REVIEW_REQUIRED' || pendingCount > 0) {
@@ -277,6 +314,19 @@ class AttentionService {
     return false;
   }
 
+  /// True when any author's latest opinionated review is APPROVED — used to
+  /// detect an approved PR on repos without required reviews (null decision).
+  static bool _hasApprovingReview(dynamic latestOpinionatedReviews) {
+    final nodes = latestOpinionatedReviews is Map
+        ? latestOpinionatedReviews['nodes']
+        : null;
+    if (nodes is! List) return false;
+    for (final n in nodes) {
+      if (n is Map && n['state'] == 'APPROVED') return true;
+    }
+    return false;
+  }
+
   /// Builds attention items for an Azure DevOps repo from its active PR list.
   static List<AttentionItem> adoItems({
     required String repoDisplay,
@@ -317,10 +367,11 @@ class AttentionService {
       }
       final changesRequested = votes.any((v) => v is int && v < 0);
       final waitingOnReview = votes.any((v) => v == 0);
+      final approved = votes.any((v) => v is int && v > 0);
+      final authoredByMe =
+          self.isNotEmpty && self.contains(author.trim().toLowerCase());
       final mine =
-          self.isNotEmpty &&
-          (self.contains(author.trim().toLowerCase()) ||
-              reviewerNames.any(self.contains));
+          authoredByMe || (self.isNotEmpty && reviewerNames.any(self.contains));
 
       if (changesRequested) {
         items.add(
@@ -346,6 +397,19 @@ class AttentionService {
             url,
             createdAt: createdAt,
             isMine: mine,
+          ),
+        );
+      } else if (authoredByMe && approved) {
+        // My own PR has an approval and nothing pending/rejected.
+        items.add(
+          _approved(
+            repoDisplay,
+            'PR #$id',
+            title,
+            author,
+            age,
+            url,
+            createdAt: createdAt,
           ),
         );
       } else if ((age ?? 0) > oldOpenPrDays) {
@@ -413,6 +477,31 @@ class AttentionService {
       ageDays: ageDays,
       createdAt: createdAt,
       isMine: isMine,
+    );
+  }
+
+  static AttentionItem _approved(
+    String repoDisplay,
+    String prLabel,
+    String title,
+    String author,
+    int? ageDays,
+    String? url, {
+    DateTime? createdAt,
+  }) {
+    return AttentionItem(
+      id: 'approved:$repoDisplay:$prLabel',
+      category: 'approved',
+      severity: _severity(_tierApproved, ageDays),
+      titleTemplate: '$prLabel approved',
+      subtitleTemplate:
+          '$repoDisplay · $title · opened ${AttentionItem.ageToken} by $author',
+      repoDisplay: repoDisplay,
+      url: url,
+      ageDays: ageDays,
+      createdAt: createdAt,
+      // Only surfaced for the user's own PRs.
+      isMine: true,
     );
   }
 
