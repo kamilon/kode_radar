@@ -321,10 +321,17 @@ class ActivityService {
   /// Runs without an `id` are skipped (no stable de-dup key). The de-dup key
   /// includes `run_attempt` so a failed attempt kept before a successful rerun
   /// (which reuses the run id) isn't overwritten — preserving the flake signal.
+  ///
+  /// Only runs on the repo's **default branch** are kept (the run payload's
+  /// `repository.default_branch`), so PR / feature-branch runs — which
+  /// legitimately fail — don't pollute a workflow's trend. A [defaultBranch]
+  /// override wins over the payload; when neither is known, all branches are
+  /// kept (a safe fallback).
   static List<CiRunSample> ciRunSamplesFromGithubRuns(
     dynamic json, {
     required String repoKey,
     required String repoDisplay,
+    String? defaultBranch,
   }) {
     final runs = json is Map ? json['workflow_runs'] : null;
     if (runs is! List) return const [];
@@ -333,6 +340,14 @@ class ActivityService {
       if (run is! Map) continue;
       final id = run['id'];
       if (id == null) continue;
+      final repository = run['repository'];
+      final payloadDefault = repository is Map
+          ? _stringValue(repository, 'default_branch')
+          : null;
+      final effectiveDefault = defaultBranch ?? payloadDefault;
+      final headBranch = _stringValue(run, 'head_branch');
+      // Scope to the default branch when we can determine it.
+      if (effectiveDefault != null && headBranch != effectiveDefault) continue;
       final attempt = _intValue(run['run_attempt']) ?? 1;
       final name =
           _stringValue(run, 'name') ??
@@ -348,7 +363,7 @@ class ActivityService {
           runKey: '$repoKey:$id:$attempt',
           outcome: githubRunOutcome(run),
           conclusion: _stringValue(run, 'conclusion') ?? '',
-          branch: _stringValue(run, 'head_branch'),
+          branch: headBranch,
           finishedAt: _parseDate(run['updated_at']),
           url: _stringValue(run, 'html_url'),
         ),
@@ -359,11 +374,18 @@ class ActivityService {
 
   /// Parses an Azure DevOps `/build/builds` response into [CiRunSample]s.
   /// Builds without an `id` are skipped (no stable de-dup key). ADO retries
+  /// Parses an Azure DevOps `/build/builds` response into [CiRunSample]s.
+  /// Builds without an `id` are skipped (no stable de-dup key). ADO retries
   /// create new build ids, so the id alone is a stable per-run key.
+  ///
+  /// Only builds on the repo's [defaultBranch] (e.g. `refs/heads/main`, from
+  /// the repository GET) are kept, so PR / topic-branch builds don't pollute a
+  /// pipeline's trend. When [defaultBranch] is null, all branches are kept.
   static List<CiRunSample> ciRunSamplesFromAdoBuilds(
     dynamic json, {
     required String repoKey,
     required String repoDisplay,
+    String? defaultBranch,
   }) {
     final builds = json is Map ? json['value'] : json;
     if (builds is! List) return const [];
@@ -372,6 +394,9 @@ class ActivityService {
       if (build is! Map) continue;
       final id = build['id'];
       if (id == null) continue;
+      final sourceBranch = _stringValue(build, 'sourceBranch');
+      // Scope to the default branch when we know it.
+      if (defaultBranch != null && sourceBranch != defaultBranch) continue;
       final definition = build['definition'];
       final defName = definition is Map ? definition['name'] : null;
       final workflow = defName is String && defName.isNotEmpty
@@ -394,13 +419,39 @@ class ActivityService {
           runKey: '$repoKey:$id',
           outcome: adoBuildOutcome(build),
           conclusion: _stringValue(build, 'result') ?? '',
-          branch: _stringValue(build, 'sourceBranch'),
+          branch: sourceBranch,
           finishedAt: _parseDate(build['finishTime']),
           url: url,
         ),
       );
     }
     return result;
+  }
+
+  /// Whether [runs] contains a run that will both persist and count toward
+  /// trends — a completed (pass/fail) run with a finish time. Mirrors the
+  /// store's record filter, so a page with only in-progress / cancelled
+  /// default-branch runs still triggers the branch-scoped trend follow-up.
+  static bool _hasCompletedTrendRun(List<CiRunSample> runs) => runs.any(
+    (run) => CiOutcome.isCompleted(run.outcome) && run.finishedAt != null,
+  );
+
+  /// The repo's default branch as reported inside a GitHub `/actions/runs`
+  /// payload (each run carries a minimal `repository` with `default_branch`),
+  /// or null when no run exposes it. Lets a caller do a branch-scoped follow-up
+  /// fetch when the unscoped page contained no default-branch runs.
+  static String? defaultBranchFromGithubRuns(dynamic json) {
+    final runs = json is Map ? json['workflow_runs'] : null;
+    if (runs is! List) return null;
+    for (final run in runs) {
+      if (run is! Map) continue;
+      final repository = run['repository'];
+      if (repository is Map) {
+        final branch = _stringValue(repository, 'default_branch');
+        if (branch != null) return branch;
+      }
+    }
+    return null;
   }
 
   static num scoreActivity({
@@ -540,10 +591,12 @@ class ActivityService {
       try {
         // Fetch a page of recent runs (not just the latest): the newest still
         // drives ciStatus, while the rest accumulate into the CI trends history.
+        // A wider page reduces the chance that default-branch runs (kept for
+        // trends) are all pushed past the window by a burst of PR-branch runs.
         final response = await httpClient
             .get(
               Uri.https('api.github.com', '/repos/$owner/$name/actions/runs', {
-                'per_page': '20',
+                'per_page': '50',
               }),
               headers: headers,
             )
@@ -556,6 +609,36 @@ class ActivityService {
             repoKey: repoKey,
             repoDisplay: displayName,
           );
+          // Trends need a completed (pass/fail) default-branch run. If the
+          // all-branch page yielded none — e.g. a PR-heavy repo whose main-
+          // branch runs are past the window — and the page was full (so older
+          // runs exist), do a branch-scoped follow-up just for trends. ciStatus
+          // stays all-branch (from the first page above).
+          final runsList = decoded is Map ? decoded['workflow_runs'] : null;
+          final pageWasFull = runsList is List && runsList.length >= 50;
+          if (pageWasFull && !_hasCompletedTrendRun(recentRuns)) {
+            final defaultBranch = defaultBranchFromGithubRuns(decoded);
+            if (defaultBranch != null) {
+              final scoped = await httpClient
+                  .get(
+                    Uri.https(
+                      'api.github.com',
+                      '/repos/$owner/$name/actions/runs',
+                      {'branch': defaultBranch, 'per_page': '20'},
+                    ),
+                    headers: headers,
+                  )
+                  .timeout(_requestTimeout);
+              if (scoped.statusCode == 200) {
+                recentRuns = ciRunSamplesFromGithubRuns(
+                  jsonDecode(scoped.body),
+                  repoKey: repoKey,
+                  repoDisplay: displayName,
+                  defaultBranch: defaultBranch,
+                );
+              }
+            }
+          }
         } else {
           errors.add('GitHub actions returned status ${response.statusCode}');
         }
@@ -654,6 +737,7 @@ class ActivityService {
         // resolving its GUID first. If we can't, we leave CI 'unknown' rather
         // than show an unrelated project build.
         String? repositoryId;
+        String? defaultBranch;
         final repoResp = await httpClient
             .get(
               Uri.https(
@@ -666,12 +750,18 @@ class ActivityService {
             .timeout(_requestTimeout);
         if (repoResp.statusCode == 200) {
           final decoded = jsonDecode(repoResp.body);
-          if (decoded is Map) repositoryId = decoded['id'] as String?;
+          if (decoded is Map) {
+            repositoryId = decoded['id'] as String?;
+            defaultBranch = decoded['defaultBranch'] as String?;
+          }
         }
 
         if (repositoryId != null) {
           // Fetch a page of recent builds newest-first: the latest drives
-          // ciStatus, the rest feed the CI trends history.
+          // ciStatus (all-branch, like GitHub), the rest feed the CI trends
+          // history. A wider page reduces the chance default-branch builds are
+          // crowded out of the window by a burst of PR-branch builds; the
+          // default-branch scoping itself happens in the parser.
           final response = await httpClient
               .get(
                 Uri.https(
@@ -681,7 +771,7 @@ class ActivityService {
                     'repositoryId': repositoryId,
                     'repositoryType': 'TfsGit',
                     'queryOrder': 'finishTimeDescending',
-                    r'$top': '20',
+                    r'$top': '50',
                     'api-version': '6.0',
                   },
                 ),
@@ -695,7 +785,42 @@ class ActivityService {
               decoded,
               repoKey: repoKey,
               repoDisplay: displayName,
+              defaultBranch: defaultBranch,
             );
+            // As with GitHub: if the all-branch page had no completed default-
+            // branch build and was full (older builds exist), do a scoped
+            // follow-up just for trends. ciStatus stays all-branch.
+            final buildsList = decoded is Map ? decoded['value'] : null;
+            final pageWasFull = buildsList is List && buildsList.length >= 50;
+            if (pageWasFull &&
+                defaultBranch != null &&
+                !_hasCompletedTrendRun(recentRuns)) {
+              final scoped = await httpClient
+                  .get(
+                    Uri.https(
+                      'dev.azure.com',
+                      '/$organization/$project/_apis/build/builds',
+                      {
+                        'repositoryId': repositoryId,
+                        'repositoryType': 'TfsGit',
+                        'queryOrder': 'finishTimeDescending',
+                        'branchName': defaultBranch,
+                        r'$top': '20',
+                        'api-version': '6.0',
+                      },
+                    ),
+                    headers: headers,
+                  )
+                  .timeout(_requestTimeout);
+              if (scoped.statusCode == 200) {
+                recentRuns = ciRunSamplesFromAdoBuilds(
+                  jsonDecode(scoped.body),
+                  repoKey: repoKey,
+                  repoDisplay: displayName,
+                  defaultBranch: defaultBranch,
+                );
+              }
+            }
           } else {
             errors.add(
               'Azure DevOps builds returned status ${response.statusCode}',

@@ -35,10 +35,12 @@ class CiRunHistoryStore {
   static AppDatabase get _database => _db ??= AppDatabase();
 
   /// How long a run stays in history before it's pruned.
-  static const Duration retention = Duration(days: 45);
+  static const Duration retention = Duration(days: 90);
 
   /// Cap on rows kept per repo so a very active repo can't grow unbounded.
-  static const int perRepoCap = 400;
+  /// Sized to comfortably cover the 90-day [retention] for default-branch runs
+  /// (which are far fewer than all-branch runs).
+  static const int perRepoCap = 600;
 
   /// Test hook: back the store with an injected (e.g. in-memory) database and
   /// reset the mutation lock.
@@ -132,6 +134,17 @@ class CiRunHistoryStore {
       final rows = await db.select(db.ciRunHistory).get();
       final samples = rows.map(_toSample).toList();
       return CiWorkflowTrend.aggregate(samples, now: at, window: window);
+    });
+  }
+
+  /// All stored run samples (bounded by [retention] and the per-repo cap), so a
+  /// caller (e.g. the CI trends view) can aggregate client-side across a
+  /// user-chosen window without re-hitting the DB per toggle.
+  static Future<List<CiRunSample>> allSamples() {
+    return _runLocked(() async {
+      final db = _database;
+      final rows = await db.select(db.ciRunHistory).get();
+      return rows.map(_toSample).toList();
     });
   }
 

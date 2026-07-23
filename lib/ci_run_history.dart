@@ -65,8 +65,10 @@ class CiRunSample {
   final String? url;
 
   /// The key runs are grouped by for trends: the stable id when known, else the
-  /// display name.
-  String get groupKey => workflowId ?? workflow;
+  /// display name. Namespaced (`id:` vs `name:`) so a workflow whose id equals
+  /// another workflow's name can't collide.
+  String get groupKey =>
+      workflowId != null ? 'id:$workflowId' : 'name:$workflow';
 }
 
 /// A per-workflow rollup over a recency window: how often it fails and how
@@ -77,6 +79,7 @@ class CiWorkflowTrend {
     required this.repoKey,
     required this.repoDisplay,
     required this.workflow,
+    required this.workflowId,
     required this.successes,
     required this.failures,
     required this.flips,
@@ -90,6 +93,10 @@ class CiWorkflowTrend {
   final String repoKey;
   final String repoDisplay;
   final String workflow;
+
+  /// Stable workflow/definition id (or null), so a caller can filter the raw
+  /// samples back to exactly this workflow via [groupKey].
+  final String? workflowId;
 
   /// Completed (pass/fail) run counts in the window.
   final int successes;
@@ -112,6 +119,10 @@ class CiWorkflowTrend {
 
   final DateTime? lastRunAt;
   final String? url;
+
+  /// The key its runs are grouped by (matches [CiRunSample.groupKey]).
+  String get groupKey =>
+      workflowId != null ? 'id:$workflowId' : 'name:$workflow';
 
   /// Completed runs considered for the rates.
   int get total => successes + failures;
@@ -214,6 +225,7 @@ class CiWorkflowTrend {
           repoKey: newest.repoKey,
           repoDisplay: newest.repoDisplay,
           workflow: newest.workflow,
+          workflowId: newest.workflowId,
           successes: successes,
           failures: failures,
           flips: flips,

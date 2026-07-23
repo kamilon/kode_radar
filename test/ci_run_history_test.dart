@@ -129,6 +129,36 @@ void main() {
       expect(trends.firstWhere((t) => t.total == 1).successes, 1);
     });
 
+    test('a workflow id does not collide with an id-less same-string name', () {
+      final trends = CiWorkflowTrend.aggregate([
+        // workflowId "5" ...
+        CiRunSample(
+          provider: 'github',
+          repoKey: 'github:o/r',
+          repoDisplay: 'o/r',
+          workflow: 'Deploy',
+          workflowId: '5',
+          runKey: 'github:o/r:a',
+          outcome: CiOutcome.success,
+          conclusion: 'success',
+          finishedAt: ago(1),
+        ),
+        // ... vs an id-less workflow literally named "5".
+        CiRunSample(
+          provider: 'github',
+          repoKey: 'github:o/r',
+          repoDisplay: 'o/r',
+          workflow: '5',
+          runKey: 'github:o/r:b',
+          outcome: CiOutcome.failure,
+          conclusion: 'failure',
+          finishedAt: ago(2),
+        ),
+      ], now: base);
+      // Namespaced group keys keep them separate.
+      expect(trends, hasLength(2));
+    });
+
     test('small samples rank below a confident chronic failure', () {
       final trends = CiWorkflowTrend.aggregate([
         // 2-run 100% fail: high rate but low confidence.

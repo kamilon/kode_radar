@@ -239,7 +239,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forExecutor(super.executor);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -407,6 +407,19 @@ class AppDatabase extends _$AppDatabase {
           'CREATE INDEX IF NOT EXISTS idx_ci_run_history_finished_at '
           'ON ci_run_history (finished_at)',
         );
+      }
+      // v11 changes CI-trend semantics to default-branch-only. ci_run_history
+      // is a derived cache (re-populated from the API on the next sync), so
+      // clear the now-stale all-branch rows rather than let them linger for the
+      // retention window. Idempotent and safe to race: DELETE on an empty/just-
+      // created table is a no-op, and `from < 10` above guarantees the table
+      // exists first on a multi-version jump. In the rare case two connections
+      // both observe v10 and one records fresh rows before the other's DELETE
+      // runs, the only effect is that those rows are cleared and later re-
+      // observed from the API on a subsequent sync — a derived cache self-
+      // heals, so no serialization/marker is warranted here.
+      if (from < 11) {
+        await customStatement('DELETE FROM ci_run_history');
       }
     },
   );

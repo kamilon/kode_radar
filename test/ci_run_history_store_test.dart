@@ -219,4 +219,60 @@ void main() {
       await upgraded.close();
     },
   );
+
+  test('allSamples returns every stored run', () async {
+    final now = DateTime.utc(2026, 1, 11);
+    await CiRunHistoryStore.record([
+      _sample('build', runKey: 'github:owner/name:1'),
+      _sample(
+        'build',
+        runKey: 'github:owner/name:2',
+        outcome: CiOutcome.failure,
+        conclusion: 'failure',
+      ),
+    ], now: now);
+    final samples = await CiRunHistoryStore.allSamples();
+    expect(samples, hasLength(2));
+    expect(samples.map((s) => s.runKey).toSet(), {
+      'github:owner/name:1',
+      'github:owner/name:2',
+    });
+  });
+
+  test('v10 -> v11 upgrade clears the derived CI history cache', () async {
+    // A v10 database with an existing (all-branch) row: opening AppDatabase
+    // (now v11) must run onUpgrade(10 -> 11) and clear the derived cache so the
+    // new default-branch-only semantics start clean.
+    final native = sqlite3.openInMemory();
+    native.execute('''
+      CREATE TABLE ci_run_history (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        provider TEXT NOT NULL,
+        repo_key TEXT NOT NULL,
+        repo_display TEXT NOT NULL,
+        workflow TEXT NOT NULL,
+        workflow_id TEXT,
+        run_key TEXT NOT NULL,
+        outcome TEXT NOT NULL,
+        conclusion TEXT NOT NULL,
+        branch TEXT,
+        finished_at INTEGER,
+        url TEXT
+      );
+    ''');
+    native.execute(
+      "INSERT INTO ci_run_history "
+      "(provider, repo_key, repo_display, workflow, run_key, outcome, conclusion, finished_at) "
+      "VALUES ('github','github:o/r','o/r','CI','github:o/r:1:1','success','success',1000);",
+    );
+    native.execute('PRAGMA user_version = 10;');
+    final upgraded = AppDatabase.forExecutor(
+      NativeDatabase.opened(native, closeUnderlyingOnClose: true),
+    );
+    CiRunHistoryStore.debugUseDatabase(upgraded);
+
+    final samples = await CiRunHistoryStore.allSamples();
+    expect(samples, isEmpty, reason: 'the pre-v11 all-branch cache is cleared');
+    await upgraded.close();
+  });
 }

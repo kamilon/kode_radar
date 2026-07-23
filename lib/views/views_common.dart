@@ -20,7 +20,7 @@ class InsightsData {
     required List<Team> teams,
     required Map<String, TeamRollup> rollups,
     required List<Person> people,
-    List<CiWorkflowTrend> ciTrends = const [],
+    List<CiRunSample> ciRunSamples = const [],
     required this.loadedAt,
   }) : activities = List.unmodifiable(activities),
        history = Map.unmodifiable({
@@ -32,7 +32,7 @@ class InsightsData {
          for (final e in rollups.entries) e.key: _readonlyRollup(e.value),
        }),
        people = List.unmodifiable(people),
-       ciTrends = List.unmodifiable(ciTrends);
+       ciRunSamples = List.unmodifiable(ciRunSamples);
 
   final List<RepoActivity> activities;
   final Map<String, List<MetricSnapshot>> history;
@@ -40,9 +40,9 @@ class InsightsData {
   final Map<String, TeamRollup> rollups;
   final List<Person> people;
 
-  /// Per-workflow CI trends (failure rate + flakiness), worst-first, from the
-  /// accumulated run history. Empty until the sync/insights load records runs.
-  final List<CiWorkflowTrend> ciTrends;
+  /// Raw CI run history (default-branch, bounded by retention) from which the
+  /// CI trends view aggregates per-workflow trends for a user-chosen window.
+  final List<CiRunSample> ciRunSamples;
   final DateTime loadedAt;
 
   /// Repos whose fetch succeeded (errored repos would read as healthy zeros).
