@@ -202,9 +202,9 @@ class AttentionService {
       final changesRequested =
           decision == 'CHANGES_REQUESTED' ||
           _hasChangesRequestedReview(pr['latestOpinionatedReviews']);
-      // Approved & ready to merge: the required review decision is APPROVED, or
-      // (on repos without required reviews, where decision is null) an author
-      // left an approving review and none requested changes.
+      // Approved: the required review decision is APPROVED, or (on repos
+      // without required reviews, where decision is null) at least one
+      // approving review exists and none requested changes.
       final approved =
           decision == 'APPROVED' ||
           (decision == null &&
@@ -314,7 +314,7 @@ class AttentionService {
     return false;
   }
 
-  /// True when any author's latest opinionated review is APPROVED — used to
+  /// True when any reviewer's latest opinionated review is APPROVED — used to
   /// detect an approved PR on repos without required reviews (null decision).
   static bool _hasApprovingReview(dynamic latestOpinionatedReviews) {
     final nodes = latestOpinionatedReviews is Map

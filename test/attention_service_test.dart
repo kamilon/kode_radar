@@ -106,7 +106,7 @@ void main() {
     expect(approvedAged(40).single.category, 'oldOpenPr');
   });
 
-  test('GitHub: my APPROVED PR -> approved (ready to merge)', () {
+  test('GitHub: my APPROVED PR -> approved', () {
     final items = AttentionService.githubItems(
       repoDisplay: 'acme/api',
       now: now,

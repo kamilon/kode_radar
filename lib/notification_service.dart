@@ -220,7 +220,9 @@ class NotificationService {
 
   /// The items to actually notify about: those whose id is in [newIds] and that
   /// pass the notification filters ([notifiesFor]). Suppressed items still show
-  /// in the inbox, and the seen baseline still advances for them.
+  /// in the inbox; their seen baseline advances when they're dropped (muted /
+  /// silenced), but a not-mine item under mine-only is instead deferred so it
+  /// can still notify if it later becomes the user's (see [baselineIdsToRecord]).
   @visibleForTesting
   static List<AttentionItem> notifiableItems(
     List<AttentionItem> items,
