@@ -204,11 +204,13 @@ class AttentionService {
           _hasChangesRequestedReview(pr['latestOpinionatedReviews']);
       // Approved: the required review decision is APPROVED, or (on repos
       // without required reviews, where decision is null) at least one
-      // approving review exists and none requested changes.
+      // approving review exists — and, in either case, no changes are
+      // requested (folded in so the flag stands on its own).
       final approved =
-          decision == 'APPROVED' ||
-          (decision == null &&
-              _hasApprovingReview(pr['latestOpinionatedReviews']));
+          !changesRequested &&
+          (decision == 'APPROVED' ||
+              (decision == null &&
+                  _hasApprovingReview(pr['latestOpinionatedReviews'])));
 
       final reviewRequests = pr['reviewRequests'];
       final pendingCount =
