@@ -426,10 +426,11 @@ class ActivityService {
     return result;
   }
 
-  /// Whether [runs] contains a run that will both persist and count toward
-  /// trends — a completed (pass/fail) run with a finish time. Mirrors the
-  /// store's record filter, so a page with only in-progress / cancelled
-  /// default-branch runs still triggers the branch-scoped trend follow-up.
+  /// Whether [runs] contains a run that counts toward trend rates — a completed
+  /// (pass/fail) run with a finish time. This is stricter than the store's
+  /// record filter (which also persists `other`/cancelled runs): a page whose
+  /// only default-branch runs are in-progress or cancelled has no rate-bearing
+  /// sample, so we still want the branch-scoped trend follow-up to fire.
   static bool _hasCompletedTrendRun(List<CiRunSample> runs) => runs.any(
     (run) => CiOutcome.isCompleted(run.outcome) && run.finishedAt != null,
   );
