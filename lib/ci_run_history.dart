@@ -34,6 +34,7 @@ class CiRunSample {
     this.workflowId,
     this.branch,
     this.finishedAt,
+    this.durationMs,
     this.url,
   });
 
@@ -62,6 +63,11 @@ class CiRunSample {
 
   final String? branch;
   final DateTime? finishedAt;
+
+  /// The run's execution duration in milliseconds, when known (GitHub
+  /// `run_started_at`→`updated_at`, ADO `startTime`→`finishTime`). Powers the
+  /// typical-duration and slowdown signals.
+  final int? durationMs;
   final String? url;
 
   /// The key runs are grouped by for trends: the stable id when known, else the
@@ -88,6 +94,9 @@ class CiWorkflowTrend {
     required this.recentOutcomes,
     required this.lastRunAt,
     required this.url,
+    this.medianDurationMs,
+    this.slowdownRatio,
+    this.isSlowing = false,
   });
 
   final String repoKey;
@@ -120,6 +129,19 @@ class CiWorkflowTrend {
   final DateTime? lastRunAt;
   final String? url;
 
+  /// Median duration (ms) of successful runs in the window, or null until there
+  /// are at least [minRunsForTypical] timed successes — the "typical" run time.
+  final int? medianDurationMs;
+
+  /// Ratio of the recent-half median duration to the older-half median (of
+  /// successful runs), or null without enough timed runs. > 1 means slower.
+  final double? slowdownRatio;
+
+  /// Whether the workflow's recent successful runs are meaningfully slower than
+  /// its earlier ones (both a relative [slowdownThreshold] and an absolute
+  /// [minSlowdownDeltaMs] increase), computed over a sufficient sample.
+  final bool isSlowing;
+
   /// The key its runs are grouped by (matches [CiRunSample.groupKey]).
   String get groupKey =>
       workflowId != null ? 'id:$workflowId' : 'name:$workflow';
@@ -150,22 +172,40 @@ class CiWorkflowTrend {
       flakeRate < flakyThreshold &&
       lastCompletedOutcome == CiOutcome.failure;
 
-  bool get hasProblem => isFlaky || isChronicallyFailing;
+  /// A workflow whose recent runs are meaningfully slower than its earlier ones
+  /// (a regressing pipeline), even if it's still passing.
+  bool get hasProblem => isFlaky || isChronicallyFailing || isSlowing;
 
   /// Shrinks a small sample's weight so a 1-fail / 1-pass workflow can't rank
   /// alongside a 20-run one with the same rate.
   double get _confidence => total == 0 ? 0 : total / (total + 3);
 
-  /// Worst-first ranking weight: failing dominates, flakiness adds to it, both
-  /// damped by sample confidence.
+  /// Worst-first ranking weight from failure + flakiness only (a slowdown is a
+  /// separate, lower-priority sort tier so it never outranks a real failure or
+  /// flake — see [aggregate]'s sort). Damped by sample confidence.
   double get severity => _confidence * (failureRate + 0.5 * flakeRate);
 
   /// Minimum flip rate for a mixed workflow to read as flaky (~1 in 3).
   static const double flakyThreshold = 0.34;
 
+  /// Recent runs must be at least this much slower than older runs (relative)
+  /// AND at least [minSlowdownDeltaMs] slower (absolute) to count as "slowing".
+  static const double slowdownThreshold = 1.3;
+
+  /// Absolute floor (ms) on the recent-vs-older median increase, so trivial
+  /// jitter on short jobs (e.g. 2s → 3s) isn't flagged as a slowdown.
+  static const int minSlowdownDeltaMs = 10000;
+
   /// Minimum completed runs before a workflow can be labeled flaky / failing.
   static const int minRunsForFlaky = 4;
   static const int minRunsForChronic = 3;
+
+  /// Minimum timed successful runs before a "typical" duration is shown.
+  static const int minRunsForTypical = 3;
+
+  /// Minimum timed successful runs before a slowdown is assessed (split into
+  /// two halves of at least 4 each).
+  static const int minRunsForSlowdown = 8;
 
   /// Newest-first outcomes kept in [recentOutcomes] / persisted strips.
   static const int recentCap = 16;
@@ -205,11 +245,15 @@ class CiWorkflowTrend {
       var failures = 0;
       final completed = <String>[]; // newest-first pass/fail sequence
       final recent = <String>[];
+      final successDurations = <int>[]; // newest-first success run durations
       for (final s in group) {
         if (recent.length < recentCap) recent.add(s.outcome);
         if (s.outcome == CiOutcome.success) {
           successes++;
           completed.add(CiOutcome.success);
+          if (s.durationMs != null && s.durationMs! > 0) {
+            successDurations.add(s.durationMs!);
+          }
         } else if (s.outcome == CiOutcome.failure) {
           failures++;
           completed.add(CiOutcome.failure);
@@ -219,6 +263,10 @@ class CiWorkflowTrend {
       for (var i = 1; i < completed.length; i++) {
         if (completed[i] != completed[i - 1]) flips++;
       }
+      final medianDuration = successDurations.length >= minRunsForTypical
+          ? _median(successDurations)
+          : null;
+      final (slowdown, slowing) = _slowdown(successDurations);
       final newest = group.first;
       trends.add(
         CiWorkflowTrend(
@@ -234,6 +282,9 @@ class CiWorkflowTrend {
           recentOutcomes: recent,
           lastRunAt: newest.finishedAt,
           url: newest.url,
+          medianDurationMs: medianDuration,
+          slowdownRatio: slowdown,
+          isSlowing: slowing,
         ),
       );
     }
@@ -241,6 +292,10 @@ class CiWorkflowTrend {
     trends.sort((a, b) {
       final bySeverity = b.severity.compareTo(a.severity);
       if (bySeverity != 0) return bySeverity;
+      // Slowing is a lower-priority tier: at equal failure/flake severity, a
+      // slowing workflow surfaces above a healthy one, but never above a
+      // genuinely failing/flaky one.
+      if (a.isSlowing != b.isSlowing) return a.isSlowing ? -1 : 1;
       final byTotal = b.total.compareTo(a.total);
       if (byTotal != 0) return byTotal;
       final byRepo = a.repoDisplay.toLowerCase().compareTo(
@@ -250,5 +305,32 @@ class CiWorkflowTrend {
       return a.workflow.toLowerCase().compareTo(b.workflow.toLowerCase());
     });
     return trends;
+  }
+
+  /// The median of [values] (average of the two middle elements for an even
+  /// count), or null when empty. Does not mutate [values].
+  static int? _median(List<int> values) {
+    if (values.isEmpty) return null;
+    final sorted = [...values]..sort();
+    final mid = sorted.length ~/ 2;
+    if (sorted.length.isOdd) return sorted[mid];
+    return ((sorted[mid - 1] + sorted[mid]) / 2).round();
+  }
+
+  /// The (ratio, isSlowing) of the recent-half vs older-half median durations of
+  /// [newestFirstDurations] (newest first). Ratio is null without at least
+  /// [minRunsForSlowdown] timed runs; isSlowing additionally requires the
+  /// increase to clear both the relative [slowdownThreshold] and the absolute
+  /// [minSlowdownDeltaMs] floor.
+  static (double?, bool) _slowdown(List<int> newestFirstDurations) {
+    if (newestFirstDurations.length < minRunsForSlowdown) return (null, false);
+    final half = newestFirstDurations.length ~/ 2;
+    final recent = _median(newestFirstDurations.sublist(0, half));
+    final older = _median(newestFirstDurations.sublist(half));
+    if (recent == null || older == null || older == 0) return (null, false);
+    final ratio = recent / older;
+    final slowing =
+        ratio >= slowdownThreshold && (recent - older) >= minSlowdownDeltaMs;
+    return (ratio, slowing);
   }
 }

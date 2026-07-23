@@ -174,6 +174,7 @@ class CiRunHistoryStore {
     finishedAt: row.finishedAt == null
         ? null
         : DateTime.fromMillisecondsSinceEpoch(row.finishedAt!, isUtc: true),
+    durationMs: row.durationMs,
     url: row.url,
   );
 
@@ -189,6 +190,7 @@ class CiRunHistoryStore {
         conclusion: s.conclusion,
         branch: Value(s.branch),
         finishedAt: Value(s.finishedAt?.toUtc().millisecondsSinceEpoch),
+        durationMs: Value(s.durationMs),
         url: Value(s.url),
       );
 }

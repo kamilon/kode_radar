@@ -139,7 +139,7 @@ class _TrendTile extends StatelessWidget {
   final CiWorkflowTrend trend;
   final VoidCallback onTap;
 
-  ({String label, Color color})? _badge() {
+  ({String label, Color color})? _statusBadge() {
     if (trend.isChronicallyFailing) {
       return (label: 'Failing', color: ciColor('failure'));
     }
@@ -150,8 +150,9 @@ class _TrendTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final badge = _badge();
+    final badge = _statusBadge();
     final ratePct = (trend.failureRate * 100).round();
+    final typical = formatDurationMs(trend.medianDurationMs);
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -180,8 +181,16 @@ class _TrendTile extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (trend.isSlowing)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4),
+                      child: _Badge(label: 'Slowing', color: Color(0xFF8E24AA)),
+                    ),
                   if (badge != null)
-                    _Badge(label: badge.label, color: badge.color),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: _Badge(label: badge.label, color: badge.color),
+                    ),
                   const SizedBox(width: 4),
                   Icon(
                     Icons.chevron_right,
@@ -203,10 +212,11 @@ class _TrendTile extends StatelessWidget {
               _Sparkline(outcomes: trend.recentOutcomes),
               const SizedBox(height: 6),
               Text(
-                trend.total == 0
-                    ? 'No completed runs in range'
-                    : '$ratePct% failed · ${trend.failures}/${trend.total} runs'
-                          '${trend.flips > 0 ? ' · ${trend.flips} flips' : ''}',
+                (trend.total == 0
+                        ? 'No completed runs in range'
+                        : '$ratePct% failed · ${trend.failures}/${trend.total} runs'
+                              '${trend.flips > 0 ? ' · ${trend.flips} flips' : ''}') +
+                    (typical != null ? ' · ~$typical' : ''),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),

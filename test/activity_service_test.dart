@@ -123,6 +123,53 @@ void main() {
     expect(ActivityService.ciStatusFromAdoBuilds({'value': []}), 'unknown');
   });
 
+  test('CI run parsers capture run duration from start/finish timestamps', () {
+    final gh = ActivityService.ciRunSamplesFromGithubRuns(
+      {
+        'workflow_runs': [
+          {
+            'id': 1,
+            'name': 'CI',
+            'status': 'completed',
+            'conclusion': 'success',
+            'run_started_at': '2026-03-01T10:00:00Z',
+            'updated_at': '2026-03-01T10:02:30Z',
+          },
+          // No start time -> null duration (not negative/zero).
+          {
+            'id': 2,
+            'name': 'CI',
+            'status': 'completed',
+            'conclusion': 'success',
+            'updated_at': '2026-03-01T09:00:00Z',
+          },
+        ],
+      },
+      repoKey: 'github:o/r',
+      repoDisplay: 'o/r',
+    );
+    expect(gh[0].durationMs, 150000); // 2m30s
+    expect(gh[1].durationMs, isNull);
+
+    final ado = ActivityService.ciRunSamplesFromAdoBuilds(
+      {
+        'value': [
+          {
+            'id': 55,
+            'definition': {'id': 3, 'name': 'Pipeline'},
+            'status': 'completed',
+            'result': 'succeeded',
+            'startTime': '2026-03-01T10:00:00Z',
+            'finishTime': '2026-03-01T10:05:00Z',
+          },
+        ],
+      },
+      repoKey: 'ado:o/p/r',
+      repoDisplay: 'o/p/r',
+    );
+    expect(ado.single.durationMs, 300000); // 5m
+  });
+
   test(
     'ciRunSamplesFromGithubRuns keys by run id + attempt, groups by workflow id',
     () {

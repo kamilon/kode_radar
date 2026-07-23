@@ -369,6 +369,7 @@ class ActivityService {
           conclusion: _stringValue(run, 'conclusion') ?? '',
           branch: headBranch,
           finishedAt: _parseDate(run['updated_at']),
+          durationMs: _durationMs(run['run_started_at'], run['updated_at']),
           url: _stringValue(run, 'html_url'),
         ),
       );
@@ -426,11 +427,23 @@ class ActivityService {
           conclusion: _stringValue(build, 'result') ?? '',
           branch: sourceBranch,
           finishedAt: _parseDate(build['finishTime']),
+          durationMs: _durationMs(build['startTime'], build['finishTime']),
           url: url,
         ),
       );
     }
     return result;
+  }
+
+  /// The elapsed milliseconds between two ISO-8601 timestamps ([startIso] to
+  /// [endIso]), or null when either is missing/unparseable or the result is not
+  /// positive (guards against clock skew / mislabeled fields).
+  static int? _durationMs(dynamic startIso, dynamic endIso) {
+    final start = _parseDate(startIso);
+    final end = _parseDate(endIso);
+    if (start == null || end == null) return null;
+    final ms = end.difference(start).inMilliseconds;
+    return ms > 0 ? ms : null;
   }
 
   /// Whether [runs] contains a run that counts toward trend rates — a completed

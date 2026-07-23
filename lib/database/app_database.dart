@@ -153,6 +153,7 @@ class CiRunHistory extends Table {
   TextColumn get conclusion => text()();
   TextColumn get branch => text().nullable()();
   IntColumn get finishedAt => integer().nullable()();
+  IntColumn get durationMs => integer().nullable()();
   TextColumn get url => text().nullable()();
 }
 
@@ -239,7 +240,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forExecutor(super.executor);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -420,6 +421,23 @@ class AppDatabase extends _$AppDatabase {
       // heals, so no serialization/marker is warranted here.
       if (from < 11) {
         await customStatement('DELETE FROM ci_run_history');
+      }
+      // v12 adds `duration_ms` to ci_run_history (run-duration trends). Ensure
+      // the table exists, then add the column with a single idempotent
+      // `ALTER TABLE ADD COLUMN`, tolerating "duplicate column" from a
+      // concurrent migrator or a jump from <10 where createTable already built
+      // the current schema.
+      if (from < 12) {
+        await m.createTable(ciRunHistory);
+        try {
+          await customStatement(
+            'ALTER TABLE ci_run_history ADD COLUMN duration_ms INTEGER',
+          );
+        } on Exception catch (e) {
+          if (!e.toString().toLowerCase().contains('duplicate column')) {
+            rethrow;
+          }
+        }
       }
     },
   );
