@@ -13,6 +13,8 @@ class AppPreferences {
     this.backgroundSyncEnabled = true,
     this.notifyMineOnly = false,
     this.silencedNotifyCategories = const {},
+    this.digestModeEnabled = false,
+    this.digestHour = 9,
   });
 
   final bool notificationsEnabled;
@@ -39,6 +41,13 @@ class AppPreferences {
   /// *silenced* set means a newly-added category notifies by default.
   final Set<String> silencedNotifyCategories;
 
+  /// When true, replace per-change attention notifications with a single daily
+  /// digest summary (shown on the first sync at/after [digestHour] each day).
+  final bool digestModeEnabled;
+
+  /// Local hour [0, 23] at/after which the daily digest is shown.
+  final int digestHour;
+
   AppPreferences copyWith({
     bool? notificationsEnabled,
     bool? quietHoursEnabled,
@@ -48,6 +57,8 @@ class AppPreferences {
     bool? backgroundSyncEnabled,
     bool? notifyMineOnly,
     Set<String>? silencedNotifyCategories,
+    bool? digestModeEnabled,
+    int? digestHour,
   }) {
     return AppPreferences(
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
@@ -61,6 +72,8 @@ class AppPreferences {
       silencedNotifyCategories: Set.unmodifiable(
         silencedNotifyCategories ?? this.silencedNotifyCategories,
       ),
+      digestModeEnabled: digestModeEnabled ?? this.digestModeEnabled,
+      digestHour: digestHour ?? this.digestHour,
     );
   }
 }
@@ -79,6 +92,8 @@ class PreferencesStore {
   static const String _notifyMineOnly = 'pref_notify_mine_only';
   static const String _silencedNotifyCategories =
       'pref_notify_silenced_categories';
+  static const String _digestModeEnabled = 'pref_digest_mode_enabled';
+  static const String _digestHour = 'pref_digest_hour';
 
   /// Allowed lookback options shown in the UI.
   static const List<int> lookbackOptions = [7, 14, 30, 60];
@@ -116,6 +131,9 @@ class PreferencesStore {
         prefs.getStringList(_silencedNotifyCategories)?.toSet() ??
             defaults.silencedNotifyCategories,
       ),
+      digestModeEnabled:
+          prefs.getBool(_digestModeEnabled) ?? defaults.digestModeEnabled,
+      digestHour: _clampHour(prefs.getInt(_digestHour) ?? defaults.digestHour),
     );
   }
 
@@ -186,6 +204,24 @@ class PreferencesStore {
       );
     });
   }
+
+  static Future<void> setDigestModeEnabled(bool value) {
+    return _runLocked(() async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_digestModeEnabled, value);
+    });
+  }
+
+  static Future<void> setDigestHour(int hour) {
+    return _runLocked(() async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_digestHour, _clampHour(hour));
+    });
+  }
+
+  /// A local calendar-date key (`yyyy-M-d`) for the once-per-day digest claim.
+  static String localDateString(DateTime now) =>
+      '${now.year}-${now.month}-${now.day}';
 
   /// Whether notifications should be shown right now given [prefs] and [now].
   static bool notificationsAllowed(AppPreferences prefs, DateTime now) {

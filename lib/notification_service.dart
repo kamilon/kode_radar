@@ -14,6 +14,7 @@ class NotificationService {
   NotificationService._();
 
   static const int _summaryNotificationId = 42001;
+  static const int _digestNotificationId = 42002;
   static const String _channelId = 'attention_inbox';
   static const String _channelName = 'Attention Inbox';
   static const String _channelDescription =
@@ -128,9 +129,63 @@ class NotificationService {
       final muted = await MuteStore.mutedDisplays();
       final silenced = appPrefs.silencedNotifyCategories;
       final mineOnly = appPrefs.notifyMineOnly;
+      final notificationsAllowed = PreferencesStore.notificationsAllowed(
+        appPrefs,
+        now,
+      );
 
-      if (newIds.isNotEmpty &&
-          PreferencesStore.notificationsAllowed(appPrefs, now)) {
+      // Digest mode: suppress per-change alerts and instead show at most one
+      // summary a day. Advance the baseline as in per-item mode but WITHOUT
+      // quiet-hours deferral (the digest owns its own timing) — muted/silenced
+      // still drop and mine-only not-mine items still defer (preserving the
+      // becomes-mine invariant), so switching back to per-item alerts can't
+      // replay yet a not-mine item can still notify if it becomes the user's.
+      if (appPrefs.digestModeEnabled) {
+        final baselineIds = baselineIdsToRecord(
+          currentIds: currentIds,
+          items: attention,
+          mutedDisplays: muted,
+          silencedCategories: silenced,
+          mineOnly: mineOnly,
+          notificationsEnabled: appPrefs.notificationsEnabled,
+          firstRun: firstRun,
+          inQuietHours: false,
+        );
+        await NotificationSeenStore.recordBaseline(baselineIds, monitoredRepos);
+        final digestItems = attention
+            .where(
+              (item) => notifiesFor(
+                item,
+                mutedDisplays: muted,
+                silencedCategories: silenced,
+                mineOnly: mineOnly,
+              ),
+            )
+            .toList(growable: false);
+        if (digestItems.isNotEmpty &&
+            _isSupportedPlatform &&
+            shouldShowDigest(
+              now: now,
+              digestHour: appPrefs.digestHour,
+              notificationsEnabled: appPrefs.notificationsEnabled,
+              quietHoursEnabled: appPrefs.quietHoursEnabled,
+              quietStartHour: appPrefs.quietStartHour,
+              quietEndHour: appPrefs.quietEndHour,
+            )) {
+          // Atomic once-per-day claim (serialized across isolates in the DB);
+          // release it if the notification fails so a later sync retries.
+          final date = PreferencesStore.localDateString(now);
+          if (await NotificationSeenStore.claimDailyDigest(date)) {
+            final shown = await _showDigestNotification(digestItems);
+            if (!shown) {
+              await NotificationSeenStore.releaseDailyDigest(date);
+            }
+          }
+        }
+        return;
+      }
+
+      if (newIds.isNotEmpty && notificationsAllowed) {
         // Exclude muted repos, silenced categories, and (when mine-only) items
         // that aren't the user's — they still appear in the inbox.
         final newItems = notifiableItems(
@@ -477,5 +532,82 @@ class NotificationService {
       titles.add('+$remaining more');
     }
     return titles.join('\n');
+  }
+
+  /// Whether the once-daily digest should be shown now, by timing alone (the
+  /// once-per-day guarantee is a separate atomic claim). True when notifications
+  /// are enabled, it's not currently quiet hours, and either we've reached the
+  /// digest hour today OR the digest hour falls inside an overnight (wrapping)
+  /// quiet window — in which case it can never be reached while allowed, so we
+  /// fire it once quiet hours lift. Pure.
+  @visibleForTesting
+  static bool shouldShowDigest({
+    required DateTime now,
+    required int digestHour,
+    required bool notificationsEnabled,
+    required bool quietHoursEnabled,
+    required int quietStartHour,
+    required int quietEndHour,
+  }) {
+    if (!notificationsEnabled) return false;
+    final inQuiet =
+        quietHoursEnabled &&
+        PreferencesStore.isWithinQuietHours(now, quietStartHour, quietEndHour);
+    if (inQuiet) return false;
+    if (now.hour >= digestHour) return true;
+    // Overnight quiet window (start > end) that contains the digest hour: the
+    // digest hour is unreachable while notifications are allowed, so deliver at
+    // the first allowed moment after the window lifts.
+    final quietWraps = quietHoursEnabled && quietStartHour > quietEndHour;
+    return quietWraps &&
+        digestHour >= quietStartHour &&
+        now.hour >= quietEndHour;
+  }
+
+  /// The digest notification's title (the total count). Pure.
+  @visibleForTesting
+  static String digestTitle(int count) => count == 1
+      ? '1 item needs your attention'
+      : '$count items need your attention';
+
+  /// The digest notification's body: a per-category breakdown of [items] in
+  /// priority order (e.g. "3 review requested · 1 changes requested"). Pure.
+  @visibleForTesting
+  static String digestBody(List<AttentionItem> items) {
+    final counts = <String, int>{};
+    for (final item in items) {
+      counts[item.category] = (counts[item.category] ?? 0) + 1;
+    }
+    final parts = <String>[];
+    for (final category in AttentionService.notifiableCategories) {
+      final n = counts[category] ?? 0;
+      if (n > 0) {
+        parts.add(
+          '$n ${AttentionService.categoryLabel(category).toLowerCase()}',
+        );
+      }
+    }
+    return parts.join(' · ');
+  }
+
+  static Future<bool> _showDigestNotification(List<AttentionItem> items) async {
+    try {
+      if (items.isEmpty || !_isSupportedPlatform) return false;
+      await init();
+      if (!_initialized) return false;
+      final details = _notificationDetails();
+      if (details == null) return false;
+      await _plugin.show(
+        id: _digestNotificationId,
+        title: digestTitle(items.length),
+        body: digestBody(items),
+        notificationDetails: details,
+        payload: attentionPayload,
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Failed to show digest notification: $e');
+      return false;
+    }
   }
 }
