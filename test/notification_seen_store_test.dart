@@ -111,4 +111,19 @@ void main() {
 
     await upgraded.close();
   });
+
+  test('claimDailyDigest is once-per-day and release allows a retry', () async {
+    // First claim for a date wins; a second (e.g. the other isolate) loses.
+    expect(await NotificationSeenStore.claimDailyDigest('2026-7-23'), isTrue);
+    expect(await NotificationSeenStore.claimDailyDigest('2026-7-23'), isFalse);
+    // Releasing the ACTIVE claim (e.g. after a failed show) lets the SAME day
+    // be re-claimed so a later sync retries.
+    await NotificationSeenStore.releaseDailyDigest('2026-7-23');
+    expect(await NotificationSeenStore.claimDailyDigest('2026-7-23'), isTrue);
+    // A different date is its own claim.
+    expect(await NotificationSeenStore.claimDailyDigest('2026-7-24'), isTrue);
+    // A stale release (the marker has moved on) is a no-op — today stays held.
+    await NotificationSeenStore.releaseDailyDigest('2026-7-23');
+    expect(await NotificationSeenStore.claimDailyDigest('2026-7-24'), isFalse);
+  });
 }

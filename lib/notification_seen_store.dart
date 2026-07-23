@@ -180,11 +180,54 @@ class NotificationSeenStore {
     return row != null;
   }
 
+  static Future<String?> _getMeta(AppDatabase db, String key) async {
+    final row = await (db.select(
+      db.appMeta,
+    )..where((t) => t.key.equals(key))).getSingleOrNull();
+    return row?.value;
+  }
+
   static Future<void> _setMeta(AppDatabase db, String key, String value) {
     return db
         .into(db.appMeta)
         .insertOnConflictUpdate(
           AppMetaCompanion.insert(key: key, value: value),
         );
+  }
+
+  /// `app_meta` key holding the local date (`yyyy-M-d`) the daily digest was
+  /// last shown, used as an atomic once-per-day claim.
+  static const String _digestShownKey = 'digest_last_shown';
+
+  /// Atomically claims the daily digest for [date] (a `yyyy-M-d` key): returns
+  /// true if this run won the claim (the digest hasn't been shown for [date]
+  /// yet), false if another run already claimed it. The check-and-set runs in a
+  /// single write transaction, which SQLite serializes, so the foreground and
+  /// background-sync isolates can't both claim — and show — the same day.
+  static Future<bool> claimDailyDigest(String date) {
+    final db = _database;
+    return _runLocked(
+      () => db.transaction(() async {
+        if (await _getMeta(db, _digestShownKey) == date) return false;
+        await _setMeta(db, _digestShownKey, date);
+        return true;
+      }),
+    );
+  }
+
+  /// Releases a same-day digest claim (e.g. when showing the notification
+  /// failed) so a later sync can retry. Only clears the marker if it still
+  /// holds [date], to avoid clobbering a newer day's claim.
+  static Future<void> releaseDailyDigest(String date) {
+    final db = _database;
+    return _runLocked(
+      () => db.transaction(() async {
+        if (await _getMeta(db, _digestShownKey) == date) {
+          await (db.delete(
+            db.appMeta,
+          )..where((t) => t.key.equals(_digestShownKey))).go();
+        }
+      }),
+    );
   }
 }

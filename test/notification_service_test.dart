@@ -489,4 +489,105 @@ void main() {
       );
     });
   });
+
+  group('daily digest', () {
+    AttentionItem item(String id, String category) => AttentionItem(
+      id: id,
+      category: category,
+      severity: 1000,
+      titleTemplate: id,
+      subtitleTemplate: '',
+      repoDisplay: 'acme/api',
+    );
+
+    test('shouldShowDigest only at/after the hour, respecting quiet hours', () {
+      bool show({
+        required int hour,
+        int digestHour = 9,
+        bool notificationsEnabled = true,
+        bool quietHoursEnabled = false,
+        int quietStartHour = 22,
+        int quietEndHour = 8,
+      }) => NotificationService.shouldShowDigest(
+        now: DateTime(2026, 7, 23, hour),
+        digestHour: digestHour,
+        notificationsEnabled: notificationsEnabled,
+        quietHoursEnabled: quietHoursEnabled,
+        quietStartHour: quietStartHour,
+        quietEndHour: quietEndHour,
+      );
+
+      // Before / at / after the digest hour.
+      expect(show(hour: 8), isFalse);
+      expect(show(hour: 9), isTrue);
+      expect(show(hour: 14), isTrue);
+      // Notifications disabled.
+      expect(show(hour: 10, notificationsEnabled: false), isFalse);
+      // Digest hour inside a normal (non-wrapping) quiet window: blocked during
+      // it, fires once it lifts.
+      expect(
+        show(
+          hour: 9,
+          quietHoursEnabled: true,
+          quietStartHour: 8,
+          quietEndHour: 10,
+        ),
+        isFalse,
+      );
+      expect(
+        show(
+          hour: 10,
+          quietHoursEnabled: true,
+          quietStartHour: 8,
+          quietEndHour: 10,
+        ),
+        isTrue,
+      );
+      // Not premature before the digest hour when quiet doesn't cover it.
+      expect(
+        show(
+          hour: 7,
+          quietHoursEnabled: true,
+          quietStartHour: 8,
+          quietEndHour: 10,
+        ),
+        isFalse,
+      );
+    });
+
+    test('shouldShowDigest is not starved by an overnight quiet window', () {
+      // Regression: digest hour 23 with quiet hours 22->8 has no allowed hour
+      // >= 23, so it must fire once quiet lifts (from 08:00) rather than never.
+      bool show(int hour) => NotificationService.shouldShowDigest(
+        now: DateTime(2026, 7, 23, hour),
+        digestHour: 23,
+        notificationsEnabled: true,
+        quietHoursEnabled: true,
+        quietStartHour: 22,
+        quietEndHour: 8,
+      );
+      expect(show(3), isFalse, reason: 'quiet hours (night)');
+      expect(show(22), isFalse, reason: 'quiet hours (evening)');
+      expect(show(8), isTrue, reason: 'fires when quiet lifts');
+      expect(show(15), isTrue);
+    });
+
+    test('digestTitle counts items', () {
+      expect(NotificationService.digestTitle(1), '1 item needs your attention');
+      expect(NotificationService.digestTitle(4), '4 items need your attention');
+    });
+
+    test('digestBody breaks down by category in priority order', () {
+      final items = [
+        item('r1', 'reviewRequested'),
+        item('r2', 'reviewRequested'),
+        item('c1', 'changesRequested'),
+        item('a1', 'approved'),
+      ];
+      expect(
+        NotificationService.digestBody(items),
+        '2 review requested · 1 changes requested · 1 approved',
+      );
+    });
+  });
 }

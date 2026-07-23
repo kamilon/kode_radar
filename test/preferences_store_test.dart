@@ -48,6 +48,27 @@ void main() {
     expect((await PreferencesStore.load()).backgroundSyncEnabled, isTrue);
   });
 
+  test('digest settings round-trip through load()', () async {
+    expect((await PreferencesStore.load()).digestModeEnabled, isFalse);
+    expect((await PreferencesStore.load()).digestHour, 9);
+    await PreferencesStore.setDigestModeEnabled(true);
+    await PreferencesStore.setDigestHour(7);
+    final loaded = await PreferencesStore.load();
+    expect(loaded.digestModeEnabled, isTrue);
+    expect(loaded.digestHour, 7);
+    // Out-of-range hour is clamped.
+    await PreferencesStore.setDigestHour(99);
+    expect((await PreferencesStore.load()).digestHour, 23);
+  });
+
+  test('last-digest local date key formats correctly', () {
+    expect(PreferencesStore.localDateString(DateTime(2026, 1, 5)), '2026-1-5');
+    expect(
+      PreferencesStore.localDateString(DateTime(2026, 7, 23, 14)),
+      '2026-7-23',
+    );
+  });
+
   test('setters round-trip through load()', () async {
     await PreferencesStore.setNotificationsEnabled(false);
     await PreferencesStore.setQuietHoursEnabled(true);

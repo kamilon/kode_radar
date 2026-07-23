@@ -130,6 +130,36 @@ class _PreferencesPageState extends State<PreferencesPage>
                   ),
                 ],
                 SwitchListTile(
+                  title: const Text('Daily digest'),
+                  subtitle: const Text(
+                    'One summary a day instead of per-change alerts',
+                  ),
+                  value: _prefs.digestModeEnabled,
+                  onChanged: _prefs.notificationsEnabled
+                      ? (value) async {
+                          await PreferencesStore.setDigestModeEnabled(value);
+                          if (!mounted) return;
+                          setState(
+                            () => _prefs = _prefs.copyWith(
+                              digestModeEnabled: value,
+                            ),
+                          );
+                        }
+                      : null,
+                ),
+                if (_prefs.notificationsEnabled && _prefs.digestModeEnabled)
+                  _hourTile(
+                    label: 'Digest time',
+                    hour: _prefs.digestHour,
+                    onChanged: (hour) async {
+                      await PreferencesStore.setDigestHour(hour);
+                      if (!mounted) return;
+                      setState(
+                        () => _prefs = _prefs.copyWith(digestHour: hour),
+                      );
+                    },
+                  ),
+                SwitchListTile(
                   title: const Text('Only my PRs & reviews'),
                   subtitle: const Text(
                     'Notify only for items you authored or were asked to '
