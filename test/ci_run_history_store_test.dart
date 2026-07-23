@@ -14,6 +14,7 @@ CiRunSample _sample(
   String conclusion = 'success',
   String? workflowId,
   DateTime? finishedAt,
+  int? durationMs,
   String? url,
 }) => CiRunSample(
   provider: 'github',
@@ -25,6 +26,7 @@ CiRunSample _sample(
   outcome: outcome,
   conclusion: conclusion,
   finishedAt: finishedAt ?? DateTime.utc(2026, 1, 10),
+  durationMs: durationMs,
   url: url ?? 'https://example.com/$runKey',
 );
 
@@ -273,6 +275,64 @@ void main() {
 
     final samples = await CiRunHistoryStore.allSamples();
     expect(samples, isEmpty, reason: 'the pre-v11 all-branch cache is cleared');
+    await upgraded.close();
+  });
+
+  test('durationMs round-trips through the store', () async {
+    final now = DateTime.utc(2026, 1, 11);
+    await CiRunHistoryStore.record([
+      _sample('build', runKey: 'github:owner/name:1', durationMs: 123456),
+      _sample('build', runKey: 'github:owner/name:2'),
+    ], now: now);
+    final byKey = {
+      for (final s in await CiRunHistoryStore.allSamples()) s.runKey: s,
+    };
+    expect(byKey['github:owner/name:1']!.durationMs, 123456);
+    expect(byKey['github:owner/name:2']!.durationMs, isNull);
+  });
+
+  test('v11 -> v12 upgrade adds duration_ms and keeps rows', () async {
+    // A v11 database (ci_run_history without duration_ms) with a row: opening
+    // AppDatabase (now v12) must ALTER TABLE to add duration_ms without loss.
+    final native = sqlite3.openInMemory();
+    native.execute('''
+      CREATE TABLE ci_run_history (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        provider TEXT NOT NULL,
+        repo_key TEXT NOT NULL,
+        repo_display TEXT NOT NULL,
+        workflow TEXT NOT NULL,
+        workflow_id TEXT,
+        run_key TEXT NOT NULL,
+        outcome TEXT NOT NULL,
+        conclusion TEXT NOT NULL,
+        branch TEXT,
+        finished_at INTEGER,
+        url TEXT
+      );
+    ''');
+    native.execute(
+      "INSERT INTO ci_run_history "
+      "(provider, repo_key, repo_display, workflow, run_key, outcome, conclusion, finished_at) "
+      "VALUES ('github','github:o/r','o/r','CI','github:o/r:9:1','success','success',1000);",
+    );
+    native.execute('PRAGMA user_version = 11;');
+    final upgraded = AppDatabase.forExecutor(
+      NativeDatabase.opened(native, closeUnderlyingOnClose: true),
+    );
+    CiRunHistoryStore.debugUseDatabase(upgraded);
+
+    final samples = await CiRunHistoryStore.allSamples();
+    expect(samples, hasLength(1), reason: 'the pre-v12 row is preserved');
+    expect(samples.single.durationMs, isNull);
+    // The new column is writable after the migration.
+    await CiRunHistoryStore.record([
+      _sample('build', runKey: 'github:o/r:10:1', durationMs: 5000),
+    ], now: DateTime.utc(2026, 1, 11));
+    final withDuration = (await CiRunHistoryStore.allSamples()).firstWhere(
+      (s) => s.runKey == 'github:o/r:10:1',
+    );
+    expect(withDuration.durationMs, 5000);
     await upgraded.close();
   });
 }

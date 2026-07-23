@@ -61,11 +61,16 @@ class CiWorkflowDetailPage extends StatelessWidget {
               children: [
                 _Stat(label: 'Failure rate', value: '$ratePct%'),
                 _Stat(label: 'Completed', value: '${trend.total}'),
-                _Stat(label: 'Flips', value: '${trend.flips}'),
+                _Stat(
+                  label: trend.isSlowing ? 'Typical ↑' : 'Typical',
+                  value: formatDurationMs(trend.medianDurationMs) ?? '—',
+                ),
                 if (trend.isFlaky)
                   const _Stat(label: 'Verdict', value: 'Flaky')
                 else if (trend.isChronicallyFailing)
                   const _Stat(label: 'Verdict', value: 'Failing')
+                else if (trend.isSlowing)
+                  const _Stat(label: 'Verdict', value: 'Slowing')
                 else
                   const _Stat(label: 'Verdict', value: 'OK'),
               ],
@@ -128,9 +133,11 @@ class _RunTile extends StatelessWidget {
     final theme = Theme.of(context);
     final url = run.url;
     final when = run.finishedAt;
+    final duration = formatDurationMs(run.durationMs);
     final subtitleParts = <String>[
       if (run.conclusion.isNotEmpty) run.conclusion,
       if (when != null) relativeTime(when),
+      ?duration,
       if (run.branch != null && run.branch!.isNotEmpty) run.branch!,
     ];
     return ListTile(

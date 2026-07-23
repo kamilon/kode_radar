@@ -4487,6 +4487,17 @@ class $CiRunHistoryTable extends CiRunHistory
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _durationMsMeta = const VerificationMeta(
+    'durationMs',
+  );
+  @override
+  late final GeneratedColumn<int> durationMs = GeneratedColumn<int>(
+    'duration_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _urlMeta = const VerificationMeta('url');
   @override
   late final GeneratedColumn<String> url = GeneratedColumn<String>(
@@ -4509,6 +4520,7 @@ class $CiRunHistoryTable extends CiRunHistory
     conclusion,
     branch,
     finishedAt,
+    durationMs,
     url,
   ];
   @override
@@ -4603,6 +4615,12 @@ class $CiRunHistoryTable extends CiRunHistory
         finishedAt.isAcceptableOrUnknown(data['finished_at']!, _finishedAtMeta),
       );
     }
+    if (data.containsKey('duration_ms')) {
+      context.handle(
+        _durationMsMeta,
+        durationMs.isAcceptableOrUnknown(data['duration_ms']!, _durationMsMeta),
+      );
+    }
     if (data.containsKey('url')) {
       context.handle(
         _urlMeta,
@@ -4662,6 +4680,10 @@ class $CiRunHistoryTable extends CiRunHistory
         DriftSqlType.int,
         data['${effectivePrefix}finished_at'],
       ),
+      durationMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_ms'],
+      ),
       url: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}url'],
@@ -4687,6 +4709,7 @@ class CiRunHistoryRow extends DataClass implements Insertable<CiRunHistoryRow> {
   final String conclusion;
   final String? branch;
   final int? finishedAt;
+  final int? durationMs;
   final String? url;
   const CiRunHistoryRow({
     required this.id,
@@ -4700,6 +4723,7 @@ class CiRunHistoryRow extends DataClass implements Insertable<CiRunHistoryRow> {
     required this.conclusion,
     this.branch,
     this.finishedAt,
+    this.durationMs,
     this.url,
   });
   @override
@@ -4721,6 +4745,9 @@ class CiRunHistoryRow extends DataClass implements Insertable<CiRunHistoryRow> {
     }
     if (!nullToAbsent || finishedAt != null) {
       map['finished_at'] = Variable<int>(finishedAt);
+    }
+    if (!nullToAbsent || durationMs != null) {
+      map['duration_ms'] = Variable<int>(durationMs);
     }
     if (!nullToAbsent || url != null) {
       map['url'] = Variable<String>(url);
@@ -4747,6 +4774,9 @@ class CiRunHistoryRow extends DataClass implements Insertable<CiRunHistoryRow> {
       finishedAt: finishedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(finishedAt),
+      durationMs: durationMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(durationMs),
       url: url == null && nullToAbsent ? const Value.absent() : Value(url),
     );
   }
@@ -4768,6 +4798,7 @@ class CiRunHistoryRow extends DataClass implements Insertable<CiRunHistoryRow> {
       conclusion: serializer.fromJson<String>(json['conclusion']),
       branch: serializer.fromJson<String?>(json['branch']),
       finishedAt: serializer.fromJson<int?>(json['finishedAt']),
+      durationMs: serializer.fromJson<int?>(json['durationMs']),
       url: serializer.fromJson<String?>(json['url']),
     );
   }
@@ -4786,6 +4817,7 @@ class CiRunHistoryRow extends DataClass implements Insertable<CiRunHistoryRow> {
       'conclusion': serializer.toJson<String>(conclusion),
       'branch': serializer.toJson<String?>(branch),
       'finishedAt': serializer.toJson<int?>(finishedAt),
+      'durationMs': serializer.toJson<int?>(durationMs),
       'url': serializer.toJson<String?>(url),
     };
   }
@@ -4802,6 +4834,7 @@ class CiRunHistoryRow extends DataClass implements Insertable<CiRunHistoryRow> {
     String? conclusion,
     Value<String?> branch = const Value.absent(),
     Value<int?> finishedAt = const Value.absent(),
+    Value<int?> durationMs = const Value.absent(),
     Value<String?> url = const Value.absent(),
   }) => CiRunHistoryRow(
     id: id ?? this.id,
@@ -4815,6 +4848,7 @@ class CiRunHistoryRow extends DataClass implements Insertable<CiRunHistoryRow> {
     conclusion: conclusion ?? this.conclusion,
     branch: branch.present ? branch.value : this.branch,
     finishedAt: finishedAt.present ? finishedAt.value : this.finishedAt,
+    durationMs: durationMs.present ? durationMs.value : this.durationMs,
     url: url.present ? url.value : this.url,
   );
   CiRunHistoryRow copyWithCompanion(CiRunHistoryCompanion data) {
@@ -4838,6 +4872,9 @@ class CiRunHistoryRow extends DataClass implements Insertable<CiRunHistoryRow> {
       finishedAt: data.finishedAt.present
           ? data.finishedAt.value
           : this.finishedAt,
+      durationMs: data.durationMs.present
+          ? data.durationMs.value
+          : this.durationMs,
       url: data.url.present ? data.url.value : this.url,
     );
   }
@@ -4856,6 +4893,7 @@ class CiRunHistoryRow extends DataClass implements Insertable<CiRunHistoryRow> {
           ..write('conclusion: $conclusion, ')
           ..write('branch: $branch, ')
           ..write('finishedAt: $finishedAt, ')
+          ..write('durationMs: $durationMs, ')
           ..write('url: $url')
           ..write(')'))
         .toString();
@@ -4874,6 +4912,7 @@ class CiRunHistoryRow extends DataClass implements Insertable<CiRunHistoryRow> {
     conclusion,
     branch,
     finishedAt,
+    durationMs,
     url,
   );
   @override
@@ -4891,6 +4930,7 @@ class CiRunHistoryRow extends DataClass implements Insertable<CiRunHistoryRow> {
           other.conclusion == this.conclusion &&
           other.branch == this.branch &&
           other.finishedAt == this.finishedAt &&
+          other.durationMs == this.durationMs &&
           other.url == this.url);
 }
 
@@ -4906,6 +4946,7 @@ class CiRunHistoryCompanion extends UpdateCompanion<CiRunHistoryRow> {
   final Value<String> conclusion;
   final Value<String?> branch;
   final Value<int?> finishedAt;
+  final Value<int?> durationMs;
   final Value<String?> url;
   const CiRunHistoryCompanion({
     this.id = const Value.absent(),
@@ -4919,6 +4960,7 @@ class CiRunHistoryCompanion extends UpdateCompanion<CiRunHistoryRow> {
     this.conclusion = const Value.absent(),
     this.branch = const Value.absent(),
     this.finishedAt = const Value.absent(),
+    this.durationMs = const Value.absent(),
     this.url = const Value.absent(),
   });
   CiRunHistoryCompanion.insert({
@@ -4933,6 +4975,7 @@ class CiRunHistoryCompanion extends UpdateCompanion<CiRunHistoryRow> {
     required String conclusion,
     this.branch = const Value.absent(),
     this.finishedAt = const Value.absent(),
+    this.durationMs = const Value.absent(),
     this.url = const Value.absent(),
   }) : provider = Value(provider),
        repoKey = Value(repoKey),
@@ -4953,6 +4996,7 @@ class CiRunHistoryCompanion extends UpdateCompanion<CiRunHistoryRow> {
     Expression<String>? conclusion,
     Expression<String>? branch,
     Expression<int>? finishedAt,
+    Expression<int>? durationMs,
     Expression<String>? url,
   }) {
     return RawValuesInsertable({
@@ -4967,6 +5011,7 @@ class CiRunHistoryCompanion extends UpdateCompanion<CiRunHistoryRow> {
       if (conclusion != null) 'conclusion': conclusion,
       if (branch != null) 'branch': branch,
       if (finishedAt != null) 'finished_at': finishedAt,
+      if (durationMs != null) 'duration_ms': durationMs,
       if (url != null) 'url': url,
     });
   }
@@ -4983,6 +5028,7 @@ class CiRunHistoryCompanion extends UpdateCompanion<CiRunHistoryRow> {
     Value<String>? conclusion,
     Value<String?>? branch,
     Value<int?>? finishedAt,
+    Value<int?>? durationMs,
     Value<String?>? url,
   }) {
     return CiRunHistoryCompanion(
@@ -4997,6 +5043,7 @@ class CiRunHistoryCompanion extends UpdateCompanion<CiRunHistoryRow> {
       conclusion: conclusion ?? this.conclusion,
       branch: branch ?? this.branch,
       finishedAt: finishedAt ?? this.finishedAt,
+      durationMs: durationMs ?? this.durationMs,
       url: url ?? this.url,
     );
   }
@@ -5037,6 +5084,9 @@ class CiRunHistoryCompanion extends UpdateCompanion<CiRunHistoryRow> {
     if (finishedAt.present) {
       map['finished_at'] = Variable<int>(finishedAt.value);
     }
+    if (durationMs.present) {
+      map['duration_ms'] = Variable<int>(durationMs.value);
+    }
     if (url.present) {
       map['url'] = Variable<String>(url.value);
     }
@@ -5057,6 +5107,7 @@ class CiRunHistoryCompanion extends UpdateCompanion<CiRunHistoryRow> {
           ..write('conclusion: $conclusion, ')
           ..write('branch: $branch, ')
           ..write('finishedAt: $finishedAt, ')
+          ..write('durationMs: $durationMs, ')
           ..write('url: $url')
           ..write(')'))
         .toString();
@@ -7487,6 +7538,7 @@ typedef $$CiRunHistoryTableCreateCompanionBuilder =
       required String conclusion,
       Value<String?> branch,
       Value<int?> finishedAt,
+      Value<int?> durationMs,
       Value<String?> url,
     });
 typedef $$CiRunHistoryTableUpdateCompanionBuilder =
@@ -7502,6 +7554,7 @@ typedef $$CiRunHistoryTableUpdateCompanionBuilder =
       Value<String> conclusion,
       Value<String?> branch,
       Value<int?> finishedAt,
+      Value<int?> durationMs,
       Value<String?> url,
     });
 
@@ -7566,6 +7619,11 @@ class $$CiRunHistoryTableFilterComposer
 
   ColumnFilters<int> get finishedAt => $composableBuilder(
     column: $table.finishedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7639,6 +7697,11 @@ class $$CiRunHistoryTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get url => $composableBuilder(
     column: $table.url,
     builder: (column) => ColumnOrderings(column),
@@ -7695,6 +7758,11 @@ class $$CiRunHistoryTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get url =>
       $composableBuilder(column: $table.url, builder: (column) => column);
 }
@@ -7741,6 +7809,7 @@ class $$CiRunHistoryTableTableManager
                 Value<String> conclusion = const Value.absent(),
                 Value<String?> branch = const Value.absent(),
                 Value<int?> finishedAt = const Value.absent(),
+                Value<int?> durationMs = const Value.absent(),
                 Value<String?> url = const Value.absent(),
               }) => CiRunHistoryCompanion(
                 id: id,
@@ -7754,6 +7823,7 @@ class $$CiRunHistoryTableTableManager
                 conclusion: conclusion,
                 branch: branch,
                 finishedAt: finishedAt,
+                durationMs: durationMs,
                 url: url,
               ),
           createCompanionCallback:
@@ -7769,6 +7839,7 @@ class $$CiRunHistoryTableTableManager
                 required String conclusion,
                 Value<String?> branch = const Value.absent(),
                 Value<int?> finishedAt = const Value.absent(),
+                Value<int?> durationMs = const Value.absent(),
                 Value<String?> url = const Value.absent(),
               }) => CiRunHistoryCompanion.insert(
                 id: id,
@@ -7782,6 +7853,7 @@ class $$CiRunHistoryTableTableManager
                 conclusion: conclusion,
                 branch: branch,
                 finishedAt: finishedAt,
+                durationMs: durationMs,
                 url: url,
               ),
           withReferenceMapper: (p0) => p0

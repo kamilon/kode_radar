@@ -143,6 +143,19 @@ String relativeTime(DateTime? value, {DateTime? now}) {
   return '${diff.inDays ~/ 365}y ago';
 }
 
+/// Formats a duration in milliseconds compactly (e.g. "45s", "2m 30s",
+/// "1h 5m"), or null when [ms] is null/non-positive.
+String? formatDurationMs(int? ms) {
+  if (ms == null || ms <= 0) return null;
+  final totalSeconds = ms ~/ 1000;
+  final h = totalSeconds ~/ 3600;
+  final m = (totalSeconds % 3600) ~/ 60;
+  final s = totalSeconds % 60;
+  if (h > 0) return m > 0 ? '${h}h ${m}m' : '${h}h';
+  if (m > 0) return s > 0 ? '${m}m ${s}s' : '${m}m';
+  return '${s}s';
+}
+
 // ---- Freshness / heat scale -------------------------------------------------
 
 /// Maps a repo's last activity to a freshness color: green (fresh) → amber

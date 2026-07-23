@@ -7,6 +7,7 @@ CiRunSample _s(
   DateTime finishedAt, {
   String repoKey = 'github:owner/name',
   String repoDisplay = 'owner/name',
+  int? durationMs,
 }) => CiRunSample(
   provider: 'github',
   repoKey: repoKey,
@@ -16,6 +17,7 @@ CiRunSample _s(
   outcome: outcome,
   conclusion: outcome,
   finishedAt: finishedAt,
+  durationMs: durationMs,
 );
 
 void main() {
@@ -237,6 +239,116 @@ void main() {
       ], now: base);
       expect(trends.first.workflow, 'red');
       expect(trends.last.workflow, 'green');
+    });
+
+    test('computes median duration over successful runs', () {
+      final trends = CiWorkflowTrend.aggregate([
+        _s('build', CiOutcome.success, ago(1), durationMs: 100),
+        _s('build', CiOutcome.success, ago(2), durationMs: 300),
+        _s('build', CiOutcome.success, ago(3), durationMs: 200),
+        // A failure's duration is ignored for the typical-duration signal.
+        _s('build', CiOutcome.failure, ago(4), durationMs: 9999),
+      ], now: base);
+      expect(trends.single.medianDurationMs, 200);
+    });
+
+    test('flags a slowing workflow (recent runs slower than older)', () {
+      // 8 timed successes, newest-first: recent half 500s, older half 200s —
+      // a 2.5x, +300s increase (clears both the ratio and absolute floors).
+      final trends = CiWorkflowTrend.aggregate([
+        for (var i = 0; i < 4; i++)
+          _s('build', CiOutcome.success, ago(i + 1), durationMs: 500000),
+        for (var i = 4; i < 8; i++)
+          _s('build', CiOutcome.success, ago(i + 1), durationMs: 200000),
+      ], now: base);
+      final t = trends.single;
+      expect(t.slowdownRatio, closeTo(2.5, 1e-9));
+      expect(t.isSlowing, isTrue);
+    });
+
+    test('a large relative but tiny absolute change is not slowing', () {
+      // 2s -> 3s is 1.5x but only +1s: below the absolute delta floor.
+      final trends = CiWorkflowTrend.aggregate([
+        for (var i = 0; i < 4; i++)
+          _s('build', CiOutcome.success, ago(i + 1), durationMs: 3000),
+        for (var i = 4; i < 8; i++)
+          _s('build', CiOutcome.success, ago(i + 1), durationMs: 2000),
+      ], now: base);
+      expect(trends.single.slowdownRatio, closeTo(1.5, 1e-9));
+      expect(trends.single.isSlowing, isFalse);
+    });
+
+    test('a steady workflow is not slowing', () {
+      final trends = CiWorkflowTrend.aggregate([
+        for (var i = 0; i < 8; i++)
+          _s('build', CiOutcome.success, ago(i + 1), durationMs: 300000),
+      ], now: base);
+      expect(trends.single.isSlowing, isFalse);
+      expect(trends.single.slowdownRatio, closeTo(1.0, 1e-9));
+    });
+
+    test('slowdown needs a minimum sample; typical needs 3 timed runs', () {
+      final trends = CiWorkflowTrend.aggregate([
+        _s('build', CiOutcome.success, ago(1), durationMs: 900000),
+        _s('build', CiOutcome.success, ago(2), durationMs: 100000),
+      ], now: base);
+      expect(trends.single.slowdownRatio, isNull);
+      expect(trends.single.isSlowing, isFalse);
+      // Only 2 timed runs -> no "typical" duration shown.
+      expect(trends.single.medianDurationMs, isNull);
+    });
+
+    test('slowing ranks above healthy but below flaky/failing', () {
+      CiRunSample s(
+        String wf,
+        String outcome,
+        int i, {
+        int? durationMs,
+        String repoKey = 'github:o/r',
+        String repoDisplay = 'o/r',
+      }) => _s(
+        wf,
+        outcome,
+        ago(i),
+        durationMs: durationMs,
+        repoKey: repoKey,
+        repoDisplay: repoDisplay,
+      );
+      final trends = CiWorkflowTrend.aggregate([
+        // healthy green (no duration)
+        for (var i = 1; i <= 3; i++) s('green', CiOutcome.success, i),
+        // slowing but green
+        for (var i = 1; i <= 4; i++)
+          s(
+            'slow',
+            CiOutcome.success,
+            i,
+            durationMs: 600000,
+            repoKey: 'github:o/s',
+            repoDisplay: 'o/s',
+          ),
+        for (var i = 5; i <= 8; i++)
+          s(
+            'slow',
+            CiOutcome.success,
+            i,
+            durationMs: 200000,
+            repoKey: 'github:o/s',
+            repoDisplay: 'o/s',
+          ),
+        // flaky (alternating), repo o/f
+        for (var i = 1; i <= 4; i++)
+          s(
+            'flaky',
+            i.isEven ? CiOutcome.success : CiOutcome.failure,
+            i,
+            repoKey: 'github:o/f',
+            repoDisplay: 'o/f',
+          ),
+      ], now: base);
+      final order = trends.map((t) => t.workflow).toList();
+      expect(order.indexOf('flaky'), lessThan(order.indexOf('slow')));
+      expect(order.indexOf('slow'), lessThan(order.indexOf('green')));
     });
   });
 }
