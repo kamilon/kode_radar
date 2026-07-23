@@ -106,6 +106,130 @@ void main() {
     expect(approvedAged(40).single.category, 'oldOpenPr');
   });
 
+  test('GitHub: my APPROVED PR -> approved', () {
+    final items = AttentionService.githubItems(
+      repoDisplay: 'acme/api',
+      now: now,
+      selfGithubLogins: {'alice'},
+      prs: [
+        {
+          'number': 44,
+          'title': 'Ready',
+          'author': {'login': 'alice'},
+          'createdAt': daysAgo(2).toIso8601String(),
+          'url': 'https://github.com/acme/api/pull/44',
+          'reviewDecision': 'APPROVED',
+          'reviewRequests': {'totalCount': 0, 'nodes': []},
+        },
+      ],
+    );
+    expect(items.single.category, 'approved');
+    expect(items.single.isMine, isTrue);
+    expect(items.single.title, 'PR #44 approved');
+  });
+
+  test(
+    'GitHub: my PR approved via review on a null-decision repo -> approved',
+    () {
+      final items = AttentionService.githubItems(
+        repoDisplay: 'acme/api',
+        now: now,
+        selfGithubLogins: {'alice'},
+        prs: [
+          {
+            'number': 45,
+            'title': 'Ready',
+            'author': {'login': 'alice'},
+            'createdAt': daysAgo(1).toIso8601String(),
+            'reviewDecision': null,
+            'latestOpinionatedReviews': {
+              'nodes': [
+                {'state': 'APPROVED'},
+              ],
+            },
+            'reviewRequests': {'totalCount': 0, 'nodes': []},
+          },
+        ],
+      );
+      expect(items.single.category, 'approved');
+    },
+  );
+
+  test('ADO: my approved PR -> approved', () {
+    final items = AttentionService.adoItems(
+      repoDisplay: 'org/proj/repo',
+      organization: 'org',
+      project: 'proj',
+      name: 'repo',
+      now: now,
+      selfAdoNames: {'Ada'},
+      prs: [
+        {
+          'pullRequestId': 7,
+          'title': 'Ready',
+          'createdBy': {'displayName': 'Ada'},
+          'creationDate': daysAgo(1).toIso8601String(),
+          'reviewers': [
+            {'vote': 10, 'displayName': 'Reviewer'},
+          ],
+        },
+      ],
+    );
+    expect(items.single.category, 'approved');
+    expect(items.single.isMine, isTrue);
+  });
+
+  test('GitHub: a reviewer (not author) does not get approved', () {
+    final items = AttentionService.githubItems(
+      repoDisplay: 'acme/api',
+      now: now,
+      selfGithubLogins: {'bob'},
+      prs: [
+        {
+          'number': 46,
+          'title': 'Ready',
+          'author': {'login': 'alice'},
+          'createdAt': daysAgo(1).toIso8601String(),
+          'reviewDecision': 'APPROVED',
+          'reviewRequests': {
+            'totalCount': 1,
+            'nodes': [
+              {
+                'requestedReviewer': {'login': 'bob'},
+              },
+            ],
+          },
+        },
+      ],
+    );
+    // Bob is a requested reviewer, not the author -> not "approved".
+    expect(items.single.category, isNot('approved'));
+  });
+
+  test('ADO: a reviewer (not author) does not get approved', () {
+    final items = AttentionService.adoItems(
+      repoDisplay: 'org/proj/repo',
+      organization: 'org',
+      project: 'proj',
+      name: 'repo',
+      now: now,
+      selfAdoNames: {'Bob'},
+      prs: [
+        {
+          'pullRequestId': 8,
+          'title': 'Ready',
+          'createdBy': {'displayName': 'Ada'},
+          'creationDate': daysAgo(1).toIso8601String(),
+          'reviewers': [
+            {'vote': 10, 'displayName': 'Bob'},
+          ],
+        },
+      ],
+    );
+    // Bob reviewed (approved) Ada's PR, but isn't the author -> no item.
+    expect(items.where((i) => i.category == 'approved'), isEmpty);
+  });
+
   test('GitHub: REVIEW_REQUIRED decision -> reviewRequested', () {
     final items = AttentionService.githubItems(
       repoDisplay: 'acme/api',

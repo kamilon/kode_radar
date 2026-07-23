@@ -11,6 +11,8 @@ class AppPreferences {
     this.quietEndHour = 8,
     this.feedLookbackDays = 14,
     this.backgroundSyncEnabled = true,
+    this.notifyMineOnly = false,
+    this.silencedNotifyCategories = const {},
   });
 
   final bool notificationsEnabled;
@@ -28,6 +30,15 @@ class AppPreferences {
   /// on iOS). Desktop keeps polling while running regardless.
   final bool backgroundSyncEnabled;
 
+  /// When true, only notify for attention items that concern the user (a PR
+  /// they authored or are a requested reviewer on). The inbox still shows all.
+  final bool notifyMineOnly;
+
+  /// Attention categories whose notifications are turned OFF (the empty default
+  /// notifies for every category — matching the prior behavior). Storing the
+  /// *silenced* set means a newly-added category notifies by default.
+  final Set<String> silencedNotifyCategories;
+
   AppPreferences copyWith({
     bool? notificationsEnabled,
     bool? quietHoursEnabled,
@@ -35,6 +46,8 @@ class AppPreferences {
     int? quietEndHour,
     int? feedLookbackDays,
     bool? backgroundSyncEnabled,
+    bool? notifyMineOnly,
+    Set<String>? silencedNotifyCategories,
   }) {
     return AppPreferences(
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
@@ -44,6 +57,10 @@ class AppPreferences {
       feedLookbackDays: feedLookbackDays ?? this.feedLookbackDays,
       backgroundSyncEnabled:
           backgroundSyncEnabled ?? this.backgroundSyncEnabled,
+      notifyMineOnly: notifyMineOnly ?? this.notifyMineOnly,
+      silencedNotifyCategories: Set.unmodifiable(
+        silencedNotifyCategories ?? this.silencedNotifyCategories,
+      ),
     );
   }
 }
@@ -59,6 +76,9 @@ class PreferencesStore {
   static const String _quietEndHour = 'pref_quiet_end_hour';
   static const String _feedLookbackDays = 'pref_feed_lookback_days';
   static const String _backgroundSyncEnabled = 'pref_background_sync_enabled';
+  static const String _notifyMineOnly = 'pref_notify_mine_only';
+  static const String _silencedNotifyCategories =
+      'pref_notify_silenced_categories';
 
   /// Allowed lookback options shown in the UI.
   static const List<int> lookbackOptions = [7, 14, 30, 60];
@@ -91,6 +111,11 @@ class PreferencesStore {
       backgroundSyncEnabled:
           prefs.getBool(_backgroundSyncEnabled) ??
           defaults.backgroundSyncEnabled,
+      notifyMineOnly: prefs.getBool(_notifyMineOnly) ?? defaults.notifyMineOnly,
+      silencedNotifyCategories: Set.unmodifiable(
+        prefs.getStringList(_silencedNotifyCategories)?.toSet() ??
+            defaults.silencedNotifyCategories,
+      ),
     );
   }
 
@@ -133,6 +158,32 @@ class PreferencesStore {
     return _runLocked(() async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_feedLookbackDays, _sanitizeLookback(days));
+    });
+  }
+
+  static Future<void> setNotifyMineOnly(bool value) {
+    return _runLocked(() async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_notifyMineOnly, value);
+    });
+  }
+
+  /// Turns notifications for [category] on ([silenced] false) or off (true),
+  /// persisting the updated silenced set.
+  static Future<void> setCategorySilenced(String category, bool silenced) {
+    return _runLocked(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final current =
+          prefs.getStringList(_silencedNotifyCategories)?.toSet() ?? <String>{};
+      if (silenced) {
+        current.add(category);
+      } else {
+        current.remove(category);
+      }
+      await prefs.setStringList(
+        _silencedNotifyCategories,
+        current.toList(growable: false),
+      );
     });
   }
 

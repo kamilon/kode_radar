@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'attention_service.dart';
 import 'background_sync.dart';
 import 'background_sync_status_store.dart';
 import 'preferences_store.dart';
@@ -128,6 +129,59 @@ class _PreferencesPageState extends State<PreferencesPage>
                     },
                   ),
                 ],
+                SwitchListTile(
+                  title: const Text('Only my PRs & reviews'),
+                  subtitle: const Text(
+                    'Notify only for items you authored or were asked to '
+                    'review',
+                  ),
+                  value: _prefs.notifyMineOnly,
+                  onChanged: _prefs.notificationsEnabled
+                      ? (value) async {
+                          await PreferencesStore.setNotifyMineOnly(value);
+                          if (!mounted) return;
+                          setState(
+                            () =>
+                                _prefs = _prefs.copyWith(notifyMineOnly: value),
+                          );
+                        }
+                      : null,
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Text(
+                    'Notify me about',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                for (final category in AttentionService.notifiableCategories)
+                  SwitchListTile(
+                    dense: true,
+                    title: Text(AttentionService.categoryLabel(category)),
+                    value: !_prefs.silencedNotifyCategories.contains(category),
+                    onChanged: _prefs.notificationsEnabled
+                        ? (enabled) async {
+                            await PreferencesStore.setCategorySilenced(
+                              category,
+                              !enabled,
+                            );
+                            if (!mounted) return;
+                            setState(() {
+                              final next = {..._prefs.silencedNotifyCategories};
+                              if (enabled) {
+                                next.remove(category);
+                              } else {
+                                next.add(category);
+                              }
+                              _prefs = _prefs.copyWith(
+                                silencedNotifyCategories: next,
+                              );
+                            });
+                          }
+                        : null,
+                  ),
                 const Divider(),
                 _sectionHeader('Activity Feed'),
                 ListTile(

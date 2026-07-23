@@ -548,6 +548,8 @@ class _AttentionInboxPageState extends State<AttentionInboxPage> {
         return (icon: Icons.rate_review, color: Colors.orange);
       case 'changesRequested':
         return (icon: Icons.edit_note, color: Colors.red);
+      case 'approved':
+        return (icon: Icons.check_circle, color: Colors.green);
       case 'oldOpenPr':
         return (icon: Icons.schedule, color: Colors.blueGrey);
       case 'error':
