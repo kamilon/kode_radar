@@ -113,20 +113,23 @@ InsightsData _sampleData() {
         reviewRequests: 2,
       ),
     ],
-    ciTrends: CiWorkflowTrend.aggregate([
+    ciRunSamples: [
       for (var i = 0; i < 4; i++)
         CiRunSample(
           provider: 'github',
           repoKey: 'github:acme/kode',
           repoDisplay: 'acme/kode',
           workflow: 'CI',
+          workflowId: '1',
           runKey: 'github:acme/kode:$i',
           outcome: i.isEven ? CiOutcome.success : CiOutcome.failure,
           conclusion: i.isEven ? 'success' : 'failure',
-          finishedAt: DateTime.utc(2026, 3, 1, 12 - i),
+          // Within the default 30-day window of the fixed loadedAt below, so
+          // the view renders populated deterministically (no wall-clock).
+          finishedAt: DateTime.utc(2026, 3, 1, 12).subtract(Duration(days: i)),
         ),
-    ], now: DateTime.utc(2026, 3, 1, 13)),
-    loadedAt: DateTime.now(),
+    ],
+    loadedAt: DateTime.utc(2026, 3, 1, 13),
   );
 }
 

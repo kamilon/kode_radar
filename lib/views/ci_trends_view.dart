@@ -1,81 +1,143 @@
 import 'package:flutter/material.dart';
 
 import '../ci_run_history.dart';
+import 'ci_workflow_detail_page.dart';
 import 'views_common.dart';
 
 /// Ranks each workflow/pipeline by how much it needs attention — chronically
-/// failing and flaky ones first — from the accumulated CI run history, with a
-/// pass/fail sparkline of recent runs. Complements the CI health board (current
-/// state) with the trend over time.
-class CiTrendsView extends StatelessWidget {
+/// failing and flaky ones first — from the accumulated (default-branch) CI run
+/// history, with a pass/fail sparkline of recent runs. A window selector
+/// re-aggregates the already-loaded samples client-side; tapping a workflow
+/// drills into its individual runs.
+class CiTrendsView extends StatefulWidget {
   const CiTrendsView({super.key, required this.data});
 
   final InsightsData data;
 
   @override
+  State<CiTrendsView> createState() => _CiTrendsViewState();
+}
+
+class _CiTrendsViewState extends State<CiTrendsView> {
+  static const List<int> _windowChoices = [7, 30, 90];
+  int _windowDays = 30;
+
+  Duration get _window => Duration(days: _windowDays);
+
+  @override
   Widget build(BuildContext context) {
-    final trends = data.ciTrends;
+    final samples = widget.data.ciRunSamples;
+    // Anchor aggregation to the load time so it matches the drill-down cutoff
+    // (both use loadedAt), even if the view lingers open across the cutoff.
+    final trends = CiWorkflowTrend.aggregate(
+      samples,
+      now: widget.data.loadedAt,
+      window: _window,
+    );
     final problems = trends.where((t) => t.hasProblem).length;
 
     return ViewScaffold(
       title: 'CI trends',
-      loadedAt: data.loadedAt,
-      child: trends.isEmpty
-          ? const ViewEmpty(
-              message:
-                  'No CI history yet.\nWorkflow runs accumulate as syncs '
-                  'observe them — check back after a few refreshes.',
-            )
-          : Column(
+      loadedAt: widget.data.loadedAt,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Row(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      problems == 0
-                          ? '${trends.length} workflows · all healthy'
-                          : '$problems needing attention · '
-                                '${trends.length} workflows',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: problems == 0
-                            ? Theme.of(context).colorScheme.onSurfaceVariant
-                            : ciColor('failure'),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'From recent sampled runs across all branches.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ),
                 Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: trends.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, i) => _TrendTile(trend: trends[i]),
+                  child: Text(
+                    trends.isEmpty
+                        ? 'No CI history yet'
+                        : problems == 0
+                        ? '${trends.length} workflows · all healthy'
+                        : '$problems needing attention · '
+                              '${trends.length} workflows',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: problems == 0
+                          ? Theme.of(context).colorScheme.onSurfaceVariant
+                          : ciColor('failure'),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
+                ),
+                SegmentedButton<int>(
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  segments: [
+                    for (final d in _windowChoices)
+                      ButtonSegment(value: d, label: Text('${d}d')),
+                  ],
+                  selected: {_windowDays},
+                  onSelectionChanged: (s) =>
+                      setState(() => _windowDays = s.first),
                 ),
               ],
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Default-branch runs seen in the last $_windowDays days.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: trends.isEmpty
+                ? const ViewEmpty(
+                    message:
+                        'No CI history yet.\nWorkflow runs accumulate as syncs '
+                        'observe them — check back after a few refreshes.',
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: trends.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, i) => _TrendTile(
+                      trend: trends[i],
+                      onTap: () => _openDetail(trends[i]),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openDetail(CiWorkflowTrend trend) {
+    // Same anchor as aggregation (loadedAt) so the drill-down list can't drift
+    // out of sync with the tile's run count.
+    final cutoff = widget.data.loadedAt.subtract(_window);
+    final runs = widget.data.ciRunSamples
+        .where(
+          (s) =>
+              s.repoKey == trend.repoKey &&
+              s.groupKey == trend.groupKey &&
+              (s.finishedAt == null || !s.finishedAt!.isBefore(cutoff)),
+        )
+        .toList();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CiWorkflowDetailPage(trend: trend, samples: runs),
+      ),
     );
   }
 }
 
 class _TrendTile extends StatelessWidget {
-  const _TrendTile({required this.trend});
+  const _TrendTile({required this.trend, required this.onTap});
 
   final CiWorkflowTrend trend;
+  final VoidCallback onTap;
 
   ({String label, Color color})? _badge() {
     if (trend.isChronicallyFailing) {
@@ -89,13 +151,12 @@ class _TrendTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final badge = _badge();
-    final url = trend.url;
     final ratePct = (trend.failureRate * 100).round();
 
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: url == null ? null : () => openUrl(url),
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -121,6 +182,12 @@ class _TrendTile extends StatelessWidget {
                   ),
                   if (badge != null)
                     _Badge(label: badge.label, color: badge.color),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ],
               ),
               const SizedBox(height: 2),

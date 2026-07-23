@@ -176,12 +176,12 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       // Record a trend snapshot from this load too (deduped ~1/day), matching
       // Radar/Teams/Digest, so opening Insights also advances trend history.
       await MetricStore.capture(activities, restrictToMonitored: true);
-      // Accumulate this fetch's CI runs, then read back the rolled-up trends so
-      // the CI trends view reflects the freshest history.
+      // Accumulate this fetch's CI runs, then read back the raw history so the
+      // CI trends view can aggregate per its selected window.
       await CiRunHistoryStore.recordSafely(
         activities.expand((a) => a.recentRuns),
       );
-      final ciTrends = await CiRunHistoryStore.trends();
+      final ciRunSamples = await CiRunHistoryStore.allSamples();
       final history = await MetricStore.all();
       final teams = await TeamStore.list();
       final rollups = TeamService.rollupAll(teams, activities);
@@ -193,7 +193,7 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
           teams: teams,
           rollups: rollups,
           people: people,
-          ciTrends: ciTrends,
+          ciRunSamples: ciRunSamples,
           loadedAt: DateTime.now(),
         );
         _loading = false;
