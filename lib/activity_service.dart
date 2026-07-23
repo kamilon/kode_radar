@@ -617,9 +617,11 @@ class ActivityService {
           );
           // Trends need a completed (pass/fail) default-branch run. If the
           // all-branch page yielded none — e.g. a PR-heavy repo whose main-
-          // branch runs are past the window — and the page was full (so older
-          // runs exist), do a branch-scoped follow-up just for trends. ciStatus
-          // stays all-branch (from the first page above).
+          // branch runs are past the window — and the page hit the per_page
+          // limit (so older runs likely exist beyond it), do a branch-scoped
+          // follow-up just for trends. ciStatus stays all-branch (from the
+          // first page above). Worst case (exactly a full page with no more
+          // runs) is one extra scoped request that returns nothing.
           final runsList = decoded is Map ? decoded['workflow_runs'] : null;
           final pageWasFull = runsList is List && runsList.length >= 50;
           if (pageWasFull && !_hasCompletedTrendRun(recentRuns)) {
@@ -794,8 +796,10 @@ class ActivityService {
               defaultBranch: defaultBranch,
             );
             // As with GitHub: if the all-branch page had no completed default-
-            // branch build and was full (older builds exist), do a scoped
-            // follow-up just for trends. ciStatus stays all-branch.
+            // branch build and hit the page limit (older builds likely exist
+            // beyond it), do a scoped follow-up just for trends. ciStatus stays
+            // all-branch. Worst case is one extra scoped request that finds
+            // nothing.
             final buildsList = decoded is Map ? decoded['value'] : null;
             final pageWasFull = buildsList is List && buildsList.length >= 50;
             if (pageWasFull &&
