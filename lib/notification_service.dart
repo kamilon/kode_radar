@@ -152,6 +152,9 @@ class NotificationService {
           inQuietHours: false,
         );
         await NotificationSeenStore.recordBaseline(baselineIds, monitoredRepos);
+        // `attention` already excludes error items (filtered at the top of this
+        // method), so the digest's count and per-category breakdown stay
+        // consistent; here we only apply the notification filters.
         final digestItems = attention
             .where(
               (item) => notifiesFor(
