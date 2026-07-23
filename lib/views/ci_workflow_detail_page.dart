@@ -58,7 +58,7 @@ class CiWorkflowDetailPage extends StatelessWidget {
             child: Row(
               children: [
                 _Stat(label: 'Failure rate', value: '$ratePct%'),
-                _Stat(label: 'Runs', value: '${trend.total}'),
+                _Stat(label: 'Completed', value: '${trend.total}'),
                 _Stat(label: 'Flips', value: '${trend.flips}'),
                 if (trend.isFlaky)
                   const _Stat(label: 'Verdict', value: 'Flaky')
