@@ -85,7 +85,7 @@ class SecurityStats {
   const SecurityStats._();
 
   /// Repos with open alerts, worst-severity first (a single critical outranks
-  /// any number of highs, etc.), then most-total, then name.
+  /// any number of highs, etc.), then by display name.
   static List<RepoSecurity> rankRepos(Iterable<RepoSecurity> repos) {
     final result = repos.where((r) => !r.isEmpty).toList();
     result.sort((a, b) {
