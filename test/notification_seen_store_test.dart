@@ -184,5 +184,21 @@ void main() {
       }, 'w7-1');
       expect(again, {'w7-1|t1|mergeTimeUp'});
     });
+
+    test('ignores current keys from a different period', () async {
+      // Only the key matching the caller's period is claimed/returned; a
+      // mismatched-period key is neither alerted nor stored.
+      final fresh = await NotificationSeenStore.claimNewRegressionKeys({
+        'w7-2|t1|mergeTimeUp',
+        'w7-1|t9|ciFailureRateUp',
+      }, 'w7-2');
+      expect(fresh, {'w7-2|t1|mergeTimeUp'});
+      // The out-of-period key wasn't stored, so it's still fresh in its own
+      // period (never silently recorded as notified).
+      final other = await NotificationSeenStore.claimNewRegressionKeys({
+        'w7-1|t9|ciFailureRateUp',
+      }, 'w7-1');
+      expect(other, {'w7-1|t9|ciFailureRateUp'});
+    });
   });
 }

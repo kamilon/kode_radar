@@ -270,16 +270,20 @@ class NotificationSeenStore {
             // Corrupt marker: treat as empty and overwrite below.
           }
         }
-        // Keep only this period's already-notified keys (drop older periods).
+        // Scope everything to this period: only keys prefixed `<periodKey>|`
+        // are considered, so a caller that passes an out-of-period key can't
+        // slip an unprunable entry into the stored set (and it matches the doc:
+        // entries from any other period are pruned).
         final prefix = '$periodKey|';
+        final scoped = currentKeys.where((k) => k.startsWith(prefix)).toSet();
         final kept = stored.where((k) => k.startsWith(prefix)).toSet();
-        final fresh = currentKeys.difference(kept);
+        final fresh = scoped.difference(kept);
         // Skip the write when there's nothing new to record and nothing stale
         // to prune.
         if (fresh.isEmpty && kept.length == stored.length) {
           return <String>{};
         }
-        final updated = <String>{...kept, ...currentKeys};
+        final updated = <String>{...kept, ...scoped};
         await _setMeta(db, _regressionKeysKey, jsonEncode(updated.toList()));
         return fresh;
       }),
