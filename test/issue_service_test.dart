@@ -2,9 +2,13 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kode_radar/issue_service.dart';
+import 'package:kode_radar/repo_store.dart';
 import 'package:kode_radar/team.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   final now = DateTime.utc(2026, 3, 1);
 
   group('issuesFromGithubGraphql', () {
@@ -147,6 +151,23 @@ void main() {
       expect(result.single.teamId, 't1');
       expect(result.single.openCount, 8);
       expect(result.single.staleCount, 3);
+    });
+  });
+
+  group('computeAll', () {
+    test('malformed monitored entries count toward failedRepos', () async {
+      // Malformed entries never create a fetch task, so no network is hit;
+      // they must still be reported as unavailable so the partial-coverage
+      // signal is honest.
+      SharedPreferences.setMockInitialValues({
+        RepoStore.githubKey: <String>[
+          'not json',
+          '{"owner":"o"}', // missing repoName
+        ],
+      });
+      final result = await IssueService.computeAll(now: now);
+      expect(result.snapshots, isEmpty);
+      expect(result.failedRepos, 2);
     });
   });
 }

@@ -239,13 +239,23 @@ class IssueService {
           prefs.getStringList(RepoStore.githubKey) ?? const <String>[];
 
       final tasks = <Future<RepoIssues?> Function()>[];
+      // Repos we couldn't even attempt (malformed stored entry / missing
+      // fields) count toward failedRepos too, so the partial-coverage signal
+      // stays honest — but an intentional onlyRepoKeys filter-out does not.
+      var setupFailed = 0;
       for (final raw in githubRepos) {
         try {
           final decoded = jsonDecode(raw);
-          if (decoded is! Map) continue;
+          if (decoded is! Map) {
+            setupFailed++;
+            continue;
+          }
           final owner = _str(decoded, 'owner');
           final name = _str(decoded, 'repoName');
-          if (owner == null || name == null) continue;
+          if (owner == null || name == null) {
+            setupFailed++;
+            continue;
+          }
           final repoKey = RepoDiscoveryService.githubKey(owner, name);
           if (onlyRepoKeys != null && !onlyRepoKeys.contains(repoKey)) continue;
           final tokenId = _str(decoded, 'tokenId');
@@ -260,13 +270,14 @@ class IssueService {
             ),
           );
         } catch (_) {
-          // Skip malformed entries.
+          // A malformed entry we couldn't parse — count it as unavailable.
+          setupFailed++;
         }
       }
 
       final results = await _runBounded(tasks, concurrency);
       final snapshots = <RepoIssues>[];
-      var failed = 0;
+      var failed = setupFailed;
       for (final r in results) {
         if (r == null) {
           failed++;
