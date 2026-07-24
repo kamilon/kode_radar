@@ -5,6 +5,7 @@ import '../app_http.dart';
 import '../ci_run_history_store.dart';
 import '../cycle_time_service.dart';
 import '../cycle_time_store.dart';
+import '../issue_service.dart';
 import '../metric_store.dart';
 import '../people_service.dart';
 import '../team_service.dart';
@@ -19,6 +20,7 @@ import 'donut_view.dart';
 import 'freshness_view.dart';
 import 'health_gauge_view.dart';
 import 'heatmap_view.dart';
+import 'issues_view.dart';
 import 'provider_split_view.dart';
 import 'pulse_view.dart';
 import 'quadrant_view.dart';
@@ -103,6 +105,12 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       builder: (d) => TrendDigestView(data: d),
     ),
     ViewInfo(
+      title: 'Issues',
+      blurb: 'Open & stale issue backlogs',
+      icon: Icons.bug_report_outlined,
+      builder: (d) => IssuesView(data: d),
+    ),
+    ViewInfo(
       title: 'Treemap',
       blurb: 'Repos sized by activity',
       icon: Icons.dashboard,
@@ -183,12 +191,13 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       _error = null;
     });
     try {
-      // Run the three network passes concurrently (repo activity, People, and
-      // merged-PR cycle time) so none serializes behind the others.
-      final (activities, people, cycleFetched) = await (
+      // Run the network passes concurrently (repo activity, People, merged-PR
+      // cycle time, and open issues) so none serializes behind the others.
+      final (activities, people, cycleFetched, issuesResult) = await (
         ActivityService.computeAll(client: AppHttp.client),
         PeopleService.computeAll(client: AppHttp.client),
         CycleTimeService.computeAll(client: AppHttp.client),
+        IssueService.computeAll(client: AppHttp.client),
       ).wait;
       // Record a trend snapshot from this load too (deduped ~1/day), matching
       // Radar/Teams/Digest, so opening Insights also advances trend history.
@@ -215,6 +224,8 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
           people: people,
           ciRunSamples: ciRunSamples,
           cycleSamples: cycleSamples,
+          issueSnapshots: issuesResult.snapshots,
+          issuesFailedRepos: issuesResult.failedRepos,
           loadedAt: DateTime.now(),
         );
         _loading = false;
