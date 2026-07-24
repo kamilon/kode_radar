@@ -212,6 +212,27 @@ class _PreferencesPageState extends State<PreferencesPage>
                           }
                         : null,
                   ),
+                SwitchListTile(
+                  title: const Text('Team trend alerts'),
+                  subtitle: const Text(
+                    'Notify when a team\u2019s review time, merge time, or CI '
+                    'failure rate rises week-over-week',
+                  ),
+                  value: _prefs.regressionAlertsEnabled,
+                  onChanged: _prefs.notificationsEnabled
+                      ? (value) async {
+                          await PreferencesStore.setRegressionAlertsEnabled(
+                            value,
+                          );
+                          if (!mounted) return;
+                          setState(
+                            () => _prefs = _prefs.copyWith(
+                              regressionAlertsEnabled: value,
+                            ),
+                          );
+                        }
+                      : null,
+                ),
                 const Divider(),
                 _sectionHeader('Activity Feed'),
                 ListTile(

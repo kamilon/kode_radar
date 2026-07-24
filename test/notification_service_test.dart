@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kode_radar/attention_service.dart';
 import 'package:kode_radar/notification_service.dart';
+import 'package:kode_radar/trend_digest.dart';
 
 void main() {
   test('diffNew returns current ids not already seen', () {
@@ -587,6 +588,40 @@ void main() {
       expect(
         NotificationService.digestBody(items),
         '2 review requested · 1 changes requested · 1 approved',
+      );
+    });
+  });
+
+  group('regression alert copy', () {
+    TrendRegression reg(String team, RegressionKind kind, String summary) =>
+        TrendRegression(
+          teamId: team,
+          teamName: team,
+          kind: kind,
+          summary: summary,
+          key: 'w7-1|$team|${kind.id}',
+        );
+
+    test('title is singular for one, counted for many', () {
+      expect(NotificationService.regressionTitle(1), 'A team trend regressed');
+      expect(NotificationService.regressionTitle(3), '3 team trends regressed');
+    });
+
+    test('body lists up to three team lines then overflows', () {
+      final regs = [
+        reg('Platform', RegressionKind.mergeTimeUp, 'merge time 1d → 3d'),
+        reg('Infra', RegressionKind.reviewLatencyUp, 'review time 2h → 8h'),
+        reg('Web', RegressionKind.ciFailureRateUp, 'CI failures 10% → 40%'),
+        reg('Mobile', RegressionKind.mergeTimeUp, 'merge time 4h → 12h'),
+      ];
+      expect(
+        NotificationService.regressionBody(regs),
+        [
+          'Platform: merge time 1d → 3d',
+          'Infra: review time 2h → 8h',
+          'Web: CI failures 10% → 40%',
+          '+1 more',
+        ].join('\n'),
       );
     });
   });

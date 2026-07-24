@@ -9,12 +9,14 @@ import 'mute_store.dart';
 import 'notification_seen_store.dart';
 import 'preferences_store.dart';
 import 'repo_store.dart';
+import 'trend_digest.dart';
 
 class NotificationService {
   NotificationService._();
 
   static const int _summaryNotificationId = 42001;
   static const int _digestNotificationId = 42002;
+  static const int _regressionNotificationId = 42003;
   static const String _channelId = 'attention_inbox';
   static const String _channelName = 'Attention Inbox';
   static const String _channelDescription =
@@ -612,5 +614,72 @@ class NotificationService {
       debugPrint('Failed to show digest notification: $e');
       return false;
     }
+  }
+
+  /// Raises a notification for team trend regressions (review latency, merge
+  /// time, or CI failure rate up week-over-week). No-ops unless regression
+  /// alerts are enabled and notifications are currently allowed. De-duplicates
+  /// via [NotificationSeenStore.claimNewRegressionKeys] keyed by [periodKey],
+  /// so a standing regression alerts at most once per period. Never throws.
+  static Future<void> notifyRegressions(
+    List<TrendRegression> regressions, {
+    required String periodKey,
+    DateTime? now,
+    AppPreferences? prefs,
+  }) async {
+    try {
+      if (!_isSupportedPlatform || regressions.isEmpty) return;
+      final at = now ?? DateTime.now();
+      final appPrefs = prefs ?? await PreferencesStore.load();
+      if (!appPrefs.regressionAlertsEnabled) return;
+      if (!PreferencesStore.notificationsAllowed(appPrefs, at)) return;
+      // Only claim (mark as notified) once we can actually show, so a failed
+      // init/show lets a later sync retry instead of silently swallowing it.
+      await init();
+      if (!_initialized) return;
+      final details = _notificationDetails();
+      if (details == null) return;
+      final fresh = await NotificationSeenStore.claimNewRegressionKeys(
+        regressions.map((r) => r.key).toSet(),
+        periodKey,
+      );
+      if (fresh.isEmpty) return;
+      final freshRegressions = regressions
+          .where((r) => fresh.contains(r.key))
+          .toList(growable: false);
+      if (freshRegressions.isEmpty) return;
+      try {
+        await _plugin.show(
+          id: _regressionNotificationId,
+          title: regressionTitle(freshRegressions.length),
+          body: regressionBody(freshRegressions),
+          notificationDetails: details,
+          payload: attentionPayload,
+        );
+      } catch (e) {
+        // Showing failed after we claimed the keys — release them so a later
+        // sync retries instead of silently dropping the alert for the period.
+        await NotificationSeenStore.releaseRegressionKeys(fresh);
+        rethrow;
+      }
+    } catch (e, st) {
+      debugPrint('Failed to show regression notification: $e\n$st');
+    }
+  }
+
+  /// Title for a regression alert covering [count] regressions. Pure.
+  static String regressionTitle(int count) =>
+      count == 1 ? 'A team trend regressed' : '$count team trends regressed';
+
+  /// Body for a regression alert: up to three "Team: metric a → b" lines, then
+  /// a "+N more" overflow. Pure.
+  static String regressionBody(List<TrendRegression> regressions) {
+    final lines = regressions
+        .take(3)
+        .map((r) => '${r.teamName}: ${r.summary}')
+        .toList();
+    final remaining = regressions.length - lines.length;
+    if (remaining > 0) lines.add('+$remaining more');
+    return lines.join('\n');
   }
 }

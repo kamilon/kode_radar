@@ -15,6 +15,7 @@ class AppPreferences {
     this.silencedNotifyCategories = const {},
     this.digestModeEnabled = false,
     this.digestHour = 9,
+    this.regressionAlertsEnabled = true,
   });
 
   final bool notificationsEnabled;
@@ -48,6 +49,10 @@ class AppPreferences {
   /// Local hour [0, 23] at/after which the daily digest is shown.
   final int digestHour;
 
+  /// When true, raise a notification when a team's trends regress week-over-
+  /// week (review latency, merge time, or CI failure rate up past a threshold).
+  final bool regressionAlertsEnabled;
+
   AppPreferences copyWith({
     bool? notificationsEnabled,
     bool? quietHoursEnabled,
@@ -59,6 +64,7 @@ class AppPreferences {
     Set<String>? silencedNotifyCategories,
     bool? digestModeEnabled,
     int? digestHour,
+    bool? regressionAlertsEnabled,
   }) {
     return AppPreferences(
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
@@ -74,6 +80,8 @@ class AppPreferences {
       ),
       digestModeEnabled: digestModeEnabled ?? this.digestModeEnabled,
       digestHour: digestHour ?? this.digestHour,
+      regressionAlertsEnabled:
+          regressionAlertsEnabled ?? this.regressionAlertsEnabled,
     );
   }
 }
@@ -94,6 +102,8 @@ class PreferencesStore {
       'pref_notify_silenced_categories';
   static const String _digestModeEnabled = 'pref_digest_mode_enabled';
   static const String _digestHour = 'pref_digest_hour';
+  static const String _regressionAlertsEnabled =
+      'pref_regression_alerts_enabled';
 
   /// Allowed lookback options shown in the UI.
   static const List<int> lookbackOptions = [7, 14, 30, 60];
@@ -134,6 +144,9 @@ class PreferencesStore {
       digestModeEnabled:
           prefs.getBool(_digestModeEnabled) ?? defaults.digestModeEnabled,
       digestHour: _clampHour(prefs.getInt(_digestHour) ?? defaults.digestHour),
+      regressionAlertsEnabled:
+          prefs.getBool(_regressionAlertsEnabled) ??
+          defaults.regressionAlertsEnabled,
     );
   }
 
@@ -216,6 +229,13 @@ class PreferencesStore {
     return _runLocked(() async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_digestHour, _clampHour(hour));
+    });
+  }
+
+  static Future<void> setRegressionAlertsEnabled(bool value) {
+    return _runLocked(() async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_regressionAlertsEnabled, value);
     });
   }
 
