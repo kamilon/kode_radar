@@ -161,8 +161,10 @@ class CycleTimeStats {
     return result;
   }
 
-  /// The median of [values] (average of the two middle elements for an even
-  /// count), or null when empty. Does not mutate [values].
+  /// The median of [values], or null when empty. For an even count this is the
+  /// average of the two middle elements, rounded to the nearest int (values are
+  /// millisecond durations, so sub-millisecond rounding is immaterial). Does
+  /// not mutate [values].
   static int? median(List<int> values) {
     if (values.isEmpty) return null;
     final sorted = [...values]..sort();
