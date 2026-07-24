@@ -6,6 +6,7 @@ import 'package:kode_radar/cycle_time.dart';
 import 'package:kode_radar/issue_service.dart';
 import 'package:kode_radar/metric_snapshot.dart';
 import 'package:kode_radar/person.dart';
+import 'package:kode_radar/release_service.dart';
 import 'package:kode_radar/team.dart';
 import 'package:kode_radar/team_service.dart';
 import 'package:kode_radar/views/age_histogram_view.dart';
@@ -22,6 +23,7 @@ import 'package:kode_radar/views/issues_view.dart';
 import 'package:kode_radar/views/provider_split_view.dart';
 import 'package:kode_radar/views/pulse_view.dart';
 import 'package:kode_radar/views/quadrant_view.dart';
+import 'package:kode_radar/views/releases_view.dart';
 import 'package:kode_radar/views/repo_table_view.dart';
 import 'package:kode_radar/views/review_load_view.dart';
 import 'package:kode_radar/views/stacked_area_view.dart';
@@ -169,6 +171,33 @@ InsightsData _sampleData() {
       ),
     ],
     issuesFailedRepos: 1,
+    releases: [
+      ReleaseItem(
+        repoKey: 'github:o/alpha',
+        repoDisplay: 'o/alpha',
+        tag: 'v2.1',
+        name: 'Sprint 12',
+        author: 'alice',
+        publishedAt: DateTime.utc(2026, 2, 26),
+        url: 'https://github.com/o/alpha/releases/v2.1',
+      ),
+      const ReleaseItem(
+        repoKey: 'github:o/beta',
+        repoDisplay: 'o/beta',
+        tag: 'v0.9',
+      ),
+    ],
+    security: const [
+      RepoSecurity(
+        repoKey: 'github:o/alpha',
+        repoDisplay: 'o/alpha',
+        critical: 1,
+        high: 2,
+        medium: 3,
+        low: 0,
+      ),
+    ],
+    securityUnavailableRepos: 2,
     loadedAt: DateTime.utc(2026, 3, 1, 13),
   );
 }
@@ -195,6 +224,7 @@ void main() {
     'CycleTime': (d) => CycleTimeView(data: d),
     'TrendDigest': (d) => TrendDigestView(data: d),
     'Issues': (d) => IssuesView(data: d),
+    'ReleasesSecurity': (d) => ReleasesView(data: d),
     'Treemap': (d) => TreemapView(data: d),
     'AgeHistogram': (d) => AgeHistogramView(data: d),
     'Heatmap': (d) => HeatmapView(data: d),

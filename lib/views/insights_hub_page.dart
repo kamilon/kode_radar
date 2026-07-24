@@ -8,6 +8,7 @@ import '../cycle_time_store.dart';
 import '../issue_service.dart';
 import '../metric_store.dart';
 import '../people_service.dart';
+import '../release_service.dart';
 import '../team_service.dart';
 import '../team_store.dart';
 import 'age_histogram_view.dart';
@@ -24,6 +25,7 @@ import 'issues_view.dart';
 import 'provider_split_view.dart';
 import 'pulse_view.dart';
 import 'quadrant_view.dart';
+import 'releases_view.dart';
 import 'repo_table_view.dart';
 import 'review_load_view.dart';
 import 'stacked_area_view.dart';
@@ -111,6 +113,12 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       builder: (d) => IssuesView(data: d),
     ),
     ViewInfo(
+      title: 'Releases & security',
+      blurb: 'What shipped · open Dependabot alerts',
+      icon: Icons.new_releases_outlined,
+      builder: (d) => ReleasesView(data: d),
+    ),
+    ViewInfo(
       title: 'Treemap',
       blurb: 'Repos sized by activity',
       icon: Icons.dashboard,
@@ -192,12 +200,19 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
     });
     try {
       // Run the network passes concurrently (repo activity, People, merged-PR
-      // cycle time, and open issues) so none serializes behind the others.
-      final (activities, people, cycleFetched, issuesResult) = await (
+      // cycle time, open issues, releases + security) so none serializes.
+      final (
+        activities,
+        people,
+        cycleFetched,
+        issuesResult,
+        releaseResult,
+      ) = await (
         ActivityService.computeAll(client: AppHttp.client),
         PeopleService.computeAll(client: AppHttp.client),
         CycleTimeService.computeAll(client: AppHttp.client),
         IssueService.computeAll(client: AppHttp.client),
+        ReleaseService.computeAll(client: AppHttp.client),
       ).wait;
       // Record a trend snapshot from this load too (deduped ~1/day), matching
       // Radar/Teams/Digest, so opening Insights also advances trend history.
@@ -226,6 +241,10 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
           cycleSamples: cycleSamples,
           issueSnapshots: issuesResult.snapshots,
           issuesFailedRepos: issuesResult.failedRepos,
+          releases: releaseResult.releases,
+          security: releaseResult.security,
+          releasesFailedRepos: releaseResult.releasesFailedRepos,
+          securityUnavailableRepos: releaseResult.securityUnavailableRepos,
           loadedAt: DateTime.now(),
         );
         _loading = false;
