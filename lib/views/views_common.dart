@@ -7,6 +7,7 @@ import '../cycle_time.dart';
 import '../issue_service.dart';
 import '../metric_snapshot.dart';
 import '../person.dart';
+import '../release_service.dart';
 import '../team.dart';
 import '../team_service.dart';
 
@@ -26,6 +27,10 @@ class InsightsData {
     List<MergedPrSample> cycleSamples = const [],
     List<RepoIssues> issueSnapshots = const [],
     this.issuesFailedRepos = 0,
+    List<ReleaseItem> releases = const [],
+    List<RepoSecurity> security = const [],
+    this.releasesFailedRepos = 0,
+    this.securityUnavailableRepos = 0,
     required this.loadedAt,
   }) : activities = List.unmodifiable(activities),
        history = Map.unmodifiable({
@@ -39,7 +44,9 @@ class InsightsData {
        people = List.unmodifiable(people),
        ciRunSamples = List.unmodifiable(ciRunSamples),
        cycleSamples = List.unmodifiable(cycleSamples),
-       issueSnapshots = List.unmodifiable(issueSnapshots);
+       issueSnapshots = List.unmodifiable(issueSnapshots),
+       releases = List.unmodifiable(releases),
+       security = List.unmodifiable(security);
 
   final List<RepoActivity> activities;
   final Map<String, List<MetricSnapshot>> history;
@@ -61,6 +68,20 @@ class InsightsData {
   /// How many monitored GitHub repos' issue fetches failed this load, so the
   /// Issues view can show partial-coverage instead of a false "no issues".
   final int issuesFailedRepos;
+
+  /// Recent releases across monitored GitHub repos (newest first).
+  final List<ReleaseItem> releases;
+
+  /// Repos with open Dependabot alerts (worst-severity first).
+  final List<RepoSecurity> security;
+
+  /// GitHub repos whose releases fetch failed, so the releases section can note
+  /// partial coverage instead of a false "nothing shipped".
+  final int releasesFailedRepos;
+
+  /// GitHub repos whose Dependabot alerts weren't readable (commonly repos the
+  /// user doesn't administer), so the security view can note partial coverage.
+  final int securityUnavailableRepos;
   final DateTime loadedAt;
 
   /// Repos whose fetch succeeded (errored repos would read as healthy zeros).
