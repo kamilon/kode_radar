@@ -135,8 +135,9 @@ class TrendDigest {
   /// from being silently dropped.
   static const double _rateEpsilon = 1e-9;
 
-  /// Builds a per-team [TeamTrend] for the current window `[now-window, now]`
-  /// versus the immediately-preceding window `[now-2*window, now-window]`.
+  /// Builds a per-team [TeamTrend] for the current window `[now-window, now)`
+  /// versus the immediately-preceding window `[now-2*window, now-window)`
+  /// (both half-open, so the shared boundary belongs to the current window).
   ///
   /// [periodKey] (default derived from [now]) is embedded in each regression's
   /// de-dup key so a standing regression alerts at most once per period.

@@ -181,24 +181,31 @@ class SyncService {
       try {
         final appPrefs = await PreferencesStore.load();
         if (!appPrefs.regressionAlertsEnabled) return;
-        final teams = await TeamStore.list();
-        if (teams.isEmpty) return;
-        final cycleSamples = await CycleTimeStore.allSamples();
-        final ciSamples = await CiRunHistoryStore.allSamples();
-        final now = DateTime.now();
-        const window = Duration(days: 7);
-        final regressions = TrendDigest.regressions(
-          teams: teams,
-          cycleSamples: cycleSamples,
-          ciSamples: ciSamples,
-          now: now,
-          window: window,
-        );
-        await NotificationService.notifyRegressions(
-          regressions,
-          periodKey: TrendDigest.periodKeyFor(now, window),
-          now: now,
-          prefs: appPrefs,
+        // Bound the read+compute+notify by the same background deadline as the
+        // other phases so it can't extend an iOS BGAppRefreshTask past budget
+        // (no-op in the foreground where deadline is null).
+        await withDeadline(
+          Future(() async {
+            final teams = await TeamStore.list();
+            if (teams.isEmpty) return;
+            final cycleSamples = await CycleTimeStore.allSamples();
+            final ciSamples = await CiRunHistoryStore.allSamples();
+            final now = DateTime.now();
+            const window = Duration(days: 7);
+            final regressions = TrendDigest.regressions(
+              teams: teams,
+              cycleSamples: cycleSamples,
+              ciSamples: ciSamples,
+              now: now,
+              window: window,
+            );
+            await NotificationService.notifyRegressions(
+              regressions,
+              periodKey: TrendDigest.periodKeyFor(now, window),
+              now: now,
+              prefs: appPrefs,
+            );
+          }),
         );
       } catch (e, st) {
         debugPrint('SyncService: regression alerts failed: $e\n$st');

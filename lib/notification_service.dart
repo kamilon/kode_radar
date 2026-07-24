@@ -662,8 +662,8 @@ class NotificationService {
         await NotificationSeenStore.releaseRegressionKeys(fresh);
         rethrow;
       }
-    } catch (e) {
-      debugPrint('Failed to show regression notification: $e');
+    } catch (e, st) {
+      debugPrint('Failed to show regression notification: $e\n$st');
     }
   }
 
