@@ -55,6 +55,28 @@ void main() {
       expect(s.firstReviewAt, DateTime.utc(2026, 1, 10, 5));
     });
 
+    test('excludes the PR author case-insensitively', () {
+      final body = jsonDecode('''
+      {"data":{"repository":{"pullRequests":{"nodes":[
+        {"number":16,"title":"Casing","url":"https://gh/pr/16",
+         "createdAt":"2026-01-10T00:00:00Z","mergedAt":"2026-01-10T06:00:00Z",
+         "author":{"login":"Alice"},
+         "reviews":{"nodes":[
+           {"submittedAt":"2026-01-10T01:00:00Z","state":"COMMENTED","author":{"login":"alice"}},
+           {"submittedAt":"2026-01-10T04:00:00Z","state":"APPROVED","author":{"login":"bob"}}
+         ]}}
+      ]}}}}
+      ''');
+      final s = CycleTimeService.parseGithubGraphqlMergedPulls(
+        body,
+        repoKey: 'github:o/r',
+        repoDisplay: 'o/r',
+      ).single;
+      // "alice" (lowercased) matches author "Alice"; first real review is
+      // bob's at 04:00.
+      expect(s.firstReviewAt, DateTime.utc(2026, 1, 10, 4));
+    });
+
     test('ignores pending drafts and reviews submitted after the merge', () {
       final body = jsonDecode('''
       {"data":{"repository":{"pullRequests":{"nodes":[

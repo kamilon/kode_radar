@@ -67,10 +67,13 @@ class CycleSummary {
   /// Of those, how many had a known first-review time.
   final int reviewedCount;
 
-  /// Median open→first-review, or null when no PR had a first-review time.
+  /// Median open→first-review, or null when no merged PR in range had a
+  /// (valid, non-author) first-review time.
   final int? medianTimeToFirstReviewMs;
 
-  /// Median open→merge, or null when there are no merged PRs.
+  /// Median open→merge, or null when no merged PR in range has a valid
+  /// (non-negative) merge span — which can happen even when [mergedCount] > 0
+  /// if every span was dropped as invalid.
   final int? medianTimeToMergeMs;
 
   bool get isEmpty => mergedCount == 0;

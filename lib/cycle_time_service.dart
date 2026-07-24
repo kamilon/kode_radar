@@ -145,13 +145,16 @@ class CycleTimeService {
   }) {
     final nodes = reviews is Map ? reviews['nodes'] : null;
     if (nodes is! List) return null;
+    // GitHub logins are case-insensitive; normalize both sides so the PR
+    // author's own review is excluded regardless of casing/whitespace.
+    final exclude = excludeLogin?.trim().toLowerCase();
     DateTime? earliest;
     for (final review in nodes) {
       if (review is! Map) continue;
       final state = review['state'];
       if (state is String && state.toUpperCase() == 'PENDING') continue;
-      final login = _nested(review['author'], 'login');
-      if (excludeLogin != null && login == excludeLogin) continue;
+      final login = _nested(review['author'], 'login')?.trim().toLowerCase();
+      if (exclude != null && login == exclude) continue;
       final at = _parseDate(review['submittedAt']);
       if (at == null) continue;
       if (notAfter != null && at.isAfter(notAfter)) continue;
