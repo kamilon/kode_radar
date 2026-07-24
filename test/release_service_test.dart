@@ -196,6 +196,7 @@ void main() {
         expect(result.releases, isEmpty);
         expect(result.security, isEmpty);
         expect(result.releasesFailedRepos, 2);
+        expect(result.securityUnavailableRepos, 2);
       },
     );
   });

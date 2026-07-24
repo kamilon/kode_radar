@@ -282,8 +282,10 @@ class ReleaseService {
       final results = await _runBounded(tasks, concurrency);
       final releases = <ReleaseItem>[];
       final security = <RepoSecurity>[];
+      // A malformed stored entry means neither source could be fetched, so it
+      // counts toward both coverage gaps.
       var releasesFailed = setupFailed;
-      var securityUnavailable = 0;
+      var securityUnavailable = setupFailed;
       for (final r in results) {
         if (r.releases == null) {
           releasesFailed++;

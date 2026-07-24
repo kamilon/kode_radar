@@ -27,12 +27,7 @@ class ReleasesView extends StatelessWidget {
       child: hasNothing
           ? ViewEmpty(
               message: (unavailable > 0 || releasesFailed > 0)
-                  ? 'Nothing to show yet.\nReleases couldn\u2019t be fetched '
-                        'for $releasesFailed '
-                        '${releasesFailed == 1 ? 'repo' : 'repos'}; Dependabot '
-                        'alerts weren\u2019t available for $unavailable '
-                        '${unavailable == 1 ? 'repo' : 'repos'}. Check your '
-                        'connection and tokens, then refresh.'
+                  ? _coverageMessage(releasesFailed, unavailable)
                   : 'No recent releases or open alerts.\nReleases from the last '
                         '${ReleaseService.releaseWindow.inDays} days and open '
                         'Dependabot alerts show here (GitHub only).',
@@ -43,7 +38,7 @@ class ReleasesView extends StatelessWidget {
                 _SectionLabel(
                   label:
                       'Open security alerts'
-                      '${unavailable > 0 ? ' · $unavailable unavailable' : ''}',
+                      '${unavailable > 0 ? ' · $unavailable ${_repos(unavailable)} unavailable' : ''}',
                 ),
                 if (security.isEmpty)
                   _Muted(
@@ -58,7 +53,7 @@ class ReleasesView extends StatelessWidget {
                   label:
                       'Recent releases · last '
                       '${ReleaseService.releaseWindow.inDays}d'
-                      '${releasesFailed > 0 ? ' · $releasesFailed unavailable' : ''}',
+                      '${releasesFailed > 0 ? ' · $releasesFailed ${_repos(releasesFailed)} unavailable' : ''}',
                 ),
                 if (releases.isEmpty)
                   _Muted(
@@ -72,6 +67,27 @@ class ReleasesView extends StatelessWidget {
             ),
     );
   }
+
+  static String _repos(int n) => n == 1 ? 'repo' : 'repos';
+
+  /// Empty-state coverage note that mentions only the source(s) that actually
+  /// have a gap (so it never says "0 repos"), plus the likely causes.
+  static String _coverageMessage(int releasesFailed, int unavailable) {
+    final parts = <String>[
+      if (releasesFailed > 0)
+        'releases couldn\u2019t be fetched for $releasesFailed '
+            '${_repos(releasesFailed)}',
+      if (unavailable > 0)
+        'Dependabot alerts weren\u2019t available for $unavailable '
+            '${_repos(unavailable)}',
+    ];
+    return 'Nothing to show yet.\n${_sentenceCase(parts.join('; '))}. '
+        'Check your connection, tokens, and (for alerts) repo permissions, '
+        'then refresh.';
+  }
+
+  static String _sentenceCase(String s) =>
+      s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
 }
 
 const Color _critical = Color(0xFFB71C1C);
