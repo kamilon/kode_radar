@@ -176,8 +176,8 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       _error = null;
     });
     try {
-      // Run the two network passes concurrently so loading People doesn't
-      // serialize behind the repo activity fetch.
+      // Run the three network passes concurrently (repo activity, People, and
+      // merged-PR cycle time) so none serializes behind the others.
       final (activities, people, cycleFetched) = await (
         ActivityService.computeAll(client: AppHttp.client),
         PeopleService.computeAll(client: AppHttp.client),
