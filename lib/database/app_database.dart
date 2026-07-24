@@ -157,6 +157,28 @@ class CiRunHistory extends Table {
   TextColumn get url => text().nullable()();
 }
 
+/// Accumulated merged-PR history (Phase 6): one row per merged pull request,
+/// de-duplicated by [prKey], powering the review-time / cycle-time trends
+/// (median open→first-review and open→merge per repo/team). Pruned by age and a
+/// per-repo cap so the table stays bounded.
+@DataClassName('MergedPrRow')
+@TableIndex(name: 'idx_merged_prs_pr_key', columns: {#prKey}, unique: true)
+@TableIndex(name: 'idx_merged_prs_repo_key', columns: {#repoKey})
+@TableIndex(name: 'idx_merged_prs_merged_at', columns: {#mergedAt})
+class MergedPrs extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get provider => text()();
+  TextColumn get repoKey => text()();
+  TextColumn get repoDisplay => text()();
+  TextColumn get prKey => text()();
+  IntColumn get createdAt => integer()();
+  IntColumn get mergedAt => integer()();
+  IntColumn get firstReviewAt => integer().nullable()();
+  TextColumn get title => text().nullable()();
+  TextColumn get author => text().nullable()();
+  TextColumn get url => text().nullable()();
+}
+
 /// Per-scope sync provenance (Phase 3): when a cache scope was last refreshed
 /// successfully from the network, so the UI can show an accurate "updated Xh
 /// ago" instead of "just now" when it's actually displaying stale cached data.
@@ -230,6 +252,7 @@ class AppMeta extends Table {
     NotificationSeen,
     NotificationKnownRepos,
     CiRunHistory,
+    MergedPrs,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -240,7 +263,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forExecutor(super.executor);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -438,6 +461,27 @@ class AppDatabase extends _$AppDatabase {
             rethrow;
           }
         }
+      }
+      // v13 adds the merged-PR history table (Phase 6, cycle-time trends). Same
+      // idempotent-DDL reasoning as the CI-history table: `createTable` emits
+      // only `CREATE TABLE IF NOT EXISTS`, so create each @TableIndex explicitly
+      // with `CREATE [UNIQUE] INDEX IF NOT EXISTS` — the unique pr_key index the
+      // upsert relies on especially — so a concurrent background-isolate open
+      // can't crash on an already-existing object.
+      if (from < 13) {
+        await m.createTable(mergedPrs);
+        await customStatement(
+          'CREATE UNIQUE INDEX IF NOT EXISTS idx_merged_prs_pr_key '
+          'ON merged_prs (pr_key)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_merged_prs_repo_key '
+          'ON merged_prs (repo_key)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_merged_prs_merged_at '
+          'ON merged_prs (merged_at)',
+        );
       }
     },
   );
