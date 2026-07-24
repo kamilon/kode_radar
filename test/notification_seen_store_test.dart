@@ -126,4 +126,63 @@ void main() {
     await NotificationSeenStore.releaseDailyDigest('2026-7-23');
     expect(await NotificationSeenStore.claimDailyDigest('2026-7-24'), isFalse);
   });
+
+  group('claimNewRegressionKeys', () {
+    test('returns only newly-seen keys within a period', () async {
+      final first = await NotificationSeenStore.claimNewRegressionKeys({
+        'w7-1|t1|mergeTimeUp',
+        'w7-1|t2|reviewLatencyUp',
+      }, 'w7-1');
+      expect(first, {'w7-1|t1|mergeTimeUp', 'w7-1|t2|reviewLatencyUp'});
+      // Re-seeing the same standing regressions plus a new one: only the new
+      // one is returned (the others already alerted this period).
+      final second = await NotificationSeenStore.claimNewRegressionKeys({
+        'w7-1|t1|mergeTimeUp',
+        'w7-1|t2|reviewLatencyUp',
+        'w7-1|t3|ciFailureRateUp',
+      }, 'w7-1');
+      expect(second, {'w7-1|t3|ciFailureRateUp'});
+    });
+
+    test(
+      'a new period re-alerts a standing regression and prunes old',
+      () async {
+        await NotificationSeenStore.claimNewRegressionKeys({
+          'w7-1|t1|mergeTimeUp',
+        }, 'w7-1');
+        // Next period: the same regression (new period key) alerts again.
+        final next = await NotificationSeenStore.claimNewRegressionKeys({
+          'w7-2|t1|mergeTimeUp',
+        }, 'w7-2');
+        expect(next, {'w7-2|t1|mergeTimeUp'});
+        // The old period's key was pruned, so returning to it (unlikely) would
+        // alert once more — and importantly it's no longer stored.
+        final backAgain = await NotificationSeenStore.claimNewRegressionKeys({
+          'w7-2|t1|mergeTimeUp',
+        }, 'w7-2');
+        expect(backAgain, isEmpty, reason: 'still standing in the same period');
+      },
+    );
+
+    test('empty current keys is a no-op returning nothing', () async {
+      expect(
+        await NotificationSeenStore.claimNewRegressionKeys({}, 'w7-9'),
+        isEmpty,
+      );
+    });
+
+    test('releaseRegressionKeys lets a claimed key re-fire', () async {
+      await NotificationSeenStore.claimNewRegressionKeys({
+        'w7-1|t1|mergeTimeUp',
+      }, 'w7-1');
+      // Released (e.g. after a failed show) → the same key is fresh again.
+      await NotificationSeenStore.releaseRegressionKeys({
+        'w7-1|t1|mergeTimeUp',
+      });
+      final again = await NotificationSeenStore.claimNewRegressionKeys({
+        'w7-1|t1|mergeTimeUp',
+      }, 'w7-1');
+      expect(again, {'w7-1|t1|mergeTimeUp'});
+    });
+  });
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -227,6 +229,88 @@ class NotificationSeenStore {
             db.appMeta,
           )..where((t) => t.key.equals(_digestShownKey))).go();
         }
+      }),
+    );
+  }
+
+  /// `app_meta` key holding the JSON list of regression alert keys already
+  /// notified in the current period (see [claimNewRegressionKeys]).
+  static const String _regressionKeysKey = 'regression_notified_keys';
+
+  /// Records which of [currentKeys] are newly seen this period and returns just
+  /// those (the ones an alert should fire for). Every key is `<periodKey>|…`;
+  /// entries from any period other than [periodKey] are pruned, so a regression
+  /// that persists into a new period alerts again (once), while one that keeps
+  /// standing within a period doesn't re-alert. The read-modify-write runs in a
+  /// single transaction (SQLite-serialized) so foreground and background-sync
+  /// isolates can't both fire the same alert.
+  ///
+  /// Best-effort across a period boundary: if a slow pre-boundary sync commits
+  /// after a new-period sync, it prunes the newer period's keys and can cause
+  /// one duplicate alert next period. That's a benign, rare cosmetic dupe (no
+  /// data loss), so it isn't guarded against here.
+  static Future<Set<String>> claimNewRegressionKeys(
+    Set<String> currentKeys,
+    String periodKey,
+  ) {
+    final db = _database;
+    return _runLocked(
+      () => db.transaction(() async {
+        final raw = await _getMeta(db, _regressionKeysKey);
+        final stored = <String>{};
+        if (raw != null && raw.isNotEmpty) {
+          try {
+            final decoded = jsonDecode(raw);
+            if (decoded is List) {
+              for (final e in decoded) {
+                if (e is String) stored.add(e);
+              }
+            }
+          } catch (_) {
+            // Corrupt marker: treat as empty and overwrite below.
+          }
+        }
+        // Keep only this period's already-notified keys (drop older periods).
+        final prefix = '$periodKey|';
+        final kept = stored.where((k) => k.startsWith(prefix)).toSet();
+        final fresh = currentKeys.difference(kept);
+        // Skip the write when there's nothing new to record and nothing stale
+        // to prune.
+        if (fresh.isEmpty && kept.length == stored.length) {
+          return <String>{};
+        }
+        final updated = <String>{...kept, ...currentKeys};
+        await _setMeta(db, _regressionKeysKey, jsonEncode(updated.toList()));
+        return fresh;
+      }),
+    );
+  }
+
+  /// Un-marks [keys] (e.g. when showing the alert failed) so a later sync
+  /// re-fires them, mirroring [releaseDailyDigest]. Only removes the given keys
+  /// from the stored set; a no-op when none are present.
+  static Future<void> releaseRegressionKeys(Set<String> keys) {
+    if (keys.isEmpty) return Future<void>.value();
+    final db = _database;
+    return _runLocked(
+      () => db.transaction(() async {
+        final raw = await _getMeta(db, _regressionKeysKey);
+        if (raw == null || raw.isEmpty) return;
+        final stored = <String>{};
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is List) {
+            for (final e in decoded) {
+              if (e is String) stored.add(e);
+            }
+          }
+        } catch (_) {
+          return;
+        }
+        final before = stored.length;
+        stored.removeAll(keys);
+        if (stored.length == before) return;
+        await _setMeta(db, _regressionKeysKey, jsonEncode(stored.toList()));
       }),
     );
   }

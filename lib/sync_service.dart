@@ -19,6 +19,8 @@ import 'preferences_store.dart';
 import 'repo_store.dart';
 import 'snooze_store.dart';
 import 'sync_state_store.dart';
+import 'team_store.dart';
+import 'trend_digest.dart';
 
 /// Outcome of a sync. [activityOk] reflects whether the repo-activity + trend
 /// capture half succeeded (the part a manual "Sync now" reports on); attention
@@ -172,6 +174,37 @@ class SyncService {
       }
     }
 
+    // Runs AFTER the CI (activity) and cycle-time captures have recorded, since
+    // it reads back both histories to compare this week vs last per team and
+    // alert on regressions. Best-effort and never throws.
+    Future<void> regressionPhase() async {
+      try {
+        final appPrefs = await PreferencesStore.load();
+        if (!appPrefs.regressionAlertsEnabled) return;
+        final teams = await TeamStore.list();
+        if (teams.isEmpty) return;
+        final cycleSamples = await CycleTimeStore.allSamples();
+        final ciSamples = await CiRunHistoryStore.allSamples();
+        final now = DateTime.now();
+        const window = Duration(days: 7);
+        final regressions = TrendDigest.regressions(
+          teams: teams,
+          cycleSamples: cycleSamples,
+          ciSamples: ciSamples,
+          now: now,
+          window: window,
+        );
+        await NotificationService.notifyRegressions(
+          regressions,
+          periodKey: TrendDigest.periodKeyFor(now, window),
+          now: now,
+          prefs: appPrefs,
+        );
+      } catch (e, st) {
+        debugPrint('SyncService: regression alerts failed: $e\n$st');
+      }
+    }
+
     if (background) {
       // Concurrent to fit the budget; each phase is independently deadlined and
       // its errors isolated.
@@ -182,6 +215,9 @@ class SyncService {
         feedPhase(),
         cyclePhase(),
       ]);
+      // Regression detection reads back the CI + cycle histories just recorded,
+      // so it runs after the capture phases complete.
+      await regressionPhase();
       return result;
     }
 
@@ -189,6 +225,7 @@ class SyncService {
     await attentionPhase();
     await feedPhase();
     await cyclePhase();
+    await regressionPhase();
     return result;
   }
 }

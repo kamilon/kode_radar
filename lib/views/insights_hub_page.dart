@@ -27,6 +27,7 @@ import 'review_load_view.dart';
 import 'stacked_area_view.dart';
 import 'team_radar_view.dart';
 import 'treemap_view.dart';
+import 'trend_digest_view.dart';
 import 'trend_lines_view.dart';
 import 'views_common.dart';
 
@@ -94,6 +95,12 @@ class _InsightsHubPageState extends State<InsightsHubPage> {
       blurb: 'PR review & merge speed trends',
       icon: Icons.speed,
       builder: (d) => CycleTimeView(data: d),
+    ),
+    ViewInfo(
+      title: 'Trends digest',
+      blurb: 'Per-team week-over-week, regressions flagged',
+      icon: Icons.trending_up,
+      builder: (d) => TrendDigestView(data: d),
     ),
     ViewInfo(
       title: 'Treemap',

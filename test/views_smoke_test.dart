@@ -25,6 +25,7 @@ import 'package:kode_radar/views/review_load_view.dart';
 import 'package:kode_radar/views/stacked_area_view.dart';
 import 'package:kode_radar/views/team_radar_view.dart';
 import 'package:kode_radar/views/treemap_view.dart';
+import 'package:kode_radar/views/trend_digest_view.dart';
 import 'package:kode_radar/views/trend_lines_view.dart';
 import 'package:kode_radar/views/views_common.dart';
 
@@ -173,6 +174,7 @@ void main() {
     'CiGrid': (d) => CiGridView(data: d),
     'CiTrends': (d) => CiTrendsView(data: d),
     'CycleTime': (d) => CycleTimeView(data: d),
+    'TrendDigest': (d) => TrendDigestView(data: d),
     'Treemap': (d) => TreemapView(data: d),
     'AgeHistogram': (d) => AgeHistogramView(data: d),
     'Heatmap': (d) => HeatmapView(data: d),
