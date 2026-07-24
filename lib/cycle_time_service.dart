@@ -107,7 +107,7 @@ class CycleTimeService {
     for (final pr in value) {
       if (pr is! Map) continue;
       final status = pr['status'];
-      if (status is String && status.toLowerCase() != 'completed') continue;
+      if (status is! String || status.toLowerCase() != 'completed') continue;
       final id = pr['pullRequestId'];
       if (id == null) continue;
       final createdAt = _parseDate(pr['creationDate']);

@@ -173,5 +173,31 @@ void main() {
       );
       expect(samples.map((s) => s.prKey), ['ado:org/proj/repo:3']);
     });
+
+    test('skips PRs with a missing or non-string status', () {
+      final body = jsonDecode('''
+      {"value":[
+        {"pullRequestId":1,
+         "creationDate":"2026-01-10T00:00:00Z","closedDate":"2026-01-12T00:00:00Z"},
+        {"pullRequestId":2,"status":123,
+         "creationDate":"2026-01-10T00:00:00Z","closedDate":"2026-01-12T00:00:00Z"},
+        {"pullRequestId":3,"status":"completed",
+         "creationDate":"2026-01-10T00:00:00Z","closedDate":"2026-01-11T00:00:00Z"}
+      ]}
+      ''');
+      final samples = CycleTimeService.parseAdoMergedPulls(
+        body,
+        repoKey: 'ado:org/proj/repo',
+        repoDisplay: 'org/proj/repo',
+        organization: 'org',
+        project: 'proj',
+        name: 'repo',
+      );
+      expect(
+        samples.map((s) => s.prKey),
+        ['ado:org/proj/repo:3'],
+        reason: 'only an explicit "completed" status is eligible',
+      );
+    });
   });
 }
