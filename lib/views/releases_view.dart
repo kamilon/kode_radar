@@ -44,7 +44,7 @@ class ReleasesView extends StatelessWidget {
                   _Muted(
                     text: unavailable > 0
                         ? 'No open alerts in the repos that could be read.'
-                        : 'No open Dependabot alerts. \u2728',
+                        : 'No open Dependabot alerts.',
                   )
                 else
                   for (final s in security) _SecurityTile(repo: s),

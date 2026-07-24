@@ -105,11 +105,12 @@ class SecurityStats {
 /// lately" and "what's newly vulnerable".
 ///
 /// GitHub-only: Azure DevOps has no releases-list / Dependabot equivalent here.
-/// Releases use the public releases API (works for any watched repo); Dependabot
-/// alerts are owner-scoped, so repos the user doesn't administer typically 403
-/// — that's counted as "unavailable", not a failure. Parsers are pure static
-/// methods for unit-testing; [computeAll] wires the network fetch, mirroring
-/// [IssueService].
+/// Each repo is fetched with its configured token (like every other service).
+/// The releases API is public, so it's readable for any repo the token can see
+/// — including ones the user doesn't own — whereas Dependabot alerts are
+/// owner-scoped, so repos the user doesn't administer typically 403; that's
+/// counted as "unavailable", not a failure. Parsers are pure static methods for
+/// unit-testing; [computeAll] wires the network fetch, mirroring [IssueService].
 class ReleaseService {
   ReleaseService._();
 
