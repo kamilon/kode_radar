@@ -164,10 +164,11 @@ String? formatDurationMs(int? ms) {
 }
 
 /// Formats a longer span (up to days) for cycle-time durations, which routinely
-/// run to days rather than the minutes/hours of a CI run. Returns null for
-/// null/non-positive input. E.g. `2d 4h`, `5h 30m`, `12m`.
+/// run to days rather than the minutes/hours of a CI run. Returns null only for
+/// null or negative input; a zero span formats as `<1m` (it's a valid, if rare,
+/// instant span, distinct from "unknown"). E.g. `2d 4h`, `5h 30m`, `12m`.
 String? formatLongDurationMs(int? ms) {
-  if (ms == null || ms <= 0) return null;
+  if (ms == null || ms < 0) return null;
   final totalMinutes = ms ~/ 60000;
   final d = totalMinutes ~/ 1440;
   final h = (totalMinutes % 1440) ~/ 60;

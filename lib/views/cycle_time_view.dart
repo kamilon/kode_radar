@@ -50,7 +50,7 @@ class _CycleTimeViewState extends State<CycleTimeView> {
                 Expanded(
                   child: Text(
                     overall.isEmpty
-                        ? 'No merged PRs yet'
+                        ? 'No merged PRs in the last ${_windowDays}d'
                         : '${overall.mergedCount} merged · '
                               'review ${_fmt(overall.medianTimeToFirstReviewMs)} · '
                               'merge ${_fmt(overall.medianTimeToMergeMs)}',
@@ -132,12 +132,17 @@ class _CycleTimeViewState extends State<CycleTimeView> {
   List<_TeamCycle> _teamStats(List<MergedPrSample> samples, DateTime now) {
     final teams = widget.data.teams;
     if (teams.isEmpty) return const [];
+    // Index samples by repoKey once (O(samples)) instead of rescanning the full
+    // list per team (O(teams × samples)); each team then unions its repos' rows.
+    final byRepo = <String, List<MergedPrSample>>{};
+    for (final s in samples) {
+      byRepo.putIfAbsent(s.repoKey, () => []).add(s);
+    }
     final result = <_TeamCycle>[];
     for (final team in teams) {
       if (team.repoKeys.isEmpty) continue;
-      final teamSamples = samples
-          .where((s) => team.repoKeys.contains(s.repoKey))
-          .toList();
+      final teamSamples = [for (final key in team.repoKeys) ...?byRepo[key]];
+      if (teamSamples.isEmpty) continue;
       final summary = CycleTimeStats.summarize(
         teamSamples,
         now: now,
