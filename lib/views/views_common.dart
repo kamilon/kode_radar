@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../activity_service.dart';
 import '../ci_run_history.dart';
 import '../cycle_time.dart';
+import '../issue_service.dart';
 import '../metric_snapshot.dart';
 import '../person.dart';
 import '../team.dart';
@@ -23,6 +24,8 @@ class InsightsData {
     required List<Person> people,
     List<CiRunSample> ciRunSamples = const [],
     List<MergedPrSample> cycleSamples = const [],
+    List<RepoIssues> issueSnapshots = const [],
+    this.issuesFailedRepos = 0,
     required this.loadedAt,
   }) : activities = List.unmodifiable(activities),
        history = Map.unmodifiable({
@@ -35,7 +38,8 @@ class InsightsData {
        }),
        people = List.unmodifiable(people),
        ciRunSamples = List.unmodifiable(ciRunSamples),
-       cycleSamples = List.unmodifiable(cycleSamples);
+       cycleSamples = List.unmodifiable(cycleSamples),
+       issueSnapshots = List.unmodifiable(issueSnapshots);
 
   final List<RepoActivity> activities;
   final Map<String, List<MetricSnapshot>> history;
@@ -50,6 +54,13 @@ class InsightsData {
   /// Raw merged-PR history (bounded by retention) from which the cycle-time
   /// view aggregates per-repo / per-team review- and merge-time medians.
   final List<MergedPrSample> cycleSamples;
+
+  /// Current-state open-issue snapshots per GitHub repo (for the Issues view).
+  final List<RepoIssues> issueSnapshots;
+
+  /// How many monitored GitHub repos' issue fetches failed this load, so the
+  /// Issues view can show partial-coverage instead of a false "no issues".
+  final int issuesFailedRepos;
   final DateTime loadedAt;
 
   /// Repos whose fetch succeeded (errored repos would read as healthy zeros).

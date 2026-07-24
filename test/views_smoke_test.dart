@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kode_radar/activity_service.dart';
 import 'package:kode_radar/ci_run_history.dart';
 import 'package:kode_radar/cycle_time.dart';
+import 'package:kode_radar/issue_service.dart';
 import 'package:kode_radar/metric_snapshot.dart';
 import 'package:kode_radar/person.dart';
 import 'package:kode_radar/team.dart';
@@ -17,6 +18,7 @@ import 'package:kode_radar/views/donut_view.dart';
 import 'package:kode_radar/views/freshness_view.dart';
 import 'package:kode_radar/views/health_gauge_view.dart';
 import 'package:kode_radar/views/heatmap_view.dart';
+import 'package:kode_radar/views/issues_view.dart';
 import 'package:kode_radar/views/provider_split_view.dart';
 import 'package:kode_radar/views/pulse_view.dart';
 import 'package:kode_radar/views/quadrant_view.dart';
@@ -150,6 +152,23 @@ InsightsData _sampleData() {
           url: 'https://github.com/o/alpha/pull/$i',
         ),
     ],
+    issueSnapshots: [
+      const RepoIssues(
+        repoKey: 'github:o/alpha',
+        repoDisplay: 'o/alpha',
+        openCount: 12,
+        staleCount: 4,
+        oldestAgeDays: 90,
+      ),
+      const RepoIssues(
+        repoKey: 'github:o/beta',
+        repoDisplay: 'o/beta',
+        openCount: 100,
+        staleCount: 30,
+        oldestAgeDays: 200,
+      ),
+    ],
+    issuesFailedRepos: 1,
     loadedAt: DateTime.utc(2026, 3, 1, 13),
   );
 }
@@ -175,6 +194,7 @@ void main() {
     'CiTrends': (d) => CiTrendsView(data: d),
     'CycleTime': (d) => CycleTimeView(data: d),
     'TrendDigest': (d) => TrendDigestView(data: d),
+    'Issues': (d) => IssuesView(data: d),
     'Treemap': (d) => TreemapView(data: d),
     'AgeHistogram': (d) => AgeHistogramView(data: d),
     'Heatmap': (d) => HeatmapView(data: d),
