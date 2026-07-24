@@ -327,7 +327,10 @@ class IssueService {
           .timeout(_requestTimeout);
       if (response.statusCode != 200) return null;
       final body = jsonDecode(response.body);
-      if (body is Map && body['errors'] != null) return null;
+      // GitHub can return an empty `errors: []` alongside valid data; only a
+      // non-empty errors list is a real failure.
+      final errors = body is Map ? body['errors'] : null;
+      if (errors is List && errors.isNotEmpty) return null;
       return issuesFromGithubGraphql(
         body,
         repoKey: repoKey,
